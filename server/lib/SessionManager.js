@@ -30,6 +30,7 @@ module.exports.create = ({
         sessionId, accountId, entryId, configuration, connectionReason,
         tabId, browserId, auditLogId, organizationId, connectionGeneration,
         isHibernated: false,
+        connectionAbortController: new AbortController(),
         createdAt: new Date(),
         lastActivity: new Date(),
         masterConnection: null,
@@ -408,6 +409,7 @@ module.exports.remove = (sessionId, options = {}) => {
     if (!session) return Promise.resolve(false);
     if (session._removePromise) return session._removePromise;
     session._removing = true;
+    session.connectionAbortController?.abort();
     const wasSshSession = session.masterConnection?.type === "ssh";
 
     const { code = 1000, reason = "Session terminated", broadcast = true, skipAfterHooks = false } = options;

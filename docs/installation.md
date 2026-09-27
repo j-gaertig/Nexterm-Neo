@@ -53,6 +53,32 @@ docker run -d \
 > [!NOTE]
 > **Host Network** is strongly recommended. It allows Nexterm to access your host's network stack directly, which is required for features like Wake-on-LAN and connecting to servers via `localhost`. Only use **Bridge Network** if you specifically need network isolation.
 
+### Optional AIO host command bridge
+
+ENGINE hooks normally run inside the Alpine container. To run a local hook on the Linux Docker host, install the optional Debian/Ubuntu systemd bridge before starting AIO:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/j-gaertig/Nexterm-Neo/main/scripts/install-host-exec-bridge.sh | sudo bash -s -- /opt/nexterm
+```
+
+The bridge executes configured hook commands as host root. Any user allowed to connect to an entry can trigger its configured Pre-Connect command. Enable this only when that host-level access is intended. The installer enables the service and creates `/run/nexterm-host-exec`. The bridge currently requires rootful Docker; rootless Docker and user-namespace remapping are unsupported.
+
+When installing from a release tag instead of `main`, set `NEXTERM_SOURCE_REF` to that same tag and preserve it through `sudo` so the bridge files match the installer version.
+
+For `docker run`, add this bind mount:
+
+```sh
+-v /run/nexterm-host-exec:/run/nexterm-host-exec
+```
+
+For Docker Compose, add this volume to the AIO service:
+
+```yaml
+      - /run/nexterm-host-exec:/run/nexterm-host-exec
+```
+
+In the server dialog, choose **Linux Docker host (root)** for the local hook target. Commands start in the AIO installation directory. Use `cd /path/to/project && docker compose ps` for another Compose project. The existing ENGINE target continues to run in the Engine container/runtime.
+
 ## 📦 Docker Compose
 
 ### All-In-One

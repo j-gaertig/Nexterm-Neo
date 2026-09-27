@@ -1720,16 +1720,23 @@
         "hooks": {
           "pre": {
             "title": "Pre-Connect-Commands",
-            "description": "Werden vor dem Aufbau der SSH-Verbindung ausgeführt. Ein fehlgeschlagener Engine-Command bricht die Verbindung ab."
+            "description": "Werden vor dem Aufbau der SSH-Verbindung ausgeführt. Ein fehlgeschlagener lokaler Hook bricht die Verbindung ab."
           },
           "after": {
             "title": "Post-Disconnect-Commands",
             "description": "Werden nach dem Beenden der SSH-Sitzung ausgeführt. Fehler werden nur protokolliert."
           },
           "localBadge": "ENGINE",
+          "dockerHostBadge": "DOCKER-HOST",
           "remoteBadge": "ZIEL",
           "localHint": "Wird auf dem Engine-Host ausgeführt",
+          "dockerHostHint": "Wird als root auf dem Linux-Docker-Host ausgeführt",
           "remoteHint": "Wird auf dem Zielserver ausgeführt",
+          "localTargetLabel": "Ausführungsziel für lokalen Hook",
+          "localTargetEngine": "Engine-Container/Laufzeit",
+          "localTargetDockerHost": "Linux-Docker-Host (root)",
+          "dockerHostRootHint": "Wird als root auf dem Linux-Docker-Host ausgeführt. Jeder Nutzer mit Verbindungsrecht kann diesen konfigurierten Befehl auslösen.",
+          "dockerHostUnavailableHint": "Host-Bridge nicht verfügbar. Installiere und aktiviere sie auf dem Debian- oder Ubuntu-Docker-Host und binde /run/nexterm-host-exec in den AIO-Container ein.",
           "unknownEngineHint": "Gewählte Engine (ID {{engine}}) ist unbekannt oder offline",
           "swapTooltip": "Reihenfolge tauschen"
         },

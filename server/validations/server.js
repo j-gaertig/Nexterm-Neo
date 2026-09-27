@@ -14,9 +14,11 @@ const configValidation = Joi.object({
     wakeOnLanEnabled: Joi.boolean().optional(),
     wolBroadcastAddress: Joi.string().ip({ version: ['ipv4'] }).allow("").optional(),
     preLocalCommand: Joi.string().allow("").max(2000).optional(),
+    preLocalTarget: Joi.string().valid("engine", "docker-host").optional(),
     preRemoteCommand: Joi.string().allow("").max(2000).optional(),
     preOrder: Joi.string().valid("local-first", "remote-first").optional(),
     afterLocalCommand: Joi.string().allow("").max(2000).optional(),
+    afterLocalTarget: Joi.string().valid("engine", "docker-host").optional(),
     afterRemoteCommand: Joi.string().allow("").max(2000).optional(),
     afterOrder: Joi.string().valid("local-first", "remote-first").optional(),
 }).unknown(true).custom((value, helpers) => {

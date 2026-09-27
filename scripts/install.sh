@@ -329,6 +329,11 @@ ensure_docker() {
 write_aio_compose() {
     local dir="$1"
     local key="$2"
+    local host_bridge="${3:-false}"
+    local bridge_volume=""
+    if [ "$host_bridge" = "true" ]; then
+        bridge_volume="      - /run/nexterm-host-exec:/run/nexterm-host-exec"
+    fi
     mkdir -p "$dir"
     cat > "$dir/docker-compose.yml" <<EOF
 services:
@@ -341,7 +346,28 @@ services:
       - ENCRYPTION_KEY=$key
     volumes:
       - ./data:/app/data
+$bridge_volume
 EOF
+}
+
+install_host_exec_bridge() {
+    local install_dir="$1"
+    local local_script="$(dirname "${BASH_SOURCE[0]}")/install-host-exec-bridge.sh"
+    if [ -f "$local_script" ]; then
+        bash "$local_script" "$install_dir"
+        return
+    fi
+    local temp_script
+    temp_script=$(mktemp)
+    local source_ref="${NEXTERM_SOURCE_REF:-main}"
+    if ! curl -fsSL "https://raw.githubusercontent.com/j-gaertig/Nexterm-Neo/$source_ref/scripts/install-host-exec-bridge.sh" -o "$temp_script"; then
+        rm -f "$temp_script"
+        die "Could not download the optional host command bridge installer."
+    fi
+    local install_status=0
+    bash "$temp_script" "$install_dir" || install_status=$?
+    rm -f "$temp_script"
+    return "$install_status"
 }
 
 write_server_compose() {
@@ -422,7 +448,15 @@ run_docker_flow() {
             prompt_install_dir "/opt/nexterm"
             local key
             key=$(generate_token)
-            write_aio_compose "$INSTALL_DIR" "$key"
+            local host_bridge="false"
+            if prompt_yes_no "Enable root-level commands on this Linux Docker host for AIO hooks?" n; then
+                require_root
+                host_bridge="true"
+            fi
+            write_aio_compose "$INSTALL_DIR" "$key" "$host_bridge"
+            if [ "$host_bridge" = "true" ]; then
+                install_host_exec_bridge "$INSTALL_DIR"
+            fi
             ok "Wrote $INSTALL_DIR/docker-compose.yml"
             (cd "$INSTALL_DIR" && run_step "Pulling images" $DOCKER_COMPOSE pull)
             (cd "$INSTALL_DIR" && run_step "Bringing the stack up" $DOCKER_COMPOSE up -d)

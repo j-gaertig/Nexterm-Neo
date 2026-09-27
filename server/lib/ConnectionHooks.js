@@ -5,8 +5,10 @@ const { getIdentityCredentials } = require("../controllers/identity");
 const { createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES } = require("../controllers/audit");
 const logger = require("../utils/logger");
 const controlPlane = require("./controlPlane/ControlPlaneServer");
+const hostExecBridge = require("./HostExecBridge");
 
 const HOOK_TIMEOUT_MS = 30000;
+const HOST_HOOK_TIMEOUT_MS = 120000;
 const HOOK_ORDER_REMOTE_FIRST = "remote-first";
 const HOOK_DETAIL_MAX = 500;
 const HOOK_COMMAND_LOG_MAX = 200;
@@ -102,6 +104,43 @@ const runEngineHook = async (entry, command, accountId, phase) => {
     return result;
 };
 
+const runDockerHostHook = async (entry, command, accountId, phase, signal = null) => {
+    const cmd = command.trim();
+    const phaseLabel = phase === "after" ? "After-disconnect" : "Pre-connect";
+    let result;
+    try {
+        result = await hostExecBridge.exec(cmd, HOST_HOOK_TIMEOUT_MS, signal);
+    } catch (err) {
+        const reason = err.code === "ABORT_ERR"
+            ? "Host command was cancelled because the connection attempt ended"
+            : err.code === "HOST_BRIDGE_UNAVAILABLE"
+                ? "Docker-host command bridge is unavailable. Install and enable the host bridge on the AIO Docker host."
+                : err.message;
+        await writeAuditLog({ accountId, entry, phase, target: "docker-host", command: cmd, success: false, exitCode: null, error: reason });
+        throw new Error(`${phaseLabel} hook failed on Docker host: ${truncate(reason, HOOK_DETAIL_MAX)}`);
+    }
+    if (!result.success) {
+        const reason = truncate(result.stderr?.trim() || result.errorMessage || `exit code ${result.exitCode}`, HOOK_DETAIL_MAX);
+        await writeAuditLog({ accountId, entry, phase, target: "docker-host", command: cmd, success: false, exitCode: result.exitCode, error: reason, truncated: result.truncated });
+        throw new Error(`${phaseLabel} hook failed on Docker host: ${reason}`);
+    }
+    await writeAuditLog({ accountId, entry, phase, target: "docker-host", command: cmd, success: true, exitCode: result.exitCode, error: null, truncated: result.truncated });
+    logger.info("Docker-host hook succeeded", { entryId: entry.id, phase });
+    return result;
+};
+
+const getLocalHookTarget = (entry, phase) => {
+    const key = phase === "after" ? "afterLocalTarget" : "preLocalTarget";
+    const target = entry.config?.[key] || "engine";
+    if (target !== "engine" && target !== "docker-host") throw new Error(`Unsupported local hook target: ${target}`);
+    return target;
+};
+
+const runLocalHook = (entry, command, accountId, phase, signal = null) => {
+    if (getLocalHookTarget(entry, phase) === "docker-host") return runDockerHostHook(entry, command, accountId, phase, signal);
+    return runEngineHook(entry, command, accountId, phase);
+};
+
 const injectRemoteHook = async (entry, dataSocket, command, accountId, phase) => {
     const cmd = command.trim();
     const phaseLabel = phase === "after" ? "After-disconnect" : "Pre-connect";
@@ -137,10 +176,10 @@ const runRemoteOneShotHook = async (entry, accountId, identityId, directIdentity
     return controlPlane.execCommand(host, port, params, cmd, jumpHosts, entry.config?.engineId || null);
 };
 
-const runPreEngineHook = (entry, accountId) => {
+const runPreEngineHook = (entry, accountId, signal = null) => {
     const command = entry.config?.preLocalCommand;
     if (!isHookEnabled(command)) return Promise.resolve(null);
-    return runEngineHook(entry, command, accountId, "pre");
+    return runLocalHook(entry, command, accountId, "pre", signal);
 };
 
 const runPreRemoteHook = (entry, dataSocket, accountId) => {
@@ -164,9 +203,9 @@ const runAfterHooks = async ({ entryId, accountId, identityId, directIdentity })
             if (step === "engine") {
                 if (!isHookEnabled(config.afterLocalCommand)) continue;
                 try {
-                    await runEngineHook(entry, config.afterLocalCommand, accountId, "after");
+                    await runLocalHook(entry, config.afterLocalCommand, accountId, "after");
                 } catch (err) {
-                    logger.warn("After-disconnect engine hook failed", { entryId, error: err.message });
+                    logger.warn("After-disconnect local hook failed", { entryId, error: err.message });
                 }
                 continue;
             }
@@ -203,6 +242,9 @@ module.exports = {
     getAfterOrder,
     runPreEngineHook,
     runPreRemoteHook,
+    runDockerHostHook,
+    runLocalHook,
+    getLocalHookTarget,
     runRemoteOneShotHook,
     runAfterHooks,
 };

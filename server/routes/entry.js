@@ -2,8 +2,13 @@ const { Router } = require("express");
 const { createEntry, deleteEntry, editEntry, getEntry, listEntries, duplicateEntry, importSSHConfig, repositionEntry, getRecentConnections, wakeEntry } = require("../controllers/entry");
 const { createServerValidation, updateServerValidation, repositionServerValidation } = require("../validations/server");
 const { validateSchema } = require("../utils/schema");
+const hostExecBridge = require("../lib/HostExecBridge");
 
 const app = Router();
+
+app.get("/host-exec-bridge", async (req, res) => {
+    res.json({ available: await hostExecBridge.isAvailable() });
+});
 
 /**
  * GET /entry/recent

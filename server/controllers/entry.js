@@ -104,7 +104,7 @@ const validateJumpHosts = async (accountId, jumpHosts) => {
     return { valid: true };
 };
 
-const HOOK_CONFIG_KEYS = ["preLocalCommand", "preRemoteCommand", "preOrder", "afterLocalCommand", "afterRemoteCommand", "afterOrder"];
+const HOOK_CONFIG_KEYS = ["preLocalCommand", "preLocalTarget", "preRemoteCommand", "preOrder", "afterLocalCommand", "afterLocalTarget", "afterRemoteCommand", "afterOrder"];
 
 const validateHookProtocol = (config, effectiveProtocol) => {
     if (!config || effectiveProtocol === "ssh") return { valid: true };

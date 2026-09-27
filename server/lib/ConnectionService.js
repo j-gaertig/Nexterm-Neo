@@ -270,9 +270,9 @@ const createSSHConnectionForSession = async (sessionId, entry, identity, organiz
             if (getPreOrder(entry) === "remote-first") {
                 dataSocket = await openSsh();
                 await runPreRemoteHook(entry, dataSocket, accountId);
-                await runPreEngineHook(entry, accountId);
+                await runPreEngineHook(entry, accountId, session.connectionAbortController?.signal);
             } else {
-                await runPreEngineHook(entry, accountId);
+                await runPreEngineHook(entry, accountId, session.connectionAbortController?.signal);
                 dataSocket = await openSsh();
                 await runPreRemoteHook(entry, dataSocket, accountId);
             }

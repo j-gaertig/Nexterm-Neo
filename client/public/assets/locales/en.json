@@ -1724,16 +1724,23 @@
         "hooks": {
           "pre": {
             "title": "Pre-Connect Commands",
-            "description": "Run before the SSH connection is established. A failing engine command aborts the connection."
+            "description": "Run before the SSH connection is established. A failing local hook aborts the connection."
           },
           "after": {
             "title": "Post-Disconnect Commands",
             "description": "Run after the SSH session has ended. Failures are only logged."
           },
           "localBadge": "ENGINE",
+          "dockerHostBadge": "DOCKER HOST",
           "remoteBadge": "TARGET",
           "localHint": "Runs on the engine host",
+          "dockerHostHint": "Runs on the Linux Docker host as root",
           "remoteHint": "Runs on the target server",
+          "localTargetLabel": "Local hook execution target",
+          "localTargetEngine": "Engine container/runtime",
+          "localTargetDockerHost": "Linux Docker host (root)",
+          "dockerHostRootHint": "Runs as root on the Linux Docker host. Anyone allowed to connect can trigger this configured command.",
+          "dockerHostUnavailableHint": "Host bridge unavailable. Install and enable it on the Debian or Ubuntu Docker host, then mount /run/nexterm-host-exec into the AIO container.",
           "unknownEngineHint": "Selected engine (ID {{engine}}) is unknown or offline",
           "swapTooltip": "Swap execution order"
         },

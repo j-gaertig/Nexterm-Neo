@@ -151,9 +151,11 @@ export const ServerDialog = ({ open, onClose, currentFolderId, currentOrganizati
 
         if (!fieldConfig.showConnectionHooks) {
             delete finalConfig.preLocalCommand;
+            delete finalConfig.preLocalTarget;
             delete finalConfig.preRemoteCommand;
             delete finalConfig.preOrder;
             delete finalConfig.afterLocalCommand;
+            delete finalConfig.afterLocalTarget;
             delete finalConfig.afterRemoteCommand;
             delete finalConfig.afterOrder;
         }

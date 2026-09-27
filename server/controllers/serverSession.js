@@ -156,6 +156,8 @@ const createSession = async ({
             logger.info("Session connection established", { sessionId: session.sessionId, entryId, type: entry.type });
         })
         .catch((error) => {
+            const currentSession = SessionManager.get(session.sessionId);
+            if (!currentSession || currentSession._removing) return;
             logger.error("Failed to create connection for session", {
                 sessionId: session.sessionId,
                 error: error.message,
