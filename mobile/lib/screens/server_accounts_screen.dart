@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../models/server_account.dart';
 import '../utils/auth_manager.dart';
 import '../screens/device_setup_screen.dart';
@@ -19,7 +19,7 @@ class ServerAccountsScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
             child: Row(children: [
-              IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+              IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: () => Navigator.pop(context)),
               const SizedBox(width: 4),
               Expanded(child: Text('Connections', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
               Material(
@@ -32,7 +32,7 @@ class ServerAccountsScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(
                     padding: const EdgeInsets.all(8),
-                    child: Icon(Icons.add, size: 20, color: cs.onPrimaryContainer),
+                    child: Icon(AppIcons.plus, size: 20, color: cs.onPrimaryContainer),
                   ),
                 ),
               ),
@@ -63,7 +63,7 @@ class ServerAccountsScreen extends StatelessWidget {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-        child: Icon(MdiIcons.serverNetworkOff, size: 32, color: cs.outline),
+        child: Icon(AppIcons.serverNetworkOff, size: 32, color: cs.outline),
       ),
       const SizedBox(height: 20),
       Text('No connections', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -89,7 +89,7 @@ class ServerAccountsScreen extends StatelessWidget {
                 color: active ? cs.primaryContainer : cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(MdiIcons.serverNetwork, size: 20,
+              child: Icon(AppIcons.serverNetwork, size: 20,
                 color: active ? cs.onPrimaryContainer : cs.outline),
             ),
             const SizedBox(width: 12),
@@ -110,7 +110,7 @@ class ServerAccountsScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis)),
             ])),
             PopupMenuButton<String>(
-              icon: Icon(MdiIcons.dotsVertical, color: cs.outline, size: 20),
+              icon: Icon(AppIcons.dotsVertical, color: cs.outline, size: 20),
               onSelected: (v) => _onMenu(context, v, a),
               itemBuilder: (_) => [
                 if (!active) const PopupMenuItem(value: 'switch', child: Text('Switch to')),

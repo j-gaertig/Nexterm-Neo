@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import 'package:native_glass_navbar/native_glass_navbar.dart';
 import '../services/session_manager.dart';
 import '../utils/theme_manager.dart';
@@ -191,30 +191,30 @@ class _MainNavigationPageState extends State<MainNavigationPage>
       onDestinationSelected: (index) => _switchTab(index),
       destinations: [
         NavigationDestination(
-          icon: Icon(Icons.dns_outlined),
-          selectedIcon: Icon(Icons.dns),
+          icon: Icon(AppIcons.dns),
+          selectedIcon: Icon(AppIcons.dns),
           label: 'Servers',
         ),
         if (hasSessions)
           NavigationDestination(
             icon: Badge(
               label: Text('$sessionCount'),
-              child: Icon(MdiIcons.monitorMultiple),
+              child: Icon(AppIcons.monitorMultiple),
             ),
             selectedIcon: Badge(
               label: Text('$sessionCount'),
-              child: Icon(MdiIcons.monitorMultiple),
+              child: Icon(AppIcons.monitorMultiple),
             ),
             label: 'Sessions',
           ),
         NavigationDestination(
-          icon: Icon(MdiIcons.chartBoxOutline),
-          selectedIcon: Icon(MdiIcons.chartBox),
+          icon: Icon(AppIcons.chartBoxOutline),
+          selectedIcon: Icon(AppIcons.chartBox),
           label: 'Monitoring',
         ),
         NavigationDestination(
-          icon: Icon(MdiIcons.cogOutline),
-          selectedIcon: Icon(MdiIcons.cog),
+          icon: Icon(AppIcons.cogOutline),
+          selectedIcon: Icon(AppIcons.cog),
           label: 'Settings',
         ),
       ],

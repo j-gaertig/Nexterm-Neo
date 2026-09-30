@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../services/ai_service.dart';
@@ -35,19 +35,19 @@ class _Tool {
 String _arg(Map<String, dynamic> a, String key) => a[key]?.toString() ?? '';
 
 final Map<String, _Tool> _tools = {
-  'runCommand': _Tool(MdiIcons.consoleLine, 'Run command', (a) => _arg(a, 'command')),
-  'readFile': _Tool(MdiIcons.fileDocumentOutline, 'Read file', (a) => _arg(a, 'path')),
-  'writeFile': _Tool(MdiIcons.fileEditOutline, 'Write file', (a) => _arg(a, 'path')),
-  'editFile': _Tool(MdiIcons.fileEditOutline, 'Edit file', (a) => _arg(a, 'path')),
-  'listDirectory': _Tool(MdiIcons.folderOutline, 'List directory', (a) => _arg(a, 'path')),
-  'statPath': _Tool(MdiIcons.informationOutline, 'Inspect path', (a) => _arg(a, 'path')),
-  'makeDirectory': _Tool(MdiIcons.folderPlusOutline, 'Create directory', (a) => _arg(a, 'path')),
-  'deleteFile': _Tool(MdiIcons.trashCanOutline, 'Delete file', (a) => _arg(a, 'path')),
-  'removeDirectory': _Tool(MdiIcons.trashCanOutline, 'Remove directory',
+  'runCommand': _Tool(AppIcons.consoleLine, 'Run command', (a) => _arg(a, 'command')),
+  'readFile': _Tool(AppIcons.fileDocumentOutline, 'Read file', (a) => _arg(a, 'path')),
+  'writeFile': _Tool(AppIcons.fileEditOutline, 'Write file', (a) => _arg(a, 'path')),
+  'editFile': _Tool(AppIcons.fileEditOutline, 'Edit file', (a) => _arg(a, 'path')),
+  'listDirectory': _Tool(AppIcons.folderOutline, 'List directory', (a) => _arg(a, 'path')),
+  'statPath': _Tool(AppIcons.informationOutline, 'Inspect path', (a) => _arg(a, 'path')),
+  'makeDirectory': _Tool(AppIcons.folderPlusOutline, 'Create directory', (a) => _arg(a, 'path')),
+  'deleteFile': _Tool(AppIcons.trashCanOutline, 'Delete file', (a) => _arg(a, 'path')),
+  'removeDirectory': _Tool(AppIcons.trashCanOutline, 'Remove directory',
       (a) => a['recursive'] == true ? '${_arg(a, 'path')} (recursive)' : _arg(a, 'path')),
-  'movePath': _Tool(MdiIcons.fileMoveOutline, 'Move', (a) => '${_arg(a, 'source')} → ${_arg(a, 'destination')}'),
-  'changePermissions': _Tool(MdiIcons.lockOutline, 'Change permissions', (a) => '${_arg(a, 'path')} → ${_arg(a, 'mode')}'),
-  'findDirectories': _Tool(MdiIcons.magnify, 'Find directories', (a) => _arg(a, 'query')),
+  'movePath': _Tool(AppIcons.fileMoveOutline, 'Move', (a) => '${_arg(a, 'source')} → ${_arg(a, 'destination')}'),
+  'changePermissions': _Tool(AppIcons.lockOutline, 'Change permissions', (a) => '${_arg(a, 'path')} → ${_arg(a, 'mode')}'),
+  'findDirectories': _Tool(AppIcons.magnify, 'Find directories', (a) => _arg(a, 'query')),
 };
 
 enum _Role { user, assistant, system, tool }
@@ -358,7 +358,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-              child: Icon(MdiIcons.robotHappyOutline, color: cs.onPrimaryContainer, size: 18),
+              child: Icon(AppIcons.robotHappyOutline, color: cs.onPrimaryContainer, size: 18),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -373,7 +373,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
               ]),
             ),
             IconButton(
-              icon: Icon(MdiIcons.close, size: 20),
+              icon: Icon(AppIcons.close, size: 20),
               onPressed: () => Navigator.pop(context),
               style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
             ),
@@ -388,7 +388,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(MdiIcons.robotHappyOutline, size: 48, color: cs.outline),
+            Icon(AppIcons.robotHappyOutline, size: 48, color: cs.outline),
             const SizedBox(height: 16),
             Text(
               'Ask the assistant to inspect or change this server. It can run commands and read or edit files directly over the connection.',
@@ -432,7 +432,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
             child: Row(children: [
-              Icon(MdiIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
+              Icon(AppIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
               const SizedBox(width: 8),
               Expanded(child: Text(m.text, style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
             ]),
@@ -460,7 +460,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
           child: Row(children: [
-            Icon(tool?.icon ?? MdiIcons.consoleLine, size: 16, color: cs.onSurfaceVariant),
+            Icon(tool?.icon ?? AppIcons.consoleLine, size: 16, color: cs.onSurfaceVariant),
             const SizedBox(width: 8),
             Text(tool?.label ?? m.tool ?? 'Tool',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
@@ -486,10 +486,10 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         'running' => SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
         'done' => failed
             ? Text('exit $exitCode', style: TextStyle(fontSize: 12, color: cs.error, fontWeight: FontWeight.w600))
-            : Icon(MdiIcons.check, size: 16, color: Colors.green),
-        'denied' => Icon(MdiIcons.cancel, size: 16, color: cs.error),
-        'aborted' => Icon(MdiIcons.stop, size: 16, color: cs.outline),
-        'error' => Icon(MdiIcons.close, size: 16, color: cs.error),
+            : Icon(AppIcons.check, size: 16, color: Colors.green),
+        'denied' => Icon(AppIcons.cancel, size: 16, color: cs.error),
+        'aborted' => Icon(AppIcons.stop, size: 16, color: cs.outline),
+        'error' => Icon(AppIcons.close, size: 16, color: cs.error),
         _ => const SizedBox.shrink(),
       };
 
@@ -502,7 +502,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _confirm(m.callId!, false),
-                icon: Icon(MdiIcons.cancel, size: 16),
+                icon: Icon(AppIcons.cancel, size: 16),
                 label: const Text('Deny'),
                 style: OutlinedButton.styleFrom(
                     foregroundColor: cs.error, side: BorderSide(color: cs.error.withValues(alpha: 0.5))),
@@ -512,7 +512,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
             Expanded(
               child: FilledButton.icon(
                 onPressed: () => _confirm(m.callId!, true),
-                icon: Icon(MdiIcons.check, size: 16),
+                icon: Icon(AppIcons.check, size: 16),
                 label: const Text('Allow'),
               ),
             ),
@@ -581,7 +581,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
         child: Row(children: [
-          Icon(MdiIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
+          Icon(AppIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
           const SizedBox(width: 8),
           Expanded(child: Text(_connectionError!, style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
         ]),
@@ -614,7 +614,7 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
                         ]
                       : null,
                 ),
-                child: Icon(_listening ? MdiIcons.microphone : MdiIcons.microphoneOutline,
+                child: Icon(_listening ? AppIcons.microphoneActive : AppIcons.microphoneOutline,
                     size: 22, color: _listening ? cs.error : cs.outline),
               ),
             ),
@@ -647,12 +647,12 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
           _running
               ? IconButton.filled(
                   onPressed: _stop,
-                  icon: Icon(MdiIcons.stop),
+                  icon: Icon(AppIcons.stop),
                   style: IconButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
                 )
               : IconButton.filled(
                   onPressed: _hasInput && _ready ? _send : null,
-                  icon: Icon(MdiIcons.send),
+                  icon: Icon(AppIcons.send),
                 ),
         ]),
       );

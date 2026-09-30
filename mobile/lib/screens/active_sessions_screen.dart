@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 
 import '../services/session_manager.dart';
 import '../utils/auth_manager.dart';
@@ -107,7 +107,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
       return Scaffold(
         body: Center(
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(MdiIcons.monitorOff, size: 48, color: Theme.of(context).colorScheme.outline),
+            Icon(AppIcons.monitorOff, size: 48, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text('No active sessions',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -198,7 +198,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                   ),
                 ],
                 const SizedBox(width: 2),
-                Icon(MdiIcons.chevronUp, size: 14, color: cs.outline),
+                Icon(AppIcons.chevronUp, size: 14, color: cs.outline),
               ]),
             ),
           ),
@@ -218,7 +218,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 child: Icon(
-                  active.showSnippets != null ? MdiIcons.codeBraces : MdiIcons.toolbox,
+                  active.showSnippets != null ? AppIcons.codeBraces : AppIcons.toolbox,
                   size: 16, color: cs.primary,
                 ),
               ),
@@ -233,7 +233,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
               behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                child: Icon(MdiIcons.creation, size: 16, color: cs.primary),
+                child: Icon(AppIcons.creation, size: 16, color: cs.primary),
               ),
             ),
           ],
@@ -276,9 +276,9 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
 
   IconData _iconForType(ConnectionType type) {
     switch (type) {
-      case ConnectionType.guacamole: return MdiIcons.monitorSmall;
-      case ConnectionType.terminal: return MdiIcons.console;
-      case ConnectionType.sftp: return MdiIcons.folderOutline;
+      case ConnectionType.guacamole: return AppIcons.monitorSmall;
+      case ConnectionType.terminal: return AppIcons.console;
+      case ConnectionType.sftp: return AppIcons.folderOutline;
     }
   }
 }
@@ -316,7 +316,7 @@ class _SessionSwitcherSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Row(children: [
-              Icon(MdiIcons.layers, size: 20, color: cs.primary),
+              Icon(AppIcons.layers, size: 20, color: cs.primary),
               const SizedBox(width: 8),
               Text('Sessions',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -349,7 +349,7 @@ class _SessionSwitcherSheet extends StatelessWidget {
             const Divider(height: 1),
             ListTile(
               dense: true,
-              leading: Icon(MdiIcons.exitToApp, size: 20, color: cs.outline),
+              leading: Icon(AppIcons.exitToApp, size: 20, color: cs.outline),
               title: Text('Back to servers',
                   style: TextStyle(fontSize: 14, color: cs.onSurface)),
               onTap: onExitFullscreen,
@@ -377,9 +377,9 @@ class _SessionTile extends StatelessWidget {
 
   IconData get _icon {
     switch (session.type) {
-      case ConnectionType.guacamole: return MdiIcons.monitorSmall;
-      case ConnectionType.terminal: return MdiIcons.console;
-      case ConnectionType.sftp: return MdiIcons.folderOutline;
+      case ConnectionType.guacamole: return AppIcons.monitorSmall;
+      case ConnectionType.terminal: return AppIcons.console;
+      case ConnectionType.sftp: return AppIcons.folderOutline;
     }
   }
 
@@ -423,7 +423,7 @@ class _SessionTile extends StatelessWidget {
             style: TextStyle(fontSize: 11,
                 color: isActive ? cs.onPrimaryContainer.withValues(alpha: 0.7) : cs.outline)),
         trailing: IconButton(
-          icon: Icon(MdiIcons.close, size: 16),
+          icon: Icon(AppIcons.close, size: 16),
           onPressed: onClose,
           color: isActive ? cs.onPrimaryContainer : cs.outline,
           tooltip: 'Close session',

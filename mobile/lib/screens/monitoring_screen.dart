@@ -1,17 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../models/monitoring.dart';
 import '../services/monitoring_service.dart';
 import '../utils/auth_manager.dart';
-
-final Map<String, IconData> _mdiByCamelName = {
-  for (final icon in MdiIcons.values)
-    if (icon.mdiMetadata != null)
-      icon.mdiMetadata!.name.split('-').asMap().entries.map((e) =>
-        e.key == 0 ? e.value : e.value[0].toUpperCase() + e.value.substring(1)
-      ).join(): icon,
-};
 
 class MonitoringScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -63,14 +55,14 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   int get _onlineCount => _servers.where((s) => s.hasData && s.error == null).length;
 
   IconData _monitorIcon(M s) {
-    if (s.isPVE) return MdiIcons.serverNetwork;
+    if (s.isPVE) return AppIcons.serverNetwork;
     final icon = s['icon']?.toString();
     if (icon != null && icon.startsWith('mdi') && icon.length > 3) {
       final camel = icon.substring(3, 4).toLowerCase() + icon.substring(4);
-      final hit = _mdiByCamelName[camel];
+      final hit = AppIcons.resolveBackendIcon(camel);
       if (hit != null) return hit;
     }
-    return MdiIcons.server;
+    return AppIcons.server;
   }
 
   @override
@@ -118,14 +110,14 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
-        child: Icon(MdiIcons.alertCircleOutline, size: 32, color: cs.onErrorContainer),
+        child: Icon(AppIcons.alertCircleOutline, size: 32, color: cs.onErrorContainer),
       ),
       const SizedBox(height: 20),
       Text('Something went wrong', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
       Text(_error!, style: tt.bodySmall?.copyWith(color: cs.outline), textAlign: TextAlign.center),
       const SizedBox(height: 24),
-      FilledButton.icon(onPressed: _load, icon: Icon(MdiIcons.refresh, size: 18), label: const Text('Retry'),
+      FilledButton.icon(onPressed: _load, icon: Icon(AppIcons.refresh, size: 18), label: const Text('Retry'),
         style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
     ])));
@@ -140,7 +132,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-          child: Icon(MdiIcons.chartBoxOutline, size: 32, color: cs.outline),
+          child: Icon(AppIcons.chartBoxOutline, size: 32, color: cs.outline),
         ),
         const SizedBox(height: 20),
         Text('No monitoring data', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -190,7 +182,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
                 if (s['ip'] != null) Padding(padding: const EdgeInsets.only(top: 2),
                   child: Text(s.str('ip'), style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis)),
               ])),
-              Icon(MdiIcons.chevronRight, color: cs.outlineVariant, size: 18),
+              Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
             ]),
             if (s.hasData) ...[
               const SizedBox(height: 14),
@@ -205,7 +197,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: cs.errorContainer.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
-                  Icon(MdiIcons.alertOutline, size: 14, color: cs.error),
+                  Icon(AppIcons.alertOutline, size: 14, color: cs.error),
                   const SizedBox(width: 6),
                   Expanded(child: Text(s.error!, style: TextStyle(fontSize: 11, color: cs.error), maxLines: 1, overflow: TextOverflow.ellipsis)),
                 ]),
@@ -245,7 +237,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
         child: Row(children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(AppIcons.arrowBack),
             onPressed: () => setState(() { _selected = null; _details = null; }),
           ),
           const SizedBox(width: 4),
@@ -356,7 +348,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
                 color: online ? cs.primaryContainer : cs.errorContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(MdiIcons.serverNetwork, size: 14, color: online ? cs.onPrimaryContainer : cs.onErrorContainer),
+              child: Icon(AppIcons.serverNetwork, size: 14, color: online ? cs.onPrimaryContainer : cs.onErrorContainer),
             ),
             const SizedBox(width: 8),
             Expanded(child: Text(n.str('name'), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),

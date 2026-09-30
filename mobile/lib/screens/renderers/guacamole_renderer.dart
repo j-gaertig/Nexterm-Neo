@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:guacamole_common_dart/guacamole_common_dart.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 
 import '../../services/session_manager.dart';
 import '../widgets/connection_loader.dart';
@@ -462,7 +462,7 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
                     Row(children: [
                       Expanded(child: _sheetAction(
                         icon: _mouseMode == MouseMode.direct
-                            ? MdiIcons.cursorDefaultClick : MdiIcons.mouse,
+                            ? AppIcons.cursorDefaultClick : AppIcons.mouse,
                         label: _mouseMode == MouseMode.direct ? 'Touch' : 'Mouse',
                         cs: cs,
                         onTap: () {
@@ -475,19 +475,19 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
                       )),
                       const SizedBox(width: 8),
                       Expanded(child: _sheetAction(
-                        icon: MdiIcons.keyboard, label: 'Keys',
+                        icon: AppIcons.keyboard, label: 'Keys',
                         cs: cs, onTap: () { Navigator.pop(ctx); _showKeyboardInput(); },
                       )),
                     ]),
                     const SizedBox(height: 8),
                     Row(children: [
                       Expanded(child: _sheetAction(
-                        icon: MdiIcons.fitToScreen, label: 'Fit',
+                        icon: AppIcons.fitToScreen, label: 'Fit',
                         cs: cs, onTap: () { Navigator.pop(ctx); _fitScreen(); },
                       )),
                       const SizedBox(width: 8),
                       Expanded(child: _sheetAction(
-                        icon: MdiIcons.keyboardSettings, label: 'C+A+Del',
+                        icon: AppIcons.keyboardSettings, label: 'C+A+Del',
                         cs: cs, onTap: () { Navigator.pop(ctx); _sendCtrlAltDel(); },
                       )),
                     ]),
@@ -643,13 +643,13 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       padding: const EdgeInsets.all(8),
       color: colors.errorContainer,
       child: Row(children: [
-        Icon(MdiIcons.alertCircleOutline, color: colors.onErrorContainer),
+        Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
         const SizedBox(width: 8),
         Expanded(
             child: Text(_error!,
                 style: TextStyle(color: colors.onErrorContainer))),
         IconButton(
-            icon: Icon(MdiIcons.close),
+            icon: Icon(AppIcons.close),
             onPressed: () => setState(() => _error = null),
             color: colors.onErrorContainer),
       ]),

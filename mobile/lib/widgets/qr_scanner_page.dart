@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../utils/app_icons.dart';
 
 class QrScannerPage extends StatefulWidget {
   final String title;
@@ -47,14 +48,14 @@ class _QrScannerPageState extends State<QrScannerPage> {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
           child: Row(children: [
-            IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+            IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: () => Navigator.pop(context)),
             const SizedBox(width: 4),
             Text(widget.title, style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             const Spacer(),
             ValueListenableBuilder(
               valueListenable: _controller,
               builder: (_, state, __) => IconButton(
-                icon: Icon(state.torchState == TorchState.on ? Icons.flash_on : Icons.flash_off),
+                icon: Icon(state.torchState == TorchState.on ? AppIcons.flashOn : AppIcons.flashOff),
                 onPressed: () => _controller.toggleTorch(),
               ),
             ),

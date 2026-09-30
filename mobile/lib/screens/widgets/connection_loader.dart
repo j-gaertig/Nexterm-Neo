@@ -1,7 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 
 class ConnectionLoader extends StatefulWidget {
   final bool visible;
@@ -142,11 +142,11 @@ class _ConnectionLoaderState extends State<ConnectionLoader>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(MdiIcons.laptop, size: 36, color: iconColor),
+          Icon(AppIcons.laptop, size: 36, color: iconColor),
           const SizedBox(width: 24),
           _buildDots(primary),
           const SizedBox(width: 24),
-          Icon(MdiIcons.server, size: 36, color: iconColor),
+          Icon(AppIcons.server, size: 36, color: iconColor),
         ],
       ),
     );
