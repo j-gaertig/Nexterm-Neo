@@ -13,6 +13,8 @@ class AppIcons {
   static const IconData application = LucideIcons.appWindow;
   static const IconData arrowBack = LucideIcons.arrowLeft;
   static const IconData arrowLeft = LucideIcons.arrowLeft;
+  static const IconData arrowDown = LucideIcons.arrowDown;
+  static const IconData arrowRight = LucideIcons.arrowRight;
   static const IconData arrowUp = LucideIcons.arrowUp;
   static const IconData cancel = LucideIcons.circleX;
   static const IconData cellphone = LucideIcons.smartphone;

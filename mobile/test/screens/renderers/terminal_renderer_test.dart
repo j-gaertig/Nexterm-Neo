@@ -4,6 +4,7 @@ import 'package:nexterm/models/server.dart';
 import 'package:nexterm/screens/renderers/terminal_renderer.dart';
 import 'package:nexterm/services/session_manager.dart';
 import 'package:nexterm/utils/ai_manager.dart';
+import 'package:nexterm/utils/app_icons.dart';
 import 'package:nexterm/utils/snippet_manager.dart';
 import 'package:nexterm/utils/terminal_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -77,6 +78,56 @@ void main() {
     expect(cursorRect.top, greaterThan(initialCursorTop));
 
     await tester.pump(const Duration(milliseconds: 100));
+    await tester.pumpWidget(const SizedBox.shrink());
+    settings.dispose();
+  });
+
+  testWidgets('shows uniform arrow icons in the keyboard toolbar when focused', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final settings = await TerminalSettings.load();
+    final terminal = Terminal(maxLines: 100);
+    final session = AppSession(
+      sessionId: 'test-session',
+      server: const Server(name: 'Test server', ip: '127.0.0.1'),
+      type: ConnectionType.terminal,
+      terminal: terminal,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SizedBox(
+          width: 800,
+          height: 600,
+          child: TerminalRenderer(
+            session: session,
+            token: 'test-token',
+            sessionManager: SessionManager(),
+            snippetManager: SnippetManager(),
+            terminalSettings: settings,
+            aiManager: AIManager(),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byType(TerminalView));
+    await tester.pump();
+
+    expect(find.byIcon(AppIcons.arrowUp), findsOneWidget);
+    expect(find.byIcon(AppIcons.arrowDown), findsOneWidget);
+    expect(find.byIcon(AppIcons.arrowLeft), findsOneWidget);
+    expect(find.byIcon(AppIcons.arrowRight), findsOneWidget);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.arrowUp)).size, 18);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.arrowDown)).size, 18);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.arrowLeft)).size, 18);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.arrowRight)).size, 18);
+    expect(find.text('↑'), findsNothing);
+    expect(find.text('↓'), findsNothing);
+    expect(find.text('←'), findsNothing);
+    expect(find.text('→'), findsNothing);
+
     await tester.pumpWidget(const SizedBox.shrink());
     settings.dispose();
   });

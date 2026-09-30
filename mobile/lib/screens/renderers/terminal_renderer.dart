@@ -503,10 +503,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         ];
       case ToolbarGroup.arrows:
         return [
-          _toolbarBtn('↑', holdKey: 'UP', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('↓', holdKey: 'DOWN', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('←', holdKey: 'LEFT', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('→', holdKey: 'RIGHT', compact: true), const SizedBox(width: 16),
+          _toolbarBtn('UP', icon: AppIcons.arrowUp, holdKey: 'UP', compact: true), const SizedBox(width: 8),
+          _toolbarBtn('DOWN', icon: AppIcons.arrowDown, holdKey: 'DOWN', compact: true), const SizedBox(width: 8),
+          _toolbarBtn('LEFT', icon: AppIcons.arrowLeft, holdKey: 'LEFT', compact: true), const SizedBox(width: 8),
+          _toolbarBtn('RIGHT', icon: AppIcons.arrowRight, holdKey: 'RIGHT', compact: true), const SizedBox(width: 16),
         ];
       case ToolbarGroup.navigation:
         return [
@@ -525,7 +525,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     }
   }
 
-  Widget _toolbarBtn(String label, {VoidCallback? onPressed, String? holdKey, bool isToggle = false, bool isActive = false, bool compact = false}) {
+  Widget _toolbarBtn(String label, {IconData? icon, VoidCallback? onPressed, String? holdKey, bool isToggle = false, bool isActive = false, bool compact = false}) {
     final theme = Theme.of(context);
     final bgColor = isActive ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest;
     final fgColor = isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
@@ -540,7 +540,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         child: Container(
           constraints: BoxConstraints(minWidth: compact ? 44 : 56, minHeight: 44),
           padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16, vertical: 10),
-          child: Center(child: Text(label, style: TextStyle(fontSize: compact ? 13 : 14, fontWeight: FontWeight.w600, color: fgColor))),
+          child: Center(
+            child: icon != null
+                ? Icon(icon, size: 18, color: fgColor, semanticLabel: label)
+                : Text(label, style: TextStyle(fontSize: compact ? 13 : 14, fontWeight: FontWeight.w600, color: fgColor)),
+          ),
         ),
       ),
     );
