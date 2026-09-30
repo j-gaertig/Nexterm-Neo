@@ -7,7 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_file_dialog/flutter_file_dialog.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -1905,7 +1905,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             bottom: 16,
             child: FloatingActionButton(
               onPressed: _showAddMenu,
-              child: Icon(MdiIcons.plus),
+              child: Icon(AppIcons.plus),
             ),
           ),
       ],
@@ -1948,7 +1948,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       ),
       child: Row(
         children: [
-          Icon(MdiIcons.folderOutline, color: cs.primary, size: 22),
+          Icon(AppIcons.folderOutline, color: cs.primary, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -1959,7 +1959,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
           ),
           if (_connected)
             IconButton(
-              icon: Icon(MdiIcons.refresh, size: 20),
+              icon: Icon(AppIcons.refresh, size: 20),
               onPressed: _refresh,
               visualDensity: VisualDensity.compact,
               tooltip: 'Refresh',
@@ -1979,12 +1979,12 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       ),
       child: Row(
         children: [
-          IconButton(icon: Icon(MdiIcons.close), onPressed: _cancelSelection),
+          IconButton(icon: Icon(AppIcons.close), onPressed: _cancelSelection),
           Text('${_selectedIndices.length} selected',
               style: TextStyle(fontWeight: FontWeight.w600, color: cs.onPrimaryContainer)),
           const Spacer(),
           IconButton(
-            icon: Icon(MdiIcons.downloadOutline),
+            icon: Icon(AppIcons.downloadOutline),
             onPressed: _selectedIndices.isNotEmpty
                 ? () {
                     final entries = _selectedEntries();
@@ -1996,7 +1996,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             tooltip: 'Download',
           ),
           IconButton(
-            icon: Icon(MdiIcons.pencilOutline),
+            icon: Icon(AppIcons.pencilOutline),
             onPressed: _selectedIndices.length == 1
                 ? () {
                     final entries = _selectedEntries();
@@ -2007,7 +2007,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             tooltip: 'Rename',
           ),
           IconButton(
-            icon: Icon(MdiIcons.deleteOutline),
+            icon: Icon(AppIcons.deleteOutline),
             onPressed: _selectedIndices.isNotEmpty ? _deleteSelected : null,
             tooltip: 'Delete',
             color: cs.error,
@@ -2032,13 +2032,13 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       child: Row(
         children: [
           IconButton(
-            icon: Icon(MdiIcons.arrowLeft, size: 20),
+            icon: Icon(AppIcons.arrowLeft, size: 20),
             onPressed: _historyIndex > 0 ? _goBack : null,
             visualDensity: VisualDensity.compact,
             tooltip: 'Back',
           ),
           IconButton(
-            icon: Icon(MdiIcons.arrowUp, size: 20),
+            icon: Icon(AppIcons.arrowUp, size: 20),
             onPressed: segments.isNotEmpty ? _goUp : null,
             visualDensity: VisualDensity.compact,
             tooltip: 'Up',
@@ -2052,7 +2052,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                 children: [
                   _buildBreadcrumb('/', _rootPath),
                   for (int i = 0; i < segments.length; i++) ...[
-                    Icon(MdiIcons.chevronRight, size: 16, color: theme.colorScheme.outline),
+                    Icon(AppIcons.chevronRight, size: 16, color: theme.colorScheme.outline),
                     _buildBreadcrumb(
                       segments[i],
                       _joinPath(segments.sublist(0, i + 1)),
@@ -2093,7 +2093,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       color: Theme.of(context).colorScheme.errorContainer,
       child: Row(
         children: [
-          Icon(MdiIcons.alertCircleOutline,
+          Icon(AppIcons.alertCircleOutline,
               color: Theme.of(context).colorScheme.onErrorContainer, size: 20),
           const SizedBox(width: 8),
           Expanded(
@@ -2105,7 +2105,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             ),
           ),
           IconButton(
-            icon: Icon(MdiIcons.close, size: 18),
+            icon: Icon(AppIcons.close, size: 18),
             onPressed: () => setState(() => _errorMessage = null),
             color: Theme.of(context).colorScheme.onErrorContainer,
             visualDensity: VisualDensity.compact,
@@ -2137,7 +2137,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(MdiIcons.folderOpen,
+                    Icon(AppIcons.folderOpen,
                         size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(height: 16),
                     Text('Empty directory',
@@ -2187,7 +2187,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
                     child: Icon(
-                      isSelected ? MdiIcons.checkboxMarked : MdiIcons.checkboxBlankOutline,
+                      isSelected ? AppIcons.checkboxMarked : AppIcons.checkboxBlankOutline,
                       color: isSelected ? theme.colorScheme.primary : theme.colorScheme.outline,
                       size: 22,
                     ),
@@ -2227,12 +2227,12 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                 ),
                 if (!_selectionMode)
                   IconButton(
-                    icon: Icon(MdiIcons.dotsVertical, color: theme.colorScheme.outline, size: 20),
+                    icon: Icon(AppIcons.dotsVertical, color: theme.colorScheme.outline, size: 20),
                     onPressed: () => _showEntryActions(entry),
                     visualDensity: VisualDensity.compact,
                   ),
                 if (!_selectionMode && entry.isDir)
-                  Icon(MdiIcons.chevronRight, color: theme.colorScheme.outline, size: 20),
+                  Icon(AppIcons.chevronRight, color: theme.colorScheme.outline, size: 20),
               ],
             ),
           ),
@@ -2329,7 +2329,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             const Divider(height: 1),
             if (!entry.isDir)
               ListTile(
-                leading: Icon(MdiIcons.openInNew),
+                leading: Icon(AppIcons.openInNew),
                 title: const Text('Open'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -2338,7 +2338,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
               ),
             if (!entry.isDir)
               ListTile(
-                leading: Icon(MdiIcons.fileCodeOutline),
+                leading: Icon(AppIcons.fileCodeOutline),
                 title: const Text('Open in Editor'),
                 onTap: () {
                   Navigator.pop(ctx);
@@ -2346,7 +2346,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                 },
               ),
             ListTile(
-              leading: Icon(MdiIcons.downloadOutline),
+              leading: Icon(AppIcons.downloadOutline),
               title: const Text('Download'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -2361,7 +2361,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                 widget.session.server.protocol?.toLowerCase() == 'ssh' &&
                 !widget.session.server.isPve)
               ListTile(
-                leading: Icon(MdiIcons.console),
+                leading: Icon(AppIcons.console),
                 title: const Text('Open Terminal Here'),
                 onTap: _openingTerminal
                     ? null
@@ -2371,12 +2371,12 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
                       },
               ),
             ListTile(
-              leading: Icon(MdiIcons.pencilOutline),
+              leading: Icon(AppIcons.pencilOutline),
               title: const Text('Rename'),
               onTap: () { Navigator.pop(ctx); _showRenameDialog(entry, base, sheetSid); },
             ),
             ListTile(
-              leading: Icon(MdiIcons.deleteOutline, color: Theme.of(ctx).colorScheme.error),
+              leading: Icon(AppIcons.deleteOutline, color: Theme.of(ctx).colorScheme.error),
               title: Text('Delete', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
               onTap: () { Navigator.pop(ctx); _showDeleteConfirmation([entry], base, sheetSid); },
             ),
@@ -2437,12 +2437,12 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: Icon(MdiIcons.folderPlusOutline),
+              leading: Icon(AppIcons.folderPlusOutline),
               title: const Text('New Folder'),
               onTap: () { Navigator.pop(ctx); _showCreateFolderDialog(base, menuSid); },
             ),
             ListTile(
-              leading: Icon(MdiIcons.uploadOutline),
+              leading: Icon(AppIcons.uploadOutline),
               title: const Text('Upload File'),
               onTap: () { Navigator.pop(ctx); _uploadFile(base, menuSid); },
             ),
@@ -2454,24 +2454,24 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
   }
 
   IconData _getFileIcon(SftpEntry entry) {
-    if (entry.isDir) return MdiIcons.folder;
-    if (entry.isSymlink) return MdiIcons.linkVariant;
+    if (entry.isDir) return AppIcons.folder;
+    if (entry.isSymlink) return AppIcons.linkVariant;
     switch (entry.extension) {
-      case 'txt': case 'md': case 'log': return MdiIcons.fileDocumentOutline;
-      case 'pdf': return MdiIcons.filePdfBox;
+      case 'txt': case 'md': case 'log': return AppIcons.fileDocumentOutline;
+      case 'pdf': return AppIcons.filePdfBox;
       case 'jpg': case 'jpeg': case 'png': case 'gif': case 'webp': case 'svg':
-        return MdiIcons.fileImageOutline;
-      case 'mp4': case 'avi': case 'mov': case 'mkv': return MdiIcons.fileVideoOutline;
-      case 'mp3': case 'wav': case 'flac': case 'ogg': return MdiIcons.fileMusicOutline;
+        return AppIcons.fileImageOutline;
+      case 'mp4': case 'avi': case 'mov': case 'mkv': return AppIcons.fileVideoOutline;
+      case 'mp3': case 'wav': case 'flac': case 'ogg': return AppIcons.fileMusicOutline;
       case 'zip': case 'tar': case 'gz': case 'bz2': case 'xz': case '7z': case 'rar':
-        return MdiIcons.zipBoxOutline;
-      case 'json': case 'xml': case 'yaml': case 'yml': case 'toml': return MdiIcons.codeJson;
+        return AppIcons.zipBoxOutline;
+      case 'json': case 'xml': case 'yaml': case 'yml': case 'toml': return AppIcons.codeJson;
       case 'js': case 'ts': case 'py': case 'dart': case 'java': case 'c': case 'cpp':
       case 'h': case 'rs': case 'go': case 'rb': case 'php': case 'sh': case 'bash':
-        return MdiIcons.fileCodeOutline;
-      case 'conf': case 'cfg': case 'ini': case 'env': return MdiIcons.fileCogOutline;
-      case 'db': case 'sqlite': case 'sql': return MdiIcons.databaseOutline;
-      default: return MdiIcons.fileOutline;
+        return AppIcons.fileCodeOutline;
+      case 'conf': case 'cfg': case 'ini': case 'env': return AppIcons.fileCogOutline;
+      case 'db': case 'sqlite': case 'sql': return AppIcons.databaseOutline;
+      default: return AppIcons.fileOutline;
     }
   }
 

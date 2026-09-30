@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import 'package:re_editor/re_editor.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
@@ -219,7 +219,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
-            icon: Icon(MdiIcons.close),
+            icon: Icon(AppIcons.close),
             onPressed: _onClosePressed,
             tooltip: 'Close',
           ),
@@ -253,7 +253,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
               )
             else
               IconButton(
-                icon: Icon(MdiIcons.contentSave),
+                icon: Icon(AppIcons.contentSave),
                 onPressed: canSave ? _save : null,
                 tooltip: 'Save',
               ),
@@ -277,7 +277,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                MdiIcons.alertCircleOutline,
+                AppIcons.alertCircleOutline,
                 size: 48,
                 color: Theme.of(context).colorScheme.error,
               ),

@@ -4,7 +4,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:xterm/xterm.dart';
 
@@ -326,7 +326,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             return Center(child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(MdiIcons.alertCircleOutline, size: 48, color: Theme.of(ctx).colorScheme.error),
+                Icon(AppIcons.alertCircleOutline, size: 48, color: Theme.of(ctx).colorScheme.error),
                 const SizedBox(height: 16),
                 Text('Failed to load snippets', style: Theme.of(ctx).textTheme.titleMedium),
               ]),
@@ -336,7 +336,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             return Center(child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(MdiIcons.codeBracesBox, size: 48, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                Icon(AppIcons.codeBracesBox, size: 48, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                 const SizedBox(height: 16),
                 Text('No snippets available', style: Theme.of(ctx).textTheme.titleMedium),
               ]),
@@ -350,11 +350,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                 border: Border(bottom: BorderSide(color: Theme.of(ctx).colorScheme.outlineVariant)),
               ),
               child: Row(children: [
-                Icon(MdiIcons.codeBraces, color: Theme.of(ctx).colorScheme.primary),
+                Icon(AppIcons.codeBraces, color: Theme.of(ctx).colorScheme.primary),
                 const SizedBox(width: 12),
                 Text('Snippets', style: Theme.of(ctx).textTheme.titleLarge),
                 const Spacer(),
-                IconButton(icon: Icon(MdiIcons.close), onPressed: () => Navigator.pop(ctx)),
+                IconButton(icon: Icon(AppIcons.close), onPressed: () => Navigator.pop(ctx)),
               ]),
             ),
             Expanded(child: ListView.builder(
@@ -365,11 +365,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                 return ListTile(
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(ctx).colorScheme.primaryContainer,
-                    child: Icon(MdiIcons.console, color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 20),
+                    child: Icon(AppIcons.console, color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 20),
                   ),
                   title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: s.description != null ? Text(s.description!, maxLines: 2, overflow: TextOverflow.ellipsis) : null,
-                  trailing: Icon(MdiIcons.chevronRight, size: 16),
+                  trailing: Icon(AppIcons.chevronRight, size: 16),
                   onTap: () { Navigator.pop(ctx); _channel?.sink.add(s.command); },
                 );
               },
@@ -455,10 +455,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     return Container(
       width: double.infinity, padding: const EdgeInsets.all(8), color: colors.errorContainer,
       child: Row(children: [
-        Icon(MdiIcons.alertCircleOutline, color: colors.onErrorContainer),
+        Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
         const SizedBox(width: 8),
         Expanded(child: Text(_errorMessage!, style: TextStyle(color: colors.onErrorContainer))),
-        IconButton(icon: Icon(MdiIcons.close), onPressed: () => setState(() => _errorMessage = null), color: colors.onErrorContainer),
+        IconButton(icon: Icon(AppIcons.close), onPressed: () => setState(() => _errorMessage = null), color: colors.onErrorContainer),
       ]),
     );
   }

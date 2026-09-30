@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../../utils/app_icons.dart';
 
 import '../../models/server.dart';
 
@@ -158,7 +158,7 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                  child: Icon(MdiIcons.cursorDefaultClick, color: cs.onPrimaryContainer, size: 18),
+                  child: Icon(AppIcons.cursorDefaultClick, color: cs.onPrimaryContainer, size: 18),
                 ),
                 const SizedBox(width: 12),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -172,13 +172,13 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 if (_showUsername) ...[
                   _label('Username'),
-                  _field(_username, hint: 'Username', icon: MdiIcons.accountCircleOutline),
+                  _field(_username, hint: 'Username', icon: AppIcons.accountCircleOutline),
                   const SizedBox(height: 14),
                 ],
                 _label('Authentication'),
                 DropdownButtonFormField<String>(
                   initialValue: _authType,
-                  decoration: _decoration(icon: MdiIcons.shieldAccountOutline),
+                  decoration: _decoration(icon: AppIcons.shieldAccountOutline),
                   items: [
                     for (final opt in _authOptions)
                       DropdownMenuItem(value: opt, child: Text(_authLabels[opt] ?? opt)),
@@ -188,7 +188,7 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
                 if (_showPassword) ...[
                   const SizedBox(height: 14),
                   _label('Password'),
-                  _field(_password, hint: 'Password', icon: MdiIcons.lockOutline, obscure: true),
+                  _field(_password, hint: 'Password', icon: AppIcons.lockOutline, obscure: true),
                 ],
                 if (_showKey) ...[
                   const SizedBox(height: 14),
@@ -202,28 +202,28 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                         child: Row(children: [
-                          Icon(MdiIcons.fileUploadOutline, size: 20, color: cs.outline),
+                          Icon(AppIcons.fileUploadOutline, size: 20, color: cs.outline),
                           const SizedBox(width: 12),
                           Expanded(child: Text(
                             _keyName ?? 'Select key file',
                             style: TextStyle(fontSize: 14, color: _keyName != null ? cs.onSurface : cs.outline),
                             overflow: TextOverflow.ellipsis,
                           )),
-                          if (_keyName != null) Icon(MdiIcons.checkCircle, size: 18, color: cs.primary),
+                          if (_keyName != null) Icon(AppIcons.checkCircle, size: 18, color: cs.primary),
                         ]),
                       ),
                     ),
                   ),
                   const SizedBox(height: 14),
                   _label('Passphrase (optional)'),
-                  _field(_passphrase, hint: 'Passphrase', icon: MdiIcons.lockOutline, obscure: true),
+                  _field(_passphrase, hint: 'Passphrase', icon: AppIcons.lockOutline, obscure: true),
                 ],
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
                     onPressed: _connect,
-                    icon: Icon(MdiIcons.connection, size: 18),
+                    icon: Icon(AppIcons.connection, size: 18),
                     label: const Text('Connect'),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),

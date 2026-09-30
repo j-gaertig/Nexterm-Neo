@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/qr_scanner_page.dart';
 import '../utils/auth_manager.dart';
@@ -205,7 +205,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
           controller: _urlController, focusNode: _urlFocus,
           decoration: InputDecoration(
             labelText: 'Server URL', hintText: 'nexterm.example.com',
-            prefixIcon: Icon(MdiIcons.serverNetwork), border: const OutlineInputBorder(), errorText: _error,
+            prefixIcon: Icon(AppIcons.serverNetwork), border: const OutlineInputBorder(), errorText: _error,
           ),
           keyboardType: TextInputType.url, enabled: !_isLoading,
           onFieldSubmitted: (_) => _validateAndConnect(),
@@ -228,7 +228,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _isLoading ? null : _handleScanQr,
-          icon: Icon(MdiIcons.qrcodeScan), label: const Text('Scan QR Code'),
+          icon: Icon(AppIcons.qrcodeScan), label: const Text('Scan QR Code'),
           style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
         ),
       ],
@@ -247,7 +247,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-        trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+        trailing: Icon(AppIcons.chevronRight, color: cs.onSurfaceVariant),
         onTap: onTap,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -262,9 +262,9 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         Text('Choose how to authenticate with the server.',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
         const SizedBox(height: 24),
-        _authOption(cs, icon: MdiIcons.numeric, title: 'Enter Code', subtitle: 'Display a code to enter on the web interface', onTap: _handleShowCode),
+        _authOption(cs, icon: AppIcons.numeric, title: 'Enter Code', subtitle: 'Display a code to enter on the web interface', onTap: _handleShowCode),
         const SizedBox(height: 8),
-        _authOption(cs, icon: MdiIcons.openInNew, title: 'Open in Browser', subtitle: 'Open your browser to authorize', onTap: _handleOpenBrowser),
+        _authOption(cs, icon: AppIcons.openInNew, title: 'Open in Browser', subtitle: 'Open your browser to authorize', onTap: _handleOpenBrowser),
         const SizedBox(height: 24),
         OutlinedButton(onPressed: _goBack,
           style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), child: const Text('Back')),
@@ -295,7 +295,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.bold, fontFamily: 'monospace', letterSpacing: 4, color: cs.primary)),
             const SizedBox(width: 16),
-            IconButton(onPressed: _copyCode, icon: Icon(MdiIcons.contentCopy), tooltip: 'Copy code'),
+            IconButton(onPressed: _copyCode, icon: Icon(AppIcons.contentCopy), tooltip: 'Copy code'),
           ]),
         ),
         const SizedBox(height: 24),
@@ -305,7 +305,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
           Expanded(child: OutlinedButton(onPressed: _goBack,
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), child: const Text('Back'))),
           const SizedBox(width: 12),
-          Expanded(child: FilledButton.icon(onPressed: _handleOpenBrowser, icon: Icon(MdiIcons.openInNew), label: const Text('Open Browser'),
+          Expanded(child: FilledButton.icon(onPressed: _handleOpenBrowser, icon: Icon(AppIcons.openInNew), label: const Text('Open Browser'),
             style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)))),
         ]),
       ],

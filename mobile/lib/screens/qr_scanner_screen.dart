@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
 import '../services/api_config.dart';
@@ -98,7 +98,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
         child: Row(children: [
-          IconButton(icon: const Icon(Icons.arrow_back), onPressed: _authorizing ? null : _openScanner),
+          IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: _authorizing ? null : _openScanner),
           const SizedBox(width: 4),
           Text('Authorize Login', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
         ]),
@@ -112,7 +112,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(14)),
-              child: Icon(MdiIcons.monitorSmall, color: cs.onPrimaryContainer, size: 24),
+              child: Icon(AppIcons.monitorSmall, color: cs.onPrimaryContainer, size: 24),
             ),
             const SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -130,9 +130,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(16)),
           child: Column(children: [
-            _detailRow(MdiIcons.key, 'Device Code', _code ?? '', cs),
+            _detailRow(AppIcons.key, 'Device Code', _code ?? '', cs),
             Divider(height: 1, indent: 56, color: cs.outlineVariant.withValues(alpha: 0.3)),
-            _detailRow(MdiIcons.web, 'Server', _server ?? '', cs),
+            _detailRow(AppIcons.web, 'Server', _server ?? '', cs),
           ]),
         ),
       ),
@@ -142,7 +142,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
           child: Row(children: [
-            Icon(MdiIcons.alertCircle, color: cs.onErrorContainer, size: 18),
+            Icon(AppIcons.alertCircle, color: cs.onErrorContainer, size: 18),
             const SizedBox(width: 10),
             Expanded(child: Text(_error!, style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
           ]),

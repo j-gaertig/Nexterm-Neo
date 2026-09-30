@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../models/session_model.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_manager.dart';
@@ -52,14 +52,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   IconData _icon(String? ua) {
-    if (ua == null) return MdiIcons.devices;
-    if (ua.startsWith('NextermConnector/')) return MdiIcons.application;
-    if (ua.startsWith('NextermMobile/')) return MdiIcons.cellphoneLink;
+    if (ua == null) return AppIcons.devices;
+    if (ua.startsWith('NextermConnector/')) return AppIcons.application;
+    if (ua.startsWith('NextermMobile/')) return AppIcons.cellphoneLink;
     final l = ua.toLowerCase();
-    if (l.contains('mobile') || l.contains('android') || l.contains('iphone')) return MdiIcons.cellphone;
-    if (l.contains('tablet') || l.contains('ipad')) return MdiIcons.tablet;
-    if (l.contains('mac') || l.contains('windows') || l.contains('linux')) return MdiIcons.laptop;
-    return MdiIcons.devices;
+    if (l.contains('mobile') || l.contains('android') || l.contains('iphone')) return AppIcons.cellphone;
+    if (l.contains('tablet') || l.contains('ipad')) return AppIcons.tablet;
+    if (l.contains('mac') || l.contains('windows') || l.contains('linux')) return AppIcons.laptop;
+    return AppIcons.devices;
   }
 
   String _ago(DateTime? d) {
@@ -103,10 +103,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
             child: Row(children: [
-              IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => Navigator.pop(context)),
+              IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: () => Navigator.pop(context)),
               const SizedBox(width: 4),
               Expanded(child: Text('Active Sessions', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
-              IconButton(icon: Icon(MdiIcons.refresh, size: 22), onPressed: _load),
+              IconButton(icon: Icon(AppIcons.refresh, size: 22), onPressed: _load),
             ]),
           ),
           Expanded(
@@ -125,7 +125,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-        child: Icon(MdiIcons.monitor, size: 32, color: cs.outline),
+        child: Icon(AppIcons.monitor, size: 32, color: cs.outline),
       ),
       const SizedBox(height: 20),
       Text('No other sessions', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -167,7 +167,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             borderRadius: BorderRadius.circular(10),
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Icon(MdiIcons.deleteOutline, size: 18, color: cs.onErrorContainer),
+              child: Icon(AppIcons.deleteOutline, size: 18, color: cs.onErrorContainer),
             ),
           ),
         ),

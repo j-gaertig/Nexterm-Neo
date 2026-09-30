@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/terminal_settings.dart';
@@ -36,7 +36,7 @@ class _ToolbarGroupTile extends StatelessWidget {
           index: index,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Icon(MdiIcons.dragHorizontalVariant, color: cs.outline, size: 20),
+            child: Icon(AppIcons.dragHorizontalVariant, color: cs.outline, size: 20),
           ),
         ),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -181,7 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Container(
                   width: 48, height: 48,
                   decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(14)),
-                  child: Icon(MdiIcons.account, color: cs.onPrimaryContainer, size: 24),
+                  child: Icon(AppIcons.account, color: cs.onPrimaryContainer, size: 24),
                 ),
                 const SizedBox(width: 14),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -203,16 +203,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 8),
           _section(cs, children: [
-            _navTile(MdiIcons.serverNetwork, 'Connections',
+            _navTile(AppIcons.serverNetwork, 'Connections',
               '${widget.authManager.accountManager.accounts.length} server(s)', cs,
               () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => ServerAccountsScreen(authManager: widget.authManager)))),
             Divider(height: 1, indent: 56, color: cs.outlineVariant.withValues(alpha: 0.3)),
-            _navTile(MdiIcons.monitor, 'Sessions', 'Manage active sessions', cs,
+            _navTile(AppIcons.monitor, 'Sessions', 'Manage active sessions', cs,
               () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => SessionsScreen(authManager: widget.authManager)))),
             Divider(height: 1, indent: 56, color: cs.outlineVariant.withValues(alpha: 0.3)),
-            _navTile(MdiIcons.qrcodeScan, 'Scan QR Code', 'Authorize a web login', cs,
+            _navTile(AppIcons.qrcodeScan, 'Scan QR Code', 'Authorize a web login', cs,
               () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => QrScannerScreen(authManager: widget.authManager)))),
           ]),
@@ -229,15 +229,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.themeLightDark, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.themeLightDark, color: cs.onPrimaryContainer, size: 18),
                     ),
                     const SizedBox(width: 12),
                     const Expanded(child: Text('Theme', style: TextStyle(fontSize: 15))),
                     SegmentedButton<ThemeMode>(
                       segments: const [
-                        ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.settings_suggest, size: 18)),
-                        ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode, size: 18)),
-                        ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode, size: 18)),
+                        ButtonSegment(value: ThemeMode.system, icon: Icon(AppIcons.themeSystem, size: 18)),
+                        ButtonSegment(value: ThemeMode.light, icon: Icon(AppIcons.lightMode, size: 18)),
+                        ButtonSegment(value: ThemeMode.dark, icon: Icon(AppIcons.darkMode, size: 18)),
                       ],
                       selected: {mode},
                       onSelectionChanged: (s) => widget.themeManager.setThemeMode(s.first),
@@ -255,7 +255,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 secondary: Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                  child: Icon(MdiIcons.palette, color: cs.onPrimaryContainer, size: 18),
+                  child: Icon(AppIcons.palette, color: cs.onPrimaryContainer, size: 18),
                 ),
                 title: const Text('Dynamic Color', style: TextStyle(fontSize: 15)),
                 subtitle: Text('Use system accent color', style: TextStyle(fontSize: 12, color: cs.outline)),
@@ -282,7 +282,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             color: color, shape: BoxShape.circle,
                             border: sel ? Border.all(color: cs.onSurface, width: 2.5) : null,
                           ),
-                          child: sel ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+                          child: sel ? const Icon(AppIcons.check, color: Colors.white, size: 18) : null,
                         ),
                       );
                     }).toList()),
@@ -305,7 +305,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                        child: Icon(MdiIcons.formatSize, color: cs.onPrimaryContainer, size: 18),
+                        child: Icon(AppIcons.formatSize, color: cs.onPrimaryContainer, size: 18),
                       ),
                       const SizedBox(width: 12),
                       const Text('Font Size', style: TextStyle(fontSize: 15)),
@@ -316,9 +316,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     child: Row(children: [
-                      IconButton(icon: Icon(MdiIcons.minus, size: 18), onPressed: ts.fontSize > 8 ? () => ts.setFontSize(ts.fontSize - 1) : null),
+                      IconButton(icon: Icon(AppIcons.minus, size: 18), onPressed: ts.fontSize > 8 ? () => ts.setFontSize(ts.fontSize - 1) : null),
                       Expanded(child: Slider(value: ts.fontSize, min: 8, max: 24, divisions: 16, onChanged: (v) => ts.setFontSize(v))),
-                      IconButton(icon: Icon(MdiIcons.plus, size: 18), onPressed: ts.fontSize < 24 ? () => ts.setFontSize(ts.fontSize + 1) : null),
+                      IconButton(icon: Icon(AppIcons.plus, size: 18), onPressed: ts.fontSize < 24 ? () => ts.setFontSize(ts.fontSize + 1) : null),
                     ]),
                   ),
                   Divider(height: 1, indent: 16, endIndent: 16, color: cs.outlineVariant.withValues(alpha: 0.3)),
@@ -419,7 +419,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.fileHidden, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.fileHidden, color: cs.onPrimaryContainer, size: 18),
                     ),
                     title: const Text('Show Hidden Files', style: TextStyle(fontSize: 15)),
                     subtitle: Text('Show files starting with .', style: TextStyle(fontSize: 12, color: cs.outline)),
@@ -433,7 +433,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       secondary: Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                        child: Icon(MdiIcons.opacity, color: cs.onPrimaryContainer, size: 18),
+                        child: Icon(AppIcons.opacity, color: cs.onPrimaryContainer, size: 18),
                       ),
                       title: const Text('Dim Hidden Files', style: TextStyle(fontSize: 15)),
                       subtitle: Text('Display hidden files with reduced opacity.', style: TextStyle(fontSize: 12, color: cs.outline)),
@@ -447,7 +447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.deleteAlert, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.deleteAlert, color: cs.onPrimaryContainer, size: 18),
                     ),
                     title: const Text('Confirm Before Delete', style: TextStyle(fontSize: 15)),
                     value: sf.confirmBeforeDelete,
@@ -459,7 +459,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.folderArrowUp, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.folderArrowUp, color: cs.onPrimaryContainer, size: 18),
                     ),
                     title: const Text('Sort Folders First', style: TextStyle(fontSize: 15)),
                     value: sf.sortFoldersFirst,
@@ -471,7 +471,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.folderMultipleOutline, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.folderMultipleOutline, color: cs.onPrimaryContainer, size: 18),
                     ),
                     title: const Text('Show Servers in Files App', style: TextStyle(fontSize: 15)),
                     subtitle: Text(
@@ -489,7 +489,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     secondary: Container(
                       width: 36, height: 36,
                       decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                      child: Icon(MdiIcons.alertOutline, color: cs.onPrimaryContainer, size: 18),
+                      child: Icon(AppIcons.alertOutline, color: cs.onPrimaryContainer, size: 18),
                     ),
                     title: const Text('Warn Before Discarding', style: TextStyle(fontSize: 15)),
                     subtitle: Text(
@@ -535,7 +535,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Padding(padding: const EdgeInsets.only(top: 2),
               child: Text(sub, style: TextStyle(fontSize: 12, color: cs.outline))),
           ])),
-          Icon(MdiIcons.chevronRight, color: cs.outlineVariant, size: 18),
+          Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
         ]),
       ),
     ),

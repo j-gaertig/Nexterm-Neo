@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_material_design_icons/flutter_material_design_icons.dart';
+import '../utils/app_icons.dart';
 import '../models/server.dart';
 import '../models/server_folder.dart';
 import '../services/server_service.dart';
@@ -22,14 +22,6 @@ class ServersScreen extends StatefulWidget {
   @override
   State<ServersScreen> createState() => _ServersScreenState();
 }
-
-final Map<String, IconData> _mdiByCamelName = {
-  for (final icon in MdiIcons.values)
-    if (icon.mdiMetadata != null)
-      icon.mdiMetadata!.name.split('-').asMap().entries.map((e) =>
-        e.key == 0 ? e.value : e.value[0].toUpperCase() + e.value.substring(1)
-      ).join(): icon,
-};
 
 class _ServersScreenState extends State<ServersScreen> {
   List<dynamic> folders = [];
@@ -227,7 +219,7 @@ class _ServersScreenState extends State<ServersScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(MdiIcons.monitorMultiple, size: 16, color: cs.onPrimaryContainer),
+                    Icon(AppIcons.monitorMultiple, size: 16, color: cs.onPrimaryContainer),
                     const SizedBox(width: 6),
                     Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
                   ]),
@@ -242,9 +234,9 @@ class _ServersScreenState extends State<ServersScreen> {
             controller: _search,
             decoration: InputDecoration(
               hintText: 'Search servers...',
-              prefixIcon: Icon(MdiIcons.magnify, size: 22),
+              prefixIcon: Icon(AppIcons.magnify, size: 22),
               suffixIcon: _query.isNotEmpty
-                  ? IconButton(icon: Icon(MdiIcons.close, size: 20), onPressed: () => _search.clear())
+                  ? IconButton(icon: Icon(AppIcons.close, size: 20), onPressed: () => _search.clear())
                   : null,
               filled: true,
               fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
@@ -276,7 +268,7 @@ class _ServersScreenState extends State<ServersScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(10)),
               alignment: Alignment.center,
-              child: Icon(MdiIcons.close, size: 16, color: cs.onErrorContainer),
+              child: Icon(AppIcons.close, size: 16, color: cs.onErrorContainer),
             ),
           );
         }
@@ -314,14 +306,14 @@ class _ServersScreenState extends State<ServersScreen> {
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
-        child: Icon(MdiIcons.alertCircleOutline, size: 32, color: cs.onErrorContainer),
+        child: Icon(AppIcons.alertCircleOutline, size: 32, color: cs.onErrorContainer),
       ),
       const SizedBox(height: 20),
       Text('Something went wrong', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
       const SizedBox(height: 8),
       Text(errorMessage!, style: tt.bodySmall?.copyWith(color: cs.outline), textAlign: TextAlign.center),
       const SizedBox(height: 24),
-      FilledButton.icon(onPressed: _loadData, icon: Icon(MdiIcons.refresh, size: 18), label: const Text('Retry'),
+      FilledButton.icon(onPressed: _loadData, icon: Icon(AppIcons.refresh, size: 18), label: const Text('Retry'),
         style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
     ])),
@@ -335,7 +327,7 @@ class _ServersScreenState extends State<ServersScreen> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-          child: Icon(MdiIcons.serverOff, size: 32, color: cs.outline),
+          child: Icon(AppIcons.serverOff, size: 32, color: cs.outline),
         ),
         const SizedBox(height: 20),
         Text(_query.isEmpty ? 'No servers yet' : 'No results', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
@@ -368,10 +360,10 @@ class _ServersScreenState extends State<ServersScreen> {
     final serverCount = folder.allServers.length + folder.allFolders.fold(0, (sum, f) => sum + _countServers(f));
 
     final (icon, color) = folder.isOrganization
-        ? (open ? MdiIcons.domain : MdiIcons.domainOff, cs.primary)
+        ? (open ? AppIcons.brandDomain : AppIcons.brandDomainOff, cs.primary)
         : folder.isPveNode
-            ? (MdiIcons.server, cs.tertiary)
-            : (open ? MdiIcons.folderOpen : MdiIcons.folder, cs.primary);
+            ? (AppIcons.brandServer, cs.tertiary)
+            : (open ? AppIcons.brandFolderOpen : AppIcons.brandFolder, cs.primary);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
@@ -397,7 +389,7 @@ class _ServersScreenState extends State<ServersScreen> {
                 ])),
                 if (hasEntries)
                   AnimatedRotation(turns: open ? 0.5 : 0, duration: const Duration(milliseconds: 200),
-                    child: Icon(MdiIcons.chevronDown, color: cs.outline, size: 20)),
+                    child: Icon(AppIcons.chevronDown, color: cs.outline, size: 20)),
               ]),
             ),
           ),
@@ -461,7 +453,7 @@ class _ServersScreenState extends State<ServersScreen> {
                     width: 8, height: 8, margin: const EdgeInsets.only(left: 4),
                     decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
                   )).toList())),
-              Icon(MdiIcons.chevronRight, color: cs.outlineVariant, size: 18),
+              Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
             ]),
           ),
         ),
@@ -548,15 +540,15 @@ class _ServersScreenState extends State<ServersScreen> {
           ]),
         ),
         const SizedBox(height: 8),
-        _menuItem(ctx, MdiIcons.connection, 'Connect', cs, () {
+        _menuItem(ctx, AppIcons.connection, 'Connect', cs, () {
           Navigator.pop(ctx); _connectToServer(server);
         }),
         if (showQuick)
-          _menuItem(ctx, MdiIcons.cursorDefaultClick, 'Quick Connect', cs, () {
+          _menuItem(ctx, AppIcons.cursorDefaultClick, 'Quick Connect', cs, () {
             Navigator.pop(ctx); _quickConnect(server);
           }),
         if (server.canWakeOnLan)
-          _menuItem(ctx, MdiIcons.powerPlug, 'Wake-On-LAN', cs, () {
+          _menuItem(ctx, AppIcons.powerPlug, 'Wake-On-LAN', cs, () {
             Navigator.pop(ctx); _wakeServer(server);
           }),
         const SizedBox(height: 12),
@@ -688,11 +680,11 @@ class _ServersScreenState extends State<ServersScreen> {
         ),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
-          Expanded(child: _connectionOption(ctx, MdiIcons.consoleLine, 'Terminal', 'SSH session', cs, () {
+          Expanded(child: _connectionOption(ctx, AppIcons.consoleLine, 'Terminal', 'SSH session', cs, () {
             Navigator.pop(ctx); _initiateConnection(server);
           })),
           const SizedBox(width: 10),
-          Expanded(child: _connectionOption(ctx, MdiIcons.folderOutline, 'SFTP', 'File manager', cs, () {
+          Expanded(child: _connectionOption(ctx, AppIcons.folderOutline, 'SFTP', 'File manager', cs, () {
             Navigator.pop(ctx); _initiateConnection(server, type: ConnectionType.sftp);
           })),
         ])),
@@ -725,16 +717,16 @@ class _ServersScreenState extends State<ServersScreen> {
     final icon = server.icon;
     if (icon != null && icon.startsWith('mdi') && icon.length > 3) {
       final camel = icon.substring(3, 4).toLowerCase() + icon.substring(4);
-      final hit = _mdiByCamelName[camel];
+      final hit = AppIcons.resolveBackendIcon(camel);
       if (hit != null) return hit;
     }
-    if (server.type == 'pve-lxc') return MdiIcons.cubeOutline;
-    if (server.type == 'pve-qemu') return MdiIcons.monitor;
-    if (server.type == 'pve-shell') return MdiIcons.console;
+    if (server.type == 'pve-lxc') return AppIcons.brandCube;
+    if (server.type == 'pve-qemu') return AppIcons.brandMonitor;
+    if (server.type == 'pve-shell') return AppIcons.brandConsole;
     final p = server.protocol?.toLowerCase();
-    if (p == 'rdp') return MdiIcons.microsoftWindows;
-    if (p == 'vnc') return MdiIcons.remoteDesktop;
-    return MdiIcons.server;
+    if (p == 'rdp') return AppIcons.brandWindows;
+    if (p == 'vnc') return AppIcons.brandRemoteDesktop;
+    return AppIcons.brandServer;
   }
 
   Color _parseColor(String c) {
