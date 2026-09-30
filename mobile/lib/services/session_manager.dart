@@ -316,10 +316,7 @@ class SessionManager extends ChangeNotifier {
     return ConnectionType.terminal;
   }
 
-  Future<void> closeSession(String sessionId, String token) async {
-    final session = _sessions[sessionId];
-    if (session == null) return;
-
+  void _disconnectSession(AppSession session) {
     switch (session.type) {
       case ConnectionType.guacamole:
         try { session.guacClient?.disconnect(); } catch (_) {}
@@ -336,6 +333,13 @@ class SessionManager extends ChangeNotifier {
         try { session.sftpChannel?.sink.close(); } catch (_) {}
         break;
     }
+  }
+
+  Future<void> closeSession(String sessionId, String token) async {
+    final session = _sessions[sessionId];
+    if (session == null) return;
+
+    _disconnectSession(session);
 
     await ConnectionService.deleteSession(token: token, sessionId: sessionId);
     _sessions.remove(sessionId);
@@ -353,6 +357,7 @@ class SessionManager extends ChangeNotifier {
     try {
       session.termSubscription?.cancel();
       session.termSubscription = null;
+      try { session.termChannel?.sink.close(); } catch (_) {}
 
       final identityId = session.server.identities?.isNotEmpty == true
           ? session.server.identities!.first
@@ -385,6 +390,7 @@ class SessionManager extends ChangeNotifier {
     try {
       session.sftpSubscription?.cancel();
       session.sftpSubscription = null;
+      try { session.sftpChannel?.sink.close(); } catch (_) {}
 
       final queryParams = <String, String>{
         'sessionToken': token,
@@ -409,6 +415,7 @@ class SessionManager extends ChangeNotifier {
     required AppSession session,
   }) async {
     try {
+      _disconnectSession(session);
       final tunnel = GuacWebSocketTunnel(ApiClient.buildWebSocketUrl('/ws/guac/'));
       final client = GuacClient(tunnel);
 
@@ -424,27 +431,22 @@ class SessionManager extends ChangeNotifier {
   Future<void> closeAll(String token) async {
     final ids = _sessions.keys.toList();
     for (final id in ids) {
-      await closeSession(id, token);
+      final session = _sessions[id];
+      if (session == null) continue;
+      _disconnectSession(session);
+      try {
+        await ConnectionService.deleteSession(token: token, sessionId: id);
+      } catch (_) {}
+      _sessions.remove(id);
     }
+    _activeSessionId = null;
+    notifyListeners();
   }
 
   @override
   void dispose() {
     for (final session in _sessions.values) {
-      switch (session.type) {
-        case ConnectionType.guacamole:
-          try { session.guacClient?.disconnect(); } catch (_) {}
-          try { session.guacClient?.dispose(); } catch (_) {}
-          break;
-        case ConnectionType.terminal:
-          try { session.termSubscription?.cancel(); } catch (_) {}
-          try { session.termChannel?.sink.close(); } catch (_) {}
-          break;
-        case ConnectionType.sftp:
-          try { session.sftpSubscription?.cancel(); } catch (_) {}
-          try { session.sftpChannel?.sink.close(); } catch (_) {}
-          break;
-      }
+      _disconnectSession(session);
     }
     _sessions.clear();
     super.dispose();

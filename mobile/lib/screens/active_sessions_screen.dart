@@ -38,6 +38,7 @@ class ActiveSessionsScreen extends StatefulWidget {
 class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   double? _pillX;
   double _pillY = 0;
+  final ValueNotifier<bool> _closingAll = ValueNotifier(false);
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   void dispose() {
     widget.sessionManager.removeListener(_onChanged);
     widget.aiManager.removeListener(_onChanged);
+    _closingAll.dispose();
     super.dispose();
   }
 
@@ -60,7 +62,57 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   Future<void> _closeSession(String sessionId) async {
     final token = widget.authManager.sessionToken;
     if (token == null) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     await widget.sessionManager.closeSession(sessionId, token);
+  }
+
+  Future<void> _closeAllSessions(BuildContext sheetContext) async {
+    if (_closingAll.value) return;
+    final sm = widget.sessionManager;
+    final token = widget.authManager.sessionToken;
+    if (token == null || sm.sessions.isEmpty) return;
+    final count = sm.sessions.length;
+    final confirmed = await showDialog<bool>(
+      context: sheetContext,
+      builder: (dialogCtx) {
+        final cs = Theme.of(dialogCtx).colorScheme;
+        return AlertDialog(
+          title: const Text('Close all sessions?'),
+          content: Text('Close $count sessions? This cannot be undone.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+              ),
+              onPressed: () => Navigator.pop(dialogCtx, true),
+              child: const Text('Close all'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) return;
+    if (!mounted || sm.sessions.isEmpty) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    _closingAll.value = true;
+    try {
+      await sm.closeAll(token);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Failed to close sessions'),
+          behavior: SnackBarBehavior.floating));
+    } finally {
+      if (mounted) _closingAll.value = false;
+    }
+    if (sheetContext.mounted) {
+      Navigator.pop(sheetContext);
+    }
   }
 
   void _showSessionSwitcher() {
@@ -71,27 +123,37 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => ListenableBuilder(
-        listenable: sm,
-        builder: (_, __) => _SessionSwitcherSheet(
-          sessions: sm.sessions,
-          activeSessionId: sm.activeSessionId,
-          onSelect: (id) {
-            sm.setActive(id);
-            Navigator.pop(ctx);
-          },
-          onClose: (id) async {
-            await _closeSession(id);
-            if (sm.sessions.isEmpty && ctx.mounted) {
+      builder: (ctx) => ValueListenableBuilder<bool>(
+        valueListenable: _closingAll,
+        builder: (_, closing, __) => ListenableBuilder(
+          listenable: sm,
+          builder: (_, __) => _SessionSwitcherSheet(
+            sessions: sm.sessions,
+            activeSessionId: sm.activeSessionId,
+            isClosingAll: closing,
+            onSelect: (id) {
+              if (closing) return;
+              sm.setActive(id);
               Navigator.pop(ctx);
-            }
-          },
-          onExitFullscreen: widget.onExitFullscreen != null
-              ? () {
-                  Navigator.pop(ctx);
-                  widget.onExitFullscreen!();
-                }
-              : null,
+            },
+            onClose: (id) async {
+              if (closing) return;
+              await _closeSession(id);
+              if (sm.sessions.isEmpty && ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+            },
+            onCloseAll: sm.sessions.length > 1
+                ? () => _closeAllSessions(ctx)
+                : null,
+            onExitFullscreen: widget.onExitFullscreen != null
+                ? () {
+                    if (closing) return;
+                    Navigator.pop(ctx);
+                    widget.onExitFullscreen!();
+                  }
+                : null,
+          ),
         ),
       ),
     );
@@ -288,6 +350,8 @@ class _SessionSwitcherSheet extends StatelessWidget {
   final String? activeSessionId;
   final ValueChanged<String> onSelect;
   final ValueChanged<String> onClose;
+  final VoidCallback? onCloseAll;
+  final bool isClosingAll;
   final VoidCallback? onExitFullscreen;
 
   const _SessionSwitcherSheet({
@@ -295,6 +359,8 @@ class _SessionSwitcherSheet extends StatelessWidget {
     required this.activeSessionId,
     required this.onSelect,
     required this.onClose,
+    this.onCloseAll,
+    this.isClosingAll = false,
     this.onExitFullscreen,
   });
 
@@ -339,16 +405,45 @@ class _SessionSwitcherSheet extends StatelessWidget {
                 return _SessionTile(
                   session: s,
                   isActive: s.sessionId == activeSessionId,
+                  enabled: !isClosingAll,
                   onTap: () => onSelect(s.sessionId),
                   onClose: () => onClose(s.sessionId),
                 );
               },
             ),
           ),
+          if (onCloseAll != null) ...[
+            const Divider(height: 1),
+            ListTile(
+              dense: true,
+              enabled: !isClosingAll,
+              leading: isClosingAll
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.error,
+                      ),
+                    )
+                  : Icon(AppIcons.close, size: 20, color: cs.error),
+              title: Text(
+                isClosingAll
+                    ? 'Closing...'
+                    : 'Close all (${sessions.length})',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: cs.error),
+              ),
+              onTap: isClosingAll ? null : onCloseAll,
+            ),
+          ],
           if (onExitFullscreen != null) ...[
             const Divider(height: 1),
             ListTile(
               dense: true,
+              enabled: !isClosingAll,
               leading: Icon(AppIcons.exitToApp, size: 20, color: cs.outline),
               title: Text('Back to servers',
                   style: TextStyle(fontSize: 14, color: cs.onSurface)),
@@ -365,12 +460,14 @@ class _SessionSwitcherSheet extends StatelessWidget {
 class _SessionTile extends StatelessWidget {
   final AppSession session;
   final bool isActive;
+  final bool enabled;
   final VoidCallback onTap;
   final VoidCallback onClose;
 
   const _SessionTile({
     required this.session,
     required this.isActive,
+    this.enabled = true,
     required this.onTap,
     required this.onClose,
   });
@@ -424,13 +521,13 @@ class _SessionTile extends StatelessWidget {
                 color: isActive ? cs.onPrimaryContainer.withValues(alpha: 0.7) : cs.outline)),
         trailing: IconButton(
           icon: Icon(AppIcons.close, size: 16),
-          onPressed: onClose,
+          onPressed: enabled ? onClose : null,
           color: isActive ? cs.onPrimaryContainer : cs.outline,
           tooltip: 'Close session',
           constraints: const BoxConstraints(),
           padding: const EdgeInsets.all(8),
         ),
-        onTap: onTap,
+        onTap: enabled ? onTap : null,
       ),
     );
   }
