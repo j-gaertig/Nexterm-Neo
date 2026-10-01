@@ -416,7 +416,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                               ),
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               focusNode: _terminalFocusNode,
-                              autofocus: true,
+                              autofocus: false,
                               deleteDetection: Platform.isIOS,
                             ),
                             Positioned.fill(
