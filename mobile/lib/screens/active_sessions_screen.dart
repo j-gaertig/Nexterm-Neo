@@ -412,33 +412,6 @@ class _SessionSwitcherSheet extends StatelessWidget {
               },
             ),
           ),
-          if (onCloseAll != null) ...[
-            const Divider(height: 1),
-            ListTile(
-              dense: true,
-              enabled: !isClosingAll,
-              leading: isClosingAll
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.error,
-                      ),
-                    )
-                  : Icon(AppIcons.close, size: 20, color: cs.error),
-              title: Text(
-                isClosingAll
-                    ? 'Closing...'
-                    : 'Close all (${sessions.length})',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: cs.error),
-              ),
-              onTap: isClosingAll ? null : onCloseAll,
-            ),
-          ],
           if (onExitFullscreen != null) ...[
             const Divider(height: 1),
             ListTile(
@@ -448,6 +421,24 @@ class _SessionSwitcherSheet extends StatelessWidget {
               title: Text('Back to servers',
                   style: TextStyle(fontSize: 14, color: cs.onSurface)),
               onTap: onExitFullscreen,
+              trailing: onCloseAll != null
+                  ? (isClosingAll
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: cs.error,
+                          ),
+                        )
+                      : IconButton(
+                          icon: Icon(AppIcons.close, size: 20, color: cs.error),
+                          tooltip: 'Close all sessions',
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(8),
+                          onPressed: onCloseAll,
+                        ))
+                  : null,
             ),
           ],
           const SizedBox(height: 8),
