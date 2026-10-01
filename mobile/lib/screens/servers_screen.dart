@@ -10,6 +10,9 @@ import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/connection_reason_dialog.dart';
+import 'widgets/server_protocol_sheet.dart';
+import '../services/server_editor_service.dart';
+import 'server_editor_screen.dart';
 
 class ServersScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -79,16 +82,21 @@ class _ServersScreenState extends State<ServersScreen> {
 
   Future<void> _loadData() async {
     try {
-      await Future.delayed(const Duration(milliseconds: 100));
       final token = widget.authManager.sessionToken;
-      if (token == null) { setState(() { errorMessage = 'Not authenticated'; isLoading = false; }); return; }
+      if (token == null) {
+        if (!mounted) return;
+        setState(() { errorMessage = 'Not authenticated'; isLoading = false; });
+        return;
+      }
       final data = await ServerService.getServerList(token);
+      if (!mounted) return;
       _expanded.clear();
       if (_folderState != null) _restoreStates(data);
       _allTags = _collectTags(data);
       setState(() { folders = data; isLoading = false; errorMessage = null; });
       _filterFolders();
     } catch (e) {
+      if (!mounted) return;
       setState(() { errorMessage = 'Failed to load servers: $e'; isLoading = false; });
     }
   }
@@ -128,17 +136,33 @@ class _ServersScreenState extends State<ServersScreen> {
 
   ServerFolder? _filterFolder(ServerFolder folder) {
     final q = _query.toLowerCase();
-    final matchServers = folder.allServers.where((s) {
-      final matchesTag = _serverMatchesTags(s);
-      if (q.isEmpty) return matchesTag;
-      return matchesTag && (s.name.toLowerCase().contains(q) || s.ip.toLowerCase().contains(q));
-    }).toList();
-    final matchFolders = folder.allFolders.map(_filterFolder).whereType<ServerFolder>().toList();
-    if (folder.name.toLowerCase().contains(q) || matchServers.isNotEmpty || matchFolders.isNotEmpty) {
+    final nameMatches = q.isNotEmpty && folder.name.toLowerCase().contains(q);
+    List<Server> matchServers;
+    if (nameMatches) {
+      matchServers = folder.allServers.where((s) => _serverMatchesTags(s)).toList();
+    } else {
+      matchServers = folder.allServers.where((s) {
+        final matchesTag = _serverMatchesTags(s);
+        if (q.isEmpty) return matchesTag;
+        return matchesTag && (s.name.toLowerCase().contains(q) || s.ip.toLowerCase().contains(q));
+      }).toList();
+    }
+    final matchFolders = (nameMatches && _selectedTags.isEmpty)
+        ? folder.allFolders
+        : folder.allFolders.map(_filterFolder).whereType<ServerFolder>().toList();
+    if (matchServers.isNotEmpty || matchFolders.isNotEmpty) {
       return ServerFolder(
         id: folder.id, name: folder.name, type: folder.type, position: folder.position,
         organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
         entries: [...matchServers.map((s) => s.toJson()), ...matchFolders.map((f) => f.toJson())],
+        ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
+      );
+    }
+    if (nameMatches && _selectedTags.isEmpty) {
+      return ServerFolder(
+        id: folder.id, name: folder.name, type: folder.type, position: folder.position,
+        organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
+        entries: folder.entries,
         ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
       );
     }
@@ -150,6 +174,7 @@ class _ServersScreenState extends State<ServersScreen> {
       final token = widget.authManager.sessionToken;
       if (token == null) return;
       final data = await ServerService.getServerList(token);
+      if (!mounted) return;
       _allTags = _collectTags(data);
       _expanded.clear();
       if (_folderState != null) _restoreStates(data);
@@ -169,9 +194,13 @@ class _ServersScreenState extends State<ServersScreen> {
     }
   }
 
+  bool _isExpanded(dynamic id) {
+    return _expanded.any((e) => e.toString() == id.toString());
+  }
+
   Future<void> _toggleFolder(dynamic id) async {
-    _expanded.contains(id) ? _expanded.remove(id) : _expanded.add(id);
-    if (_folderState != null && id != null) await _folderState!.setFolderExpanded(id, _expanded.contains(id));
+    _isExpanded(id) ? _expanded.removeWhere((e) => e.toString() == id.toString()) : _expanded.add(id);
+    if (_folderState != null && id != null) await _folderState!.setFolderExpanded(id, _isExpanded(id));
     setState(() {});
   }
 
@@ -190,6 +219,10 @@ class _ServersScreenState extends State<ServersScreen> {
                 : errorMessage != null ? _buildError(cs, tt) : filteredFolders.isEmpty ? _buildEmpty(cs, tt) : _buildList(cs),
           ),
         ]),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createServer,
+        child: Icon(AppIcons.plus),
       ),
     );
   }
@@ -236,7 +269,15 @@ class _ServersScreenState extends State<ServersScreen> {
               hintText: 'Search servers...',
               prefixIcon: Icon(AppIcons.magnify, size: 22),
               suffixIcon: _query.isNotEmpty
-                  ? IconButton(icon: Icon(AppIcons.close, size: 20), onPressed: () => _search.clear())
+                  ? IconButton(
+                      icon: Icon(AppIcons.close, size: 20),
+                      onPressed: () {
+                        _search.clear();
+                        setState(() {
+                          _query = '';
+                          _filterFolders();
+                        });
+                      })
                   : null,
               filled: true,
               fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
@@ -330,10 +371,14 @@ class _ServersScreenState extends State<ServersScreen> {
           child: Icon(AppIcons.serverOff, size: 32, color: cs.outline),
         ),
         const SizedBox(height: 20),
-        Text(_query.isEmpty ? 'No servers yet' : 'No results', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        Text((_query.isEmpty && _selectedTags.isEmpty) ? 'No servers yet' : 'No results',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
-        Text(_query.isEmpty ? 'Add servers from the web dashboard' : 'Try a different search term',
-          style: tt.bodySmall?.copyWith(color: cs.outline)),
+        Text(
+            (_query.isEmpty && _selectedTags.isEmpty)
+                ? 'Add servers with the + button'
+                : (_query.isEmpty ? 'Clear tag filters to see more' : 'Try a different search term'),
+            style: tt.bodySmall?.copyWith(color: cs.outline)),
       ])),
     )]),
   );
@@ -356,7 +401,7 @@ class _ServersScreenState extends State<ServersScreen> {
   Widget _buildFolder(ServerFolder folder, int depth) {
     final cs = Theme.of(context).colorScheme;
     final hasEntries = folder.entries.isNotEmpty;
-    final open = _expanded.contains(folder.id);
+    final open = _isExpanded(folder.id);
     final serverCount = folder.allServers.length + folder.allFolders.fold(0, (sum, f) => sum + _countServers(f));
 
     final (icon, color) = folder.isOrganization
@@ -551,6 +596,16 @@ class _ServersScreenState extends State<ServersScreen> {
           _menuItem(ctx, AppIcons.powerPlug, 'Wake-On-LAN', cs, () {
             Navigator.pop(ctx); _wakeServer(server);
           }),
+        if (showQuick)
+          _menuItem(ctx, AppIcons.pencilOutline, 'Edit', cs, () {
+            Navigator.pop(ctx); _editServer(server);
+          }),
+        _menuItem(ctx, AppIcons.contentCopy, 'Duplicate', cs, () {
+          Navigator.pop(ctx); _duplicateServer(server);
+        }),
+        _menuItem(ctx, AppIcons.trashCanOutline, 'Delete', cs, () {
+          Navigator.pop(ctx); _deleteServer(server);
+        }),
         const SizedBox(height: 12),
       ])),
     );
@@ -624,6 +679,163 @@ class _ServersScreenState extends State<ServersScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Failed to send magic packet: $e'), behavior: SnackBarBehavior.floating));
+    }
+  }
+
+  List<FolderOption> _folderOptions() {
+    final out = <FolderOption>[];
+    void walk(List<dynamic> items) {
+      for (final item in items) {
+        if (item is ServerFolder) {
+          if (item.type == 'folder') {
+            out.add(FolderOption(id: item.id, name: item.name, type: item.type, organizationId: item.organizationId));
+          }
+          walk(item.allFolders);
+        }
+      }
+    }
+    walk(folders);
+    return out;
+  }
+
+  FolderOption? _expandedFolderContext() {
+    if (_expanded.isEmpty) return null;
+    final byId = <String, FolderOption>{};
+    final depth = <String, int>{};
+    void walk(List<dynamic> items, int level) {
+      for (final item in items) {
+        if (item is ServerFolder) {
+          final key = item.id.toString();
+          if (!byId.containsKey(key) || level > (depth[key] ?? -1)) {
+            byId[key] = _folderOptionOf(item);
+            depth[key] = level;
+          }
+          walk(item.allFolders, level + 1);
+        }
+      }
+    }
+    walk(folders, 0);
+    FolderOption? match;
+    int best = -1;
+    for (final id in _expanded) {
+      final key = id.toString();
+      if (byId.containsKey(key) && (depth[key] ?? 0) > best) {
+        match = byId[key];
+        best = depth[key] ?? 0;
+      }
+    }
+    return match;
+  }
+
+  FolderOption _folderOptionOf(ServerFolder folder) {
+    if (folder.isOrganization) {
+      dynamic orgId = folder.organizationId;
+      if (orgId == null && folder.id != null) {
+        orgId = int.tryParse(folder.id.toString().split('-').last) ?? folder.id;
+      }
+      return FolderOption(id: null, name: folder.name, type: 'organization', organizationId: orgId ?? folder.id);
+    }
+    return FolderOption(id: folder.id, name: folder.name, type: folder.type, organizationId: folder.organizationId);
+  }
+
+  FolderOption? _parentFolderOf(dynamic serverId) {
+    FolderOption? search(List<dynamic> items) {
+      for (final item in items) {
+        if (item is ServerFolder) {
+          if (item.allServers.any((s) => s.id.toString() == serverId.toString())) {
+            return _folderOptionOf(item);
+          }
+          final nested = search(item.allFolders);
+          if (nested != null) return nested;
+        }
+      }
+      return null;
+    }
+    return search(folders);
+  }
+
+  Future<void> _createServer() async {
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    final protocol = await showServerProtocolSheet(context);
+    if (protocol == null || !mounted) return;
+    final contextFolder = _expandedFolderContext();
+    final changed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ServerEditorScreen(
+          token: token,
+          initialProtocol: protocol,
+          folderOptions: _folderOptions(),
+          initialFolderId: contextFolder?.id,
+          initialOrganizationId: contextFolder?.organizationId,
+        ),
+      ),
+    );
+    if (changed == true) _refreshData();
+  }
+
+  Future<void> _editServer(Server server) async {
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    if (!mounted) return;
+    final parent = _parentFolderOf(server.id);
+    final changed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ServerEditorScreen(
+          token: token,
+          editServerId: server.id,
+          folderOptions: _folderOptions(),
+          initialFolderId: parent?.id,
+          initialOrganizationId: parent?.organizationId,
+        ),
+      ),
+    );
+    if (changed == true) _refreshData();
+  }
+
+  Future<void> _duplicateServer(Server server) async {
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    try {
+      await ServerEditorService.duplicateEntry(token: token, entryId: server.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${server.name} duplicated'), behavior: SnackBarBehavior.floating));
+      _refreshData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Duplicate failed: $e'), behavior: SnackBarBehavior.floating));
+    }
+  }
+
+  Future<void> _deleteServer(Server server) async {
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete server?'),
+        content: Text('${server.name} will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ServerEditorService.deleteEntry(token: token, entryId: server.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${server.name} deleted'), behavior: SnackBarBehavior.floating));
+      _refreshData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $e'), behavior: SnackBarBehavior.floating));
     }
   }
 
@@ -725,7 +937,9 @@ class _ServersScreenState extends State<ServersScreen> {
     if (server.type == 'pve-shell') return AppIcons.brandConsole;
     final p = server.protocol?.toLowerCase();
     if (p == 'rdp') return AppIcons.brandWindows;
-    if (p == 'vnc') return AppIcons.brandRemoteDesktop;
+    if (p == 'vnc') return AppIcons.brandMonitor;
+    if (p == 'ssh' || p == 'telnet') return AppIcons.brandConsole;
+    if (p == 'sftp' || p == 'ftp' || p == 'ftps') return AppIcons.folderOutline;
     return AppIcons.brandServer;
   }
 
