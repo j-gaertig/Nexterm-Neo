@@ -86,6 +86,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   String _afterOrder = 'remote-first';
   List<dynamic> _jumpHosts = [];
   List<Server> _sshCandidates = [];
+  // Full config as loaded from the backend. The mobile editor only manages a
+  // subset of keys; the rest (e.g. notes/showNoteInList, which are web-only)
+  // must be passed through untouched so editing doesn't reset them.
+  Map<String, dynamic> _originalConfig = {};
 
   List<int> _linkedIds = [];
   Map<String, IdentityDraft> _drafts = {};
@@ -268,6 +272,7 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
 
   void _applyDetails(ServerDetails details) {
     final c = details.config;
+    _originalConfig = Map<String, dynamic>.from(c);
     _name.text = details.name;
     _icon = details.icon;
     _syncIconCustom();
@@ -371,6 +376,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
         config['afterOrder'] = _afterOrder;
       }
     }
+    // Preserve web-only fields that this editor doesn't manage.
+    if (_originalConfig.containsKey('notes')) config['notes'] = _originalConfig['notes'];
+    if (_originalConfig.containsKey('showNoteInList')) config['showNoteInList'] = _originalConfig['showNoteInList'];
     return config;
   }
 

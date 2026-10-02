@@ -272,6 +272,20 @@ module.exports.editEntry = async (accountId, entryId, configuration) => {
         if (!hookCheck.valid) return hookCheck.error;
     }
 
+    // Preserve web-only config fields (e.g. notes) when the client sends a
+    // partial config that doesn't mention them. A blanket merge is deliberately
+    // avoided so intentionally removed keys (e.g. hooks after a protocol
+    // switch) are still deleted: the web dialog always round-trips the full
+    // config, while other clients (e.g. mobile) only manage a subset.
+    if (configuration.config !== undefined && entry.config && typeof entry.config === "object") {
+        if (configuration.config.notes === undefined && entry.config.notes !== undefined) {
+            configuration.config.notes = entry.config.notes;
+        }
+        if (configuration.config.showNoteInList === undefined && entry.config.showNoteInList !== undefined) {
+            configuration.config.showNoteInList = entry.config.showNoteInList;
+        }
+    }
+
     delete configuration.organizationId;
 
     await Entry.update(configuration, { where: { id: entryId } });
