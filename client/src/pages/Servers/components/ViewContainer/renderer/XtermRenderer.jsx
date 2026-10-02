@@ -6,6 +6,7 @@ import { useKeymaps, matchesKeybind, isMac } from "@/common/contexts/KeymapConte
 import { Terminal as Xterm } from "@xterm/xterm";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { FitAddon } from "@xterm/addon-fit";
+import { attachOsc52 } from "@/common/utils/osc52.js";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/common/components/ContextMenu";
 import AIAssistant from "./components/AIAssistant";
 import CommandSuggestion from "./components/CommandSuggestion";
@@ -459,6 +460,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.open(ref.current);
+        const osc52Disposable = attachOsc52(term, !isShared);
 
         const computePasswordHintPosition = () => {
             const cell = term._core?._renderService?.dimensions?.css?.cell;
@@ -878,6 +880,9 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             }
             cursorSyncDisposable.dispose();
             selectionDisposable.dispose();
+            try {
+                osc52Disposable?.dispose();
+            } catch {}
             term.dispose();
             clearInterval(interval);
             termRef.current = null;
