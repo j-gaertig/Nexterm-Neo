@@ -5,7 +5,7 @@ import '../services/api_config.dart';
 
 class ApiClient {
   static const Duration _timeout = Duration(seconds: 30);
-  static const String _appVersion = '1.0.8';
+  static const String _appVersion = '1.2.2';
   static String get userAgent => 'NextermMobile/$_appVersion (${Platform.operatingSystem}; ${Platform.operatingSystemVersion})';
 
   static String normalizeBaseUrl(String url) {
@@ -28,6 +28,9 @@ class ApiClient {
 
   static Future<http.Response> post(String endpoint, {Map<String, dynamic>? body, Map<String, String>? headers, String? token, Duration? timeout}) =>
       http.post(Uri.parse('${ApiConfig.baseUrl}$endpoint'), headers: _headers(headers, token), body: body != null ? json.encode(body) : null).timeout(timeout ?? _timeout);
+
+  static Future<http.Response> put(String endpoint, {Map<String, dynamic>? body, Map<String, String>? headers, String? token, Duration? timeout}) =>
+      http.put(Uri.parse('${ApiConfig.baseUrl}$endpoint'), headers: _headers(headers, token), body: body != null ? json.encode(body) : null).timeout(timeout ?? _timeout);
 
   static Future<http.Response> patch(String endpoint, {Map<String, dynamic>? body, Map<String, String>? headers, String? token, Duration? timeout}) =>
       http.patch(Uri.parse('${ApiConfig.baseUrl}$endpoint'), headers: _headers(headers, token), body: body != null ? json.encode(body) : null).timeout(timeout ?? _timeout);

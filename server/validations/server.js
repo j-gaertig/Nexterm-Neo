@@ -19,6 +19,8 @@ const configValidation = Joi.object({
     afterLocalCommand: Joi.string().allow("").max(2000).optional(),
     afterRemoteCommand: Joi.string().allow("").max(2000).optional(),
     afterOrder: Joi.string().valid("local-first", "remote-first").optional(),
+    notes: Joi.string().allow("", null).optional(),
+    showNoteInList: Joi.boolean().allow(null).optional(),
 }).unknown(true).custom((value, helpers) => {
     if (value.protocol && value.protocol !== "ssh") {
         for (const key of ["preLocalCommand", "preRemoteCommand", "preOrder", "afterLocalCommand", "afterRemoteCommand", "afterOrder"]) {
