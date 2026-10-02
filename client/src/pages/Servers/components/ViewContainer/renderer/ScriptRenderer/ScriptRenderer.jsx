@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect, useContext } from "react";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { attachOsc52, stripOsc52 } from "@/common/utils/osc52.js";
 import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { getWebSocketUrl } from "@/common/utils/ConnectionUtil.js";
@@ -151,13 +152,14 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
 
         const magicIndex = data.indexOf(SCRIPT_MAGIC);
         if (magicIndex === -1) {
-            term.write(data);
-            appendTerminalContent(data);
+            const clean = stripOsc52(data);
+            term.write(clean);
+            appendTerminalContent(clean);
             return;
         }
 
         if (magicIndex > 0) {
-            const terminalData = data.slice(0, magicIndex);
+            const terminalData = stripOsc52(data.slice(0, magicIndex));
             term.write(terminalData);
             appendTerminalContent(terminalData);
         }
@@ -224,9 +226,10 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
         fitAddonRef.current = fitAddon;
         term.loadAddon(fitAddon);
         term.open(containerRef.current);
+        const osc52Disposable = attachOsc52(term, !session.isJoined);
 
         if (initialTerminalContentRef.current?.length > 0) {
-            initialTerminalContentRef.current.forEach(content => term.write(content));
+            initialTerminalContentRef.current.forEach(content => term.write(stripOsc52(content)));
         }
 
         const handleResize = () => {
@@ -309,6 +312,9 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
                 ws.close();
             }
             
+            try {
+                osc52Disposable?.dispose();
+            } catch {}
             term.dispose();
             termRef.current = null;
             wsRef.current = null;

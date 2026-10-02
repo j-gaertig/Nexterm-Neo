@@ -3,6 +3,7 @@ import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { attachOsc52, stripOsc52 } from "@/common/utils/osc52.js";
 import { getWebSocketUrl } from "@/common/utils/ConnectionUtil.js";
 
 export const buildTerminalWebSocketUrl = (sessionToken, session) => {
@@ -74,9 +75,10 @@ export const useTerminal = (containerRef, session, options = {}) => {
         fitAddonRef.current = fitAddon;
         term.loadAddon(fitAddon);
         term.open(containerRef.current);
+        const osc52Disposable = attachOsc52(term, options.allowOsc52 !== false && !options.isShared && !session?.isJoined);
 
         if (restoreContent?.length > 0) {
-            restoreContent.forEach(content => term.write(content));
+            restoreContent.forEach(content => term.write(stripOsc52(content)));
         }
 
         const handleResize = () => {
@@ -136,6 +138,9 @@ export const useTerminal = (containerRef, session, options = {}) => {
                 ws.close();
             }
             
+            try {
+                osc52Disposable?.dispose();
+            } catch {}
             term.dispose();
             termRef.current = null;
             wsRef.current = null;
