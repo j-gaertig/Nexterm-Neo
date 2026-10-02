@@ -17,9 +17,19 @@ const parseOptions = (str) => {
 };
 
 const checkSudoPrompt = (output) => {
-    const patterns = ["[sudo] password for", "Password:", "sudo: a password is required", "sudo: a terminal is required"];
-    if (!patterns.some(p => output.includes(p))) return null;
-    const m = output.match(/\[sudo\] password for ([^:]+):/);
+    const text = stripAnsi(String(output ?? "")).replace(/\u00a0/g, " ").replace(/：/g, ":");
+    const rows = text.split(/[\r\n]/);
+    let target = "";
+    for (let i = rows.length - 1; i >= 0; i--) {
+        if (rows[i].trim().length > 0) {
+            target = Array.from(rows[i]).slice(-256).join("");
+            break;
+        }
+    }
+    const promptHit = /^(?:[^$#%>\r\n]{0,120})?(?:password|passwd|passwort|kennwort|passphrase|passcode|contrase\u00f1a|contrasenya|mot de passe|senha|wachtwoord|parola|parool|has\u0142o|heslo|jelsz\u00f3|l\u00f6senord|salasana|\u043f\u0430\u0440\u043e\u043b\u044c|\u5bc6\u7801|\u30d1\u30b9\u30ef\u30fc\u30c9|\uc554\ud638)(?:[^:?\r\n]{0,80})?[:?]\s*$/iu.test(target);
+    const sudoRequired = /sudo:\s*a (password|terminal) is required/i.test(text);
+    if (!promptHit && !sudoRequired) return null;
+    const m = text.match(/\[sudo\]\s+(?:password\s+for|passwort\s+f\u00fcr)\s+([^:]+):/i);
     return { variable: "SUDO_PASSWORD", prompt: `Enter sudo password for ${m?.[1] || "user"}`, default: "", isSudoPassword: true, type: "password" };
 };
 
@@ -129,7 +139,7 @@ const getScriptCommands = (b64, platform = "linux") => {
     return commands;
 };
 
-const stripAnsi = (s) => s.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "");
+const stripAnsi = (s) => String(s ?? "").replace(/\x1b\]8;;.*?\x1b\\/g, "").replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "");
 
 const findNextermCommand = (line) => {
     const clean = stripAnsi(line);

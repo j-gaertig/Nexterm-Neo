@@ -17,6 +17,7 @@ export const Terminal = () => {
         fontSize, setFontSize, cursorStyle, setCursorStyle, cursorBlink, setCursorBlink,
         copyPasteBehavior, setCopyPasteBehavior,
         passwordPromptDetection, setPasswordPromptDetection,
+        passwordPromptPattern, setPasswordPromptPattern,
         autoReconnect, setAutoReconnect,
         getAvailableThemes, getAvailableFonts, getTerminalTheme, getCursorStyles,
         isGroupSynced, toggleGroupSync,
@@ -120,6 +121,18 @@ export const Terminal = () => {
         </div>
     );
 
+    const [patternError, setPatternError] = useState(null);
+
+    const handlePatternChange = (value) => {
+        try {
+            if (value) new RegExp(value, "i");
+            setPatternError(null);
+        } catch {
+            setPatternError(t("settings.terminal.input.passwordPromptPatternInvalid"));
+        }
+        setPasswordPromptPattern(value);
+    };
+
     return (
         <div className="terminal-settings-page">
             {renderSection(t("settings.terminal.font.title"), t("settings.terminal.font.description"), "terminal.font", (
@@ -141,6 +154,19 @@ export const Terminal = () => {
                     {renderFontOption(t("settings.terminal.input.copyPasteBehavior"), copyPasteBehaviorOptions, copyPasteBehavior, setCopyPasteBehavior)}
                     {renderFontOption(t("settings.terminal.input.passwordPromptDetection"), toggleOptions, passwordPromptDetection.toString(), (value) => setPasswordPromptDetection(value === "true"))}
                     {renderFontOption(t("settings.terminal.input.autoReconnect"), toggleOptions, autoReconnect.toString(), (value) => setAutoReconnect(value === "true"))}
+                    <div className="font-option pattern-option">
+                        <label>{t("settings.terminal.input.passwordPromptPattern")}</label>
+                        <input
+                            className={`terminal-text-input${patternError ? " invalid" : ""}`}
+                            type="text"
+                            value={passwordPromptPattern || ""}
+                            placeholder={t("settings.terminal.input.passwordPromptPatternPlaceholder")}
+                            onChange={(e) => handlePatternChange(e.target.value)}
+                            spellCheck={false}
+                            autoComplete="off"
+                        />
+                        <span className="pattern-hint">{patternError || t("settings.terminal.input.passwordPromptPatternHint")}</span>
+                    </div>
                 </div>
             ))}
 
