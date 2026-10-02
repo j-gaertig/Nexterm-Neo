@@ -295,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ]),
 
-          _sectionHeader('Serverliste', cs),
+          _sectionHeader('Server List', cs),
           _section(cs, children: [
             ListenableBuilder(
               listenable: widget.serverViewSettings,
@@ -308,14 +308,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                        child: Icon(AppIcons.viewGrid, color: cs.onPrimaryContainer, size: 18),
+                        child: Icon(sv.isGrid ? AppIcons.viewGrid : AppIcons.viewList, color: cs.onPrimaryContainer, size: 18),
                       ),
                       const SizedBox(width: 12),
-                      const Expanded(child: Text('Darstellung', style: TextStyle(fontSize: 15))),
+                      const Expanded(child: Text('View', style: TextStyle(fontSize: 15))),
                       SegmentedButton<ServerViewMode>(
                         segments: const [
-                          ButtonSegment(value: ServerViewMode.list, icon: Icon(AppIcons.viewList, size: 18), label: Text('Liste')),
-                          ButtonSegment(value: ServerViewMode.grid, icon: Icon(AppIcons.viewGrid, size: 18), label: Text('Raster')),
+                          ButtonSegment(value: ServerViewMode.list, icon: Icon(AppIcons.viewList, size: 18), label: Text('List')),
+                          ButtonSegment(value: ServerViewMode.grid, icon: Icon(AppIcons.viewGrid, size: 18), label: Text('Grid')),
                         ],
                         selected: {sv.mode},
                         onSelectionChanged: (s) => sv.setMode(s.first),
@@ -328,7 +328,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       child: Row(children: [
-                        const Text('Spalten', style: TextStyle(fontSize: 15)),
+                        const Text('Columns', style: TextStyle(fontSize: 15)),
                         const Spacer(),
                         Text('${sv.gridColumns}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.outline)),
                       ]),
@@ -339,9 +339,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Expanded(
                           child: Slider(
                             value: sv.gridColumns.toDouble(),
-                            min: 1,
-                            max: 5,
-                            divisions: 4,
+                            min: 2,
+                            max: 4,
+                            divisions: 2,
                             label: '${sv.gridColumns}',
                             onChanged: (v) => sv.setGridColumns(v.round()),
                           ),
