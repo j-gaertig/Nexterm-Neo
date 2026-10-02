@@ -7,6 +7,7 @@ import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
+import '../utils/server_view_settings.dart';
 import '../services/api_config.dart';
 import 'sessions_screen.dart';
 import 'server_accounts_screen.dart';
@@ -54,6 +55,7 @@ class SettingsScreen extends StatefulWidget {
   final AuthManager authManager;
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
+  final ServerViewSettings serverViewSettings;
 
   const SettingsScreen({
     super.key,
@@ -61,6 +63,7 @@ class SettingsScreen extends StatefulWidget {
     required this.authManager,
     required this.terminalSettings,
     required this.sftpSettings,
+    required this.serverViewSettings,
   });
 
   @override
@@ -288,6 +291,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     }).toList()),
                   ]),
                 );
+              },
+            ),
+          ]),
+
+          _sectionHeader('Serverliste', cs),
+          _section(cs, children: [
+            ListenableBuilder(
+              listenable: widget.serverViewSettings,
+              builder: (_, __) {
+                final sv = widget.serverViewSettings;
+                return Column(children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    child: Row(children: [
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                        child: Icon(AppIcons.viewGrid, color: cs.onPrimaryContainer, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(child: Text('Darstellung', style: TextStyle(fontSize: 15))),
+                      SegmentedButton<ServerViewMode>(
+                        segments: const [
+                          ButtonSegment(value: ServerViewMode.list, icon: Icon(AppIcons.viewList, size: 18), label: Text('Liste')),
+                          ButtonSegment(value: ServerViewMode.grid, icon: Icon(AppIcons.viewGrid, size: 18), label: Text('Raster')),
+                        ],
+                        selected: {sv.mode},
+                        onSelectionChanged: (s) => sv.setMode(s.first),
+                        style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                      ),
+                    ]),
+                  ),
+                  if (sv.isGrid) ...[
+                    Divider(height: 1, indent: 56, color: cs.outlineVariant.withValues(alpha: 0.3)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      child: Row(children: [
+                        const Text('Spalten', style: TextStyle(fontSize: 15)),
+                        const Spacer(),
+                        Text('${sv.gridColumns}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.outline)),
+                      ]),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      child: Row(children: [
+                        Expanded(
+                          child: Slider(
+                            value: sv.gridColumns.toDouble(),
+                            min: 1,
+                            max: 5,
+                            divisions: 4,
+                            label: '${sv.gridColumns}',
+                            onChanged: (v) => sv.setGridColumns(v.round()),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ],
+                ]);
               },
             ),
           ]),

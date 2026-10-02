@@ -8,6 +8,7 @@ import '../services/session_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
+import '../utils/server_view_settings.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/connection_reason_dialog.dart';
 
@@ -15,9 +16,10 @@ class ServersScreen extends StatefulWidget {
   final AuthManager authManager;
   final SnippetManager snippetManager;
   final SessionManager sessionManager;
+  final ServerViewSettings serverViewSettings;
   final VoidCallback? onSwitchToSessions;
 
-  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, this.onSwitchToSessions});
+  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSwitchToSessions});
 
   @override
   State<ServersScreen> createState() => _ServersScreenState();
@@ -185,9 +187,12 @@ class _ServersScreenState extends State<ServersScreen> {
         child: Column(children: [
           _buildHeader(cs, tt),
           Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : errorMessage != null ? _buildError(cs, tt) : filteredFolders.isEmpty ? _buildEmpty(cs, tt) : _buildList(cs),
+            child: ListenableBuilder(
+              listenable: widget.serverViewSettings,
+              builder: (_, __) => isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : errorMessage != null ? _buildError(cs, tt) : filteredFolders.isEmpty ? _buildEmpty(cs, tt) : _buildList(cs),
+            ),
           ),
         ]),
       ),
@@ -338,14 +343,30 @@ class _ServersScreenState extends State<ServersScreen> {
     )]),
   );
 
-  Widget _buildList(ColorScheme cs) => RefreshIndicator(
-    onRefresh: _refreshData,
-    child: ListView.builder(
-      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16, top: 4),
-      itemCount: filteredFolders.length,
-      itemBuilder: (_, i) => _buildEntry(filteredFolders[i], 0),
-    ),
-  );
+  Widget _buildList(ColorScheme cs) {
+    if (!widget.serverViewSettings.isGrid) {
+      return RefreshIndicator(
+        onRefresh: _refreshData,
+        child: ListView.builder(
+          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16, top: 4),
+          itemCount: filteredFolders.length,
+          itemBuilder: (_, i) => _buildEntry(filteredFolders[i], 0),
+        ),
+      );
+    }
+    final topServers = filteredFolders.whereType<Server>().toList();
+    final rest = filteredFolders.where((e) => e is! Server).toList();
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: ListView(
+        padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16, top: 4),
+        children: [
+          if (topServers.isNotEmpty) _buildServerGrid(topServers, 0),
+          for (final e in rest) _buildEntry(e, 0),
+        ],
+      ),
+    );
+  }
 
   Widget _buildEntry(dynamic entry, int depth) {
     if (entry is ServerFolder) return _buildFolder(entry, depth);
@@ -398,7 +419,10 @@ class _ServersScreenState extends State<ServersScreen> {
       AnimatedCrossFade(
         firstChild: const SizedBox(width: double.infinity),
         secondChild: Column(children: [
-          for (final s in folder.allServers) _buildServer(s, depth + 1),
+          if (folder.allServers.isNotEmpty)
+            widget.serverViewSettings.isGrid
+                ? _buildServerGrid(folder.allServers, depth + 1)
+                : Column(children: [for (final s in folder.allServers) _buildServer(s, depth + 1)]),
           for (final f in folder.allFolders) _buildFolder(f, depth + 1),
         ]),
         crossFadeState: open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
@@ -406,6 +430,89 @@ class _ServersScreenState extends State<ServersScreen> {
         sizeCurve: Curves.easeInOut,
       ),
     ]);
+  }
+
+  Widget _buildServerGrid(List<Server> servers, int depth) {
+    final columns = widget.serverViewSettings.gridColumns;
+    final ratio = columns <= 1 ? 2.4 : columns == 2 ? 0.92 : columns == 3 ? 0.66 : columns == 4 ? 0.52 : 0.42;
+    return Padding(
+      padding: EdgeInsets.only(left: 12.0 + depth * 16, right: 12, top: 4, bottom: 4),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: ratio,
+        ),
+        itemCount: servers.length,
+        itemBuilder: (_, i) => _buildServerGridCard(servers[i]),
+      ),
+    );
+  }
+
+  Widget _buildServerGridCard(Server server) {
+    final cs = Theme.of(context).colorScheme;
+    final offline = server.isStopped;
+    final pve = server.isPve;
+    final icon = _serverIcon(server);
+    final (bg, fg) = offline
+        ? (cs.surfaceContainerHighest, cs.outline)
+        : pve ? (cs.tertiaryContainer, cs.onTertiaryContainer) : (cs.primaryContainer, cs.onPrimaryContainer);
+    String? sub;
+    if (pve && server.status != null) {
+      sub = server.ip.isNotEmpty && server.ip != 'N/A' ? '${server.status} · ${server.ip}' : server.status;
+    } else if (server.ip.isNotEmpty && server.ip != 'N/A') {
+      sub = server.ip;
+    }
+    return Material(
+      color: cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => _connectToServer(server),
+        onLongPress: () => _showServerMenu(server),
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+                child: Center(child: Icon(icon, color: fg, size: 20)),
+              ),
+              const SizedBox(height: 10),
+              Text(server.name,
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: offline ? cs.outline : cs.onSurface),
+                maxLines: 2, overflow: TextOverflow.ellipsis),
+              if (sub != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(sub, style: TextStyle(fontSize: 11, color: cs.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              const Spacer(),
+              if (server.tags?.isNotEmpty == true)
+                Row(children: server.tags!.take(5).map((t) => Container(
+                  width: 8, height: 8, margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
+                )).toList()),
+            ]),
+          ),
+          Positioned(
+            top: 12, right: 12,
+            child: Container(
+              width: 8, height: 8,
+              decoration: BoxDecoration(
+                color: offline ? cs.outlineVariant : Colors.green,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   Widget _buildServer(Server server, int depth) {
