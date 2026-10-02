@@ -376,9 +376,13 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
         config['afterOrder'] = _afterOrder;
       }
     }
-    // Preserve web-only fields that this editor doesn't manage.
-    if (_originalConfig.containsKey('notes')) config['notes'] = _originalConfig['notes'];
-    if (_originalConfig.containsKey('showNoteInList')) config['showNoteInList'] = _originalConfig['showNoteInList'];
+    // Preserve web-only fields that this editor doesn't manage. Only pass
+    // through values with the expected type: null/legacy values are omitted
+    // so the request stays valid and the backend keeps the stored value.
+    final notes = _originalConfig['notes'];
+    if (notes is String) config['notes'] = notes;
+    final showNoteInList = _originalConfig['showNoteInList'];
+    if (showNoteInList is bool) config['showNoteInList'] = showNoteInList;
     return config;
   }
 
