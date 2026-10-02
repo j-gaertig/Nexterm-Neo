@@ -2,8 +2,14 @@ name: Sync upstream Nexterm
 
 on:
   schedule:
-    - cron: "0 2,8,14,20 * * *"
-      timezone: Europe/Berlin
+    - cron: '0 2 * * *'
+      timezone: "Europe/Berlin"
+    - cron: '0 8 * * *'
+      timezone: "Europe/Berlin"
+    - cron: '0 14 * * *'
+      timezone: "Europe/Berlin"
+    - cron: '0 20 * * *'
+      timezone: "Europe/Berlin"
   workflow_dispatch:
 
 concurrency:
