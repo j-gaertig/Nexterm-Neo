@@ -23,7 +23,7 @@ one issue; explain why each touched component is needed. -->
 ## Scope and context
 
 <!-- Link related issues or discussions when applicable (for example, Fixes #123).
-For a larger feature or behavior change, summarize any relevant prior discussion. -->
+For a larger feature or behavior change, summarize any relevant prior discussion if available. -->
 
 ## Verification
 
@@ -36,4 +36,4 @@ the change. -->
 
 - [ ] I followed the existing project style and reviewed my changes.
 - [ ] I tested the changed behavior or explained why testing was not applicable.
-- [ ] This PR contains no translation changes; translations are managed through [Crowdin](https://crowdin.com/project/nexterm).
+- [ ] This PR contains no translation changes; only the en.json file was updated with new/edited tags..
