@@ -11,6 +11,7 @@ import 'utils/snippet_manager.dart';
 import 'utils/server_account_manager.dart';
 import 'utils/terminal_settings.dart';
 import 'utils/sftp_settings.dart';
+import 'utils/server_view_settings.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +22,7 @@ void main() async {
   final accentSettings = await ThemeManager.loadAccentSettings();
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
+  final serverViewSettings = await ServerViewSettings.load();
 
   final accountManager = ServerAccountManager();
   await accountManager.load();
@@ -32,6 +34,7 @@ void main() async {
     useDynamicColor: accentSettings.useDynamicColor,
     terminalSettings: terminalSettings,
     sftpSettings: sftpSettings,
+    serverViewSettings: serverViewSettings,
   ));
 }
 
@@ -42,6 +45,7 @@ class MyApp extends StatefulWidget {
   final bool useDynamicColor;
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
+  final ServerViewSettings serverViewSettings;
 
   const MyApp({
     super.key,
@@ -51,6 +55,7 @@ class MyApp extends StatefulWidget {
     required this.useDynamicColor,
     required this.terminalSettings,
     required this.sftpSettings,
+    required this.serverViewSettings,
   });
 
   @override
@@ -65,6 +70,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late SessionManager _sessionManager;
   late TerminalSettings _terminalSettings;
   late SftpSettings _sftpSettings;
+  late ServerViewSettings _serverViewSettings;
 
   @override
   void initState() {
@@ -81,6 +87,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _sessionManager = SessionManager();
     _terminalSettings = widget.terminalSettings;
     _sftpSettings = widget.sftpSettings;
+    _serverViewSettings = widget.serverViewSettings;
 
     _authManager.addListener(_onAuthChanged);
 
@@ -130,6 +137,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _sessionManager.dispose();
     _terminalSettings.dispose();
     _sftpSettings.dispose();
+    _serverViewSettings.dispose();
     super.dispose();
   }
 
@@ -179,6 +187,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             sessionManager: _sessionManager,
             terminalSettings: _terminalSettings,
             sftpSettings: _sftpSettings,
+            serverViewSettings: _serverViewSettings,
           )
         : DeviceSetupScreen(authManager: _authManager);
   }

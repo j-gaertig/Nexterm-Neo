@@ -11,6 +11,7 @@ import '../utils/snippet_manager.dart';
 import '../utils/ai_manager.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
+import '../utils/server_view_settings.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
 import 'monitoring_screen.dart';
@@ -24,6 +25,7 @@ class MainNavigationPage extends StatefulWidget {
   final SessionManager sessionManager;
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
+  final ServerViewSettings serverViewSettings;
 
   const MainNavigationPage({
     super.key,
@@ -34,6 +36,7 @@ class MainNavigationPage extends StatefulWidget {
     required this.sessionManager,
     required this.terminalSettings,
     required this.sftpSettings,
+    required this.serverViewSettings,
   });
 
   @override
@@ -97,6 +100,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         authManager: widget.authManager,
         snippetManager: widget.snippetManager,
         sessionManager: widget.sessionManager,
+        serverViewSettings: widget.serverViewSettings,
         onSwitchToSessions: () {
           if (_hasSessions) _switchTab(1);
         },
@@ -117,6 +121,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         authManager: widget.authManager,
         terminalSettings: widget.terminalSettings,
         sftpSettings: widget.sftpSettings,
+        serverViewSettings: widget.serverViewSettings,
       ),
     ];
 

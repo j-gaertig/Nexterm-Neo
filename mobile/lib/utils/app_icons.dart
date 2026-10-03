@@ -114,6 +114,8 @@ class AppIcons {
   static const IconData toolbox = LucideIcons.toolbox;
   static const IconData trashCanOutline = LucideIcons.trash2;
   static const IconData uploadOutline = LucideIcons.upload;
+  static const IconData viewList = LucideIcons.list;
+  static const IconData viewGrid = LucideIcons.grid2x2;
   static const IconData web = LucideIcons.globe;
   static const IconData zipBoxOutline = LucideIcons.archive;
 
