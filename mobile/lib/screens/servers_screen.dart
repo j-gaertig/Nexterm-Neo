@@ -197,12 +197,7 @@ class _ServersScreenState extends State<ServersScreen> {
           ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
         );
       }
-      return ServerFolder(
-        id: folder.id, name: folder.name, type: folder.type, position: folder.position,
-        organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
-        entries: const [],
-        ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
-      );
+      return null;
     }
     final List<dynamic> kept = [];
     for (final e in folder.entries) {
@@ -358,7 +353,7 @@ class _ServersScreenState extends State<ServersScreen> {
               hintText: 'Search servers...',
               prefixIcon: Icon(AppIcons.magnify, size: 22),
               suffixIcon: _hasText
-                  ? IconButton(icon: Icon(AppIcons.close, size: 20), onPressed: _clearSearch)
+                  ? IconButton(icon: Icon(AppIcons.close, size: 20), tooltip: 'Clear search', onPressed: _clearSearch)
                   : null,
               filled: true,
               fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
@@ -471,10 +466,10 @@ class _ServersScreenState extends State<ServersScreen> {
         const SizedBox(height: 6),
         Text(_hasActiveFilter ? 'Try a different search term or clear filters' : 'Add servers from the web dashboard',
           style: tt.bodySmall?.copyWith(color: cs.outline), textAlign: TextAlign.center),
-        if (_selectedTags.isNotEmpty) ...[
+        if (_hasActiveFilter) ...[
           const SizedBox(height: 16),
           TextButton.icon(
-            onPressed: () => setState(() { _selectedTags.clear(); _filterFolders(); }),
+            onPressed: () { _selectedTags.clear(); _clearSearch(); },
             icon: Icon(AppIcons.close, size: 16),
             label: const Text('Clear filters'),
           ),
@@ -494,7 +489,7 @@ class _ServersScreenState extends State<ServersScreen> {
           itemBuilder: (_, i) {
             final e = filteredFolders[i];
             if (e is ServerFolder) {
-              return _buildFolder(e, 0, key: ValueKey('folder:${e.id ?? e.name}:${e.type}'));
+              return _buildFolder(e, 0, key: ValueKey('folder:${e.id ?? e.name}:${e.type}:${e.position}'));
             }
             if (e is Server) {
               return _buildServer(e, 0, key: ValueKey('server:${e.id ?? e.name}'));
@@ -523,7 +518,7 @@ class _ServersScreenState extends State<ServersScreen> {
 
   Widget _buildEntry(dynamic entry, int depth) {
     if (entry is ServerFolder) {
-      return _buildFolder(entry, depth, key: ValueKey('folder:${entry.id ?? entry.name}:${entry.type}'));
+      return _buildFolder(entry, depth, key: ValueKey('folder:${entry.id ?? entry.name}:${entry.type}:${entry.position}'));
     }
     if (entry is Server) return _buildServer(entry, depth, key: ValueKey('server:${entry.id ?? entry.name}'));
     return const SizedBox.shrink();
@@ -580,7 +575,8 @@ class _ServersScreenState extends State<ServersScreen> {
                   widget.serverViewSettings.isGrid
                       ? _buildServerGrid(folder.allServers, depth + 1)
                       : Column(children: [for (final s in folder.allServers) _buildServer(s, depth + 1, key: ValueKey('server:${s.id ?? s.name}'))]),
-                for (final f in folder.allFolders) _buildFolder(f, depth + 1),
+                for (final f in folder.allFolders)
+                  _buildFolder(f, depth + 1, key: ValueKey('folder:${f.id ?? f.name}:${f.type}:${f.position}')),
               ])
             : const SizedBox(width: double.infinity),
         crossFadeState: open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
@@ -599,9 +595,9 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   double _gridRatio(int columns) {
-    if (columns <= 2) return 0.88;
-    if (columns == 3) return 0.72;
-    return 0.62;
+    if (columns <= 2) return 0.82;
+    if (columns == 3) return 0.68;
+    return 0.58;
   }
 
   Widget _buildServerGrid(List<Server> servers, int depth) {
@@ -649,7 +645,7 @@ class _ServersScreenState extends State<ServersScreen> {
       sub = ip;
     }
     final tags = server.tags ?? const <Tag>[];
-    final shownTags = tags.take(4).toList();
+    final shownTags = tags.take(2).toList();
     final extraTags = tags.length - shownTags.length;
     final statusLabel = offline ? 'Offline' : 'Online';
     return Semantics(
@@ -664,58 +660,64 @@ class _ServersScreenState extends State<ServersScreen> {
           onTap: () => _connectToServer(server),
           onLongPress: () => _showServerMenu(server),
           borderRadius: BorderRadius.circular(14),
-          child: Stack(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 28, 12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 40, height: 40,
-                  decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-                  child: Center(child: Icon(icon, color: fg, size: 20)),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                    Text(server.name,
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: offline ? cs.outline : cs.onSurface),
-                      maxLines: 2, overflow: TextOverflow.ellipsis),
-                    if (sub != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 2),
-                        child: Text(sub, style: TextStyle(fontSize: 11, color: cs.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ),
-                  ]),
-                ),
-                if (tags.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(children: [
-                      for (final t in shownTags)
-                        Container(
-                          width: 8, height: 8, margin: const EdgeInsets.only(right: 4),
-                          decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
-                        ),
-                      if (extraTags > 0)
-                        Text('+$extraTags', style: TextStyle(fontSize: 10, color: cs.outline)),
-                    ]),
-                  ),
-              ]),
-            ),
-            Positioned(
-              top: 14, right: 14,
-              child: Semantics(
-                excludeSemantics: true,
-                child: Container(
-                  width: 10, height: 10,
-                  decoration: BoxDecoration(
-                    color: offline ? cs.outlineVariant : const Color(0xFF22C55E),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: cs.surfaceContainerHigh, width: 1),
-                  ),
-                ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(
+                width: 40, height: 40,
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
+                child: Center(child: Icon(icon, color: fg, size: 20)),
               ),
-            ),
-          ]),
+              const SizedBox(height: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text(server.name,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: offline ? cs.outline : cs.onSurface),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                  if (sub != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(sub, style: TextStyle(fontSize: 11, color: cs.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ),
+                ]),
+              ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 22),
+                child: tags.isEmpty
+                    ? const SizedBox.shrink()
+                    : Row(children: [
+                        for (final t in shownTags)
+                          Flexible(
+                            child: Semantics(
+                              button: true,
+                              label: 'Filter by ${t.name}',
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: () => setState(() {
+                                  _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
+                                  _filterFolders();
+                                }),
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: _parseColor(t.color).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(7),
+                                  border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
+                                ),
+                                child: Text(t.name,
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (extraTags > 0)
+                          Text('+$extraTags', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.outline)),
+                      ]),
+              ),
+            ]),
+          ),
         ),
       ),
     );
@@ -739,11 +741,15 @@ class _ServersScreenState extends State<ServersScreen> {
       sub = ip;
     }
     final tags = server.tags ?? const <Tag>[];
-    final shownTags = tags.take(3).toList();
+    final shownTags = tags.take(2).toList();
     final extraTags = tags.length - shownTags.length;
     final cappedDepth = depth.clamp(0, 2);
+    final statusLabel = offline ? 'Offline' : 'Online';
 
-    return Padding(
+    return Semantics(
+      button: true,
+      label: '${server.name}, $statusLabel${sub != null ? ', $sub' : ''}',
+      child: Padding(
       key: key,
       padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12),
       child: Material(
@@ -767,23 +773,49 @@ class _ServersScreenState extends State<ServersScreen> {
                   child: Text(sub, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis)),
               ])),
               if (tags.isNotEmpty)
-                Padding(padding: const EdgeInsets.only(right: 4),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Flexible(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(padding: const EdgeInsets.only(right: 4),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
                     for (final t in shownTags)
-                      Container(
-                        width: 8, height: 8, margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
+                      Semantics(
+                        button: true,
+                        label: 'Filter by ${t.name}',
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() {
+                            _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
+                            _filterFolders();
+                          }),
+                          child: Container(
+                            margin: const EdgeInsets.only(left: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            constraints: const BoxConstraints(maxWidth: 90),
+                            decoration: BoxDecoration(
+                              color: _parseColor(t.color).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(7),
+                              border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
+                            ),
+                            child: Text(t.name,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ),
                       ),
                     if (extraTags > 0)
                       Padding(
                         padding: const EdgeInsets.only(left: 4),
-                        child: Text('+$extraTags', style: TextStyle(fontSize: 10, color: cs.outline)),
+                        child: Text('+$extraTags', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.outline)),
                       ),
                   ])),
+                    ),
+                  ),
               Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
             ]),
           ),
         ),
+      ),
       ),
     );
   }
@@ -998,11 +1030,11 @@ class _ServersScreenState extends State<ServersScreen> {
               child: Icon(_serverIcon(server), color: cs.onPrimaryContainer, size: 18),
             ),
             const SizedBox(width: 12),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(server.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(server.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
               if (server.ip.isNotEmpty && server.ip != 'N/A')
-                Text(server.ip, style: TextStyle(fontSize: 12, color: cs.outline)),
-            ]),
+                Text(server.ip, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis),
+            ])),
           ]),
         ),
         const SizedBox(height: 8),
@@ -1057,7 +1089,19 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Color _parseColor(String c) {
-    if (c.startsWith('#')) { try { return Color(int.parse('FF${c.substring(1)}', radix: 16)); } catch (_) {} }
+    if (c.startsWith('#')) {
+      try {
+        final hex = c.substring(1);
+        if (hex.length == 3) {
+          final r = hex[0] + hex[0];
+          final g = hex[1] + hex[1];
+          final b = hex[2] + hex[2];
+          return Color(int.parse('FF$r$g$b', radix: 16));
+        }
+        if (hex.length == 6) return Color(int.parse('FF$hex', radix: 16));
+        if (hex.length == 8) return Color(int.parse(hex, radix: 16));
+      } catch (_) {}
+    }
     return Theme.of(context).colorScheme.outlineVariant;
   }
 }
