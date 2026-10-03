@@ -244,6 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                       selected: {mode},
                       onSelectionChanged: (s) => widget.themeManager.setThemeMode(s.first),
+                      showSelectedIcon: false,
                       style: ButtonStyle(visualDensity: VisualDensity.compact),
                     ),
                   ]),
@@ -295,59 +296,113 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ]),
 
-          _sectionHeader('Serverliste', cs),
+          _sectionHeader('Server List', cs),
           _section(cs, children: [
             ListenableBuilder(
               listenable: widget.serverViewSettings,
               builder: (_, __) {
                 final sv = widget.serverViewSettings;
                 return Column(children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(children: [
-                      Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                        child: Icon(AppIcons.viewGrid, color: cs.onPrimaryContainer, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(child: Text('Darstellung', style: TextStyle(fontSize: 15))),
-                      SegmentedButton<ServerViewMode>(
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final narrow = constraints.maxWidth < 340;
+                      final label = Expanded(
+                        child: Text('View',
+                          style: TextStyle(fontSize: 15),
+                          overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
+                      );
+                      final control = SegmentedButton<ServerViewMode>(
                         segments: const [
-                          ButtonSegment(value: ServerViewMode.list, icon: Icon(AppIcons.viewList, size: 18), label: Text('Liste')),
-                          ButtonSegment(value: ServerViewMode.grid, icon: Icon(AppIcons.viewGrid, size: 18), label: Text('Raster')),
+                          ButtonSegment(value: ServerViewMode.list, icon: Icon(AppIcons.viewList, size: 18), label: Text('List')),
+                          ButtonSegment(value: ServerViewMode.grid, icon: Icon(AppIcons.viewGrid, size: 18), label: Text('Grid')),
                         ],
                         selected: {sv.mode},
                         onSelectionChanged: (s) => sv.setMode(s.first),
+                        showSelectedIcon: false,
                         style: const ButtonStyle(visualDensity: VisualDensity.compact),
-                      ),
-                    ]),
+                      );
+                      if (narrow) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Row(children: [
+                              Container(
+                                width: 36, height: 36,
+                                decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                                child: Icon(sv.isGrid ? AppIcons.viewGrid : AppIcons.viewList, color: cs.onPrimaryContainer, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              label,
+                            ]),
+                            const SizedBox(height: 10),
+                            Align(alignment: Alignment.centerRight, child: control),
+                          ]),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                            child: Icon(sv.isGrid ? AppIcons.viewGrid : AppIcons.viewList, color: cs.onPrimaryContainer, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          label,
+                          control,
+                        ]),
+                      );
+                    },
                   ),
                   if (sv.isGrid) ...[
                     Divider(height: 1, indent: 56, color: cs.outlineVariant.withValues(alpha: 0.3)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       child: Row(children: [
-                        const Text('Spalten', style: TextStyle(fontSize: 15)),
-                        const Spacer(),
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                          child: Icon(AppIcons.viewGrid, color: cs.onPrimaryContainer, size: 18),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text('Columns',
+                            style: TextStyle(fontSize: 15),
+                            overflow: TextOverflow.ellipsis, maxLines: 1, softWrap: false),
+                        ),
                         Text('${sv.gridColumns}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.outline)),
                       ]),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(children: [
+                        IconButton(
+                          icon: Icon(AppIcons.minus, size: 18),
+                          tooltip: 'Fewer columns',
+                          onPressed: sv.gridColumns > ServerViewSettings.minColumns
+                              ? () => sv.setGridColumns(sv.gridColumns - 1)
+                              : null,
+                        ),
                         Expanded(
                           child: Slider(
                             value: sv.gridColumns.toDouble(),
-                            min: 1,
-                            max: 5,
-                            divisions: 4,
-                            label: '${sv.gridColumns}',
+                            min: ServerViewSettings.minColumns.toDouble(),
+                            max: ServerViewSettings.maxColumns.toDouble(),
+                            divisions: ServerViewSettings.maxColumns - ServerViewSettings.minColumns,
+                            semanticFormatterCallback: (v) => '${v.round()} columns',
                             onChanged: (v) => sv.setGridColumns(v.round()),
                           ),
                         ),
+                        IconButton(
+                          icon: Icon(AppIcons.plus, size: 18),
+                          tooltip: 'More columns',
+                          onPressed: sv.gridColumns < ServerViewSettings.maxColumns
+                              ? () => sv.setGridColumns(sv.gridColumns + 1)
+                              : null,
+                        ),
                       ]),
                     ),
+                    const SizedBox(height: 8),
                   ],
                 ]);
               },

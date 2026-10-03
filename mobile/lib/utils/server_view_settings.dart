@@ -6,6 +6,11 @@ enum ServerViewMode { list, grid }
 class ServerViewSettings extends ChangeNotifier {
   static const String _modeKey = 'server_view_mode';
   static const String _columnsKey = 'server_view_columns';
+  static const int minColumns = 2;
+  static const int maxColumns = 4;
+  static const int defaultColumns = 2;
+
+  Future<void> _pending = Future.value();
 
   ServerViewMode _mode;
   int _gridColumns;
@@ -26,23 +31,37 @@ class ServerViewSettings extends ChangeNotifier {
     final mode = rawMode == ServerViewMode.grid.name
         ? ServerViewMode.grid
         : ServerViewMode.list;
-    final rawColumns = prefs.getInt(_columnsKey) ?? 2;
-    final columns = rawColumns < 1 ? 1 : rawColumns > 5 ? 5 : rawColumns;
+    final rawColumns = prefs.getInt(_columnsKey) ?? defaultColumns;
+    final columns = rawColumns.clamp(minColumns, maxColumns);
     return ServerViewSettings._(mode: mode, gridColumns: columns);
   }
 
   Future<void> setMode(ServerViewMode mode) async {
     if (_mode == mode) return;
-    _mode = mode;
-    notifyListeners();
-    await (await SharedPreferences.getInstance()).setString(_modeKey, mode.name);
+    final task = _pending.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = await prefs.setString(_modeKey, mode.name);
+      if (stored) {
+        _mode = mode;
+        notifyListeners();
+      }
+    });
+    _pending = task.catchError((_) {});
+    await task;
   }
 
   Future<void> setGridColumns(int value) async {
-    final next = value < 1 ? 1 : value > 5 ? 5 : value;
+    final next = value.clamp(minColumns, maxColumns);
     if (_gridColumns == next) return;
-    _gridColumns = next;
-    notifyListeners();
-    await (await SharedPreferences.getInstance()).setInt(_columnsKey, next);
+    final task = _pending.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = await prefs.setInt(_columnsKey, next);
+      if (stored) {
+        _gridColumns = next;
+        notifyListeners();
+      }
+    });
+    _pending = task.catchError((_) {});
+    await task;
   }
 }
