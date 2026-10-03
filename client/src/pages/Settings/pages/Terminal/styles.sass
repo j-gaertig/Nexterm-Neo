@@ -152,3 +152,29 @@
 
       @media (max-width: breakpoints.$mobile)
         font-size: 0.9rem
+
+  .pattern-option
+    min-width: 280px
+    flex: 1 1 280px
+
+    .terminal-text-input
+      background-color: colors.$lighter-background
+      border: 1px solid colors.$dark-gray
+      border-radius: 0.5rem
+      color: colors.$white
+      font-family: monospace
+      font-size: 0.85rem
+      padding: 0.55rem 0.7rem
+      outline: none
+      width: 100%
+
+      &:focus
+        border-color: colors.$primary
+
+      &.invalid
+        border-color: colors.$error
+
+    .pattern-hint
+      color: colors.$subtext
+      font-size: 0.75rem
+      line-height: 1.4

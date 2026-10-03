@@ -265,11 +265,38 @@ module.exports.editEntry = async (accountId, entryId, configuration) => {
         if (!validationResult.valid) return validationResult.error;
     }
 
+    // Normalized view of the stored config: entry.config is normally an object
+    // (see the afterFind hook in models/Entry), but fall back gracefully for
+    // legacy/corrupt shapes so partial updates never crash or mis-validate.
+    let existingConfig = entry.config;
+    if (typeof existingConfig === "string") {
+        try {
+            existingConfig = JSON.parse(existingConfig);
+        } catch {
+            existingConfig = null;
+        }
+    }
+    const isConfigObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+    const storedConfig = isConfigObject(existingConfig) ? existingConfig : {};
+
     if (configuration.config !== undefined || configuration.type !== undefined) {
-        const mergedConfig = { ...(entry.config || {}), ...(configuration.config || {}) };
+        const mergedConfig = { ...storedConfig, ...(configuration.config || {}) };
         const effectiveType = configuration.type ?? entry.type;
         const hookCheck = validateHookProtocol(mergedConfig, effectiveType === "server" ? mergedConfig.protocol : effectiveType);
         if (!hookCheck.valid) return hookCheck.error;
+    }
+
+    // Preserve web-only config fields (e.g. notes) when the client sends a
+    // partial config that doesn't mention them. Only these explicit keys are
+    // carried over (no blanket merge), so every other key keeps the existing
+    // replace semantics of Entry.update below.
+    if (isConfigObject(configuration.config) && isConfigObject(existingConfig)) {
+        if (configuration.config.notes === undefined && existingConfig.notes !== undefined) {
+            configuration.config.notes = existingConfig.notes;
+        }
+        if (configuration.config.showNoteInList === undefined && existingConfig.showNoteInList !== undefined) {
+            configuration.config.showNoteInList = existingConfig.showNoteInList;
+        }
     }
 
     delete configuration.organizationId;

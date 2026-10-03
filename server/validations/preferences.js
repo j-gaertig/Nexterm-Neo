@@ -9,6 +9,7 @@ const terminalSchema = Joi.object({
     autoReconnect: Joi.boolean(),
     copyPasteBehavior: Joi.string().valid('none', 'smart', 'keyboard', 'mouse', 'mouseKeyboard'),
     passwordPromptDetection: Joi.boolean(),
+    passwordPromptPattern: Joi.string().max(500).allow(''),
     theme: Joi.string().max(50),
 }).unknown(false);
 
