@@ -1,37 +1,54 @@
-name: 🌍 Suggest a Language
-description: Suggest a new language to be added to Nexterm
-title: "[Language] "
-labels: ["translation"]
+name: "💡 Suggest a feature"
+description: Suggest a focused improvement for Nexterm Neo.
+title: "[Feature] "
+labels: ["enhancement"]
 body:
   - type: checkboxes
+    id: checks
     attributes:
-      label: General
-      description: Please confirm the following statements
+      label: Before submitting
       options:
-        - label: This language is not already available in Nexterm.
+        - label: I checked existing issues and discussions for a similar suggestion.
           required: true
-        - label: I have checked that this language has not been suggested by anyone else.
-          required: true
-  - type: input
-    attributes:
-      label: Language Name
-      description: What language would you like to see added?
-      placeholder: e.g., Spanish, Japanese, German
-    validations:
-      required: true
+
   - type: dropdown
+    id: area
     attributes:
-      label: Would you like to help with the translation?
-      description: Translations are managed through Crowdin. We'd love your help!
+      label: Affected area
       options:
-        - "Yes, I'd like to contribute"
-        - "No, just suggesting"
+        - Server
+        - Web client
+        - Engine
+        - Connector app
+        - Mobile app
+        - CLI
+        - Landing page
+        - Documentation
+        - Other / not sure
     validations:
       required: true
+
   - type: textarea
+    id: problem
     attributes:
-      label: Additional Context
-      description: Is there anything else you'd like to add? (e.g., why this language would be beneficial, community size)
-      placeholder: This language would be helpful because ...
+      label: Problem or use case
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: As a Nexterm Neo user, I want to ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or improvement you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and additional context
+      description: Mention any workarounds, alternatives, or examples that help explain the request.
     validations:
       required: false
