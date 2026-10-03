@@ -1,21 +1,54 @@
-name: 💡 Suggest idea
-description:  Do you have an idea? You're in the right place
+name: "💡 Suggest a feature"
+description: Suggest a focused improvement for Nexterm Neo.
 title: "[Feature] "
 labels: ["enhancement"]
 body:
   - type: checkboxes
+    id: checks
     attributes:
-      label: General
-      description: Please confirm the following statements
+      label: Before submitting
       options:
-        - label: My feature does not exist in the latest version of Nexterm.
+        - label: I checked existing issues and discussions for a similar suggestion.
           required: true
-        - label: I have checked that my feature has not been suggested by anyone else.
-          required: true
-  - type: textarea
+
+  - type: dropdown
+    id: area
     attributes:
-      label: Your Idea
-      description: What can we add? Describe your idea as precisely as possible.
-      placeholder: My idea would be to ...
+      label: Affected area
+      options:
+        - Server
+        - Web client
+        - Engine
+        - Connector app
+        - Mobile app
+        - CLI
+        - Landing page
+        - Documentation
+        - Other / not sure
     validations:
       required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what gets in the way today?
+      placeholder: As a Nexterm Neo user, I want to ... because ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior or improvement you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and additional context
+      description: Mention any workarounds, alternatives, or examples that help explain the request.
+    validations:
+      required: false
