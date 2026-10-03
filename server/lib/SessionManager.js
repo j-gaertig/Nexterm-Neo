@@ -7,6 +7,8 @@ const stateBroadcaster = require("./StateBroadcaster");
 const { safeCloseWs } = require("../utils/wsClose");
 
 const MAX_LOG_BUFFER_SIZE = 200 * 1024;
+const OSC52_REPLAY_RE = /(?:\x1b\]|\x9d)52;[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)/g;
+const OSC52_TAIL_RE = /(?:\x1b\]|\x9d)52;[A-Za-z0-9+/=;: ]{0,4096}$/;
 const sessions = new Map();
 const shareIndex = new Map();
 const CONTROL_PLANE_TYPES = new Set(["ssh", "telnet", "sftp", "guac", "pve-lxc"]);
@@ -160,11 +162,17 @@ module.exports.recordResize = (sessionId, cols, rows) => {
 module.exports.appendLog = (sessionId, data) => {
     const session = module.exports.get(sessionId);
     if (!session) return;
-    session.logBuffer += data;
+    const str = typeof data === "string" ? data : String(data ?? "");
+    if (!str) return;
+    OSC52_REPLAY_RE.lastIndex = 0;
+    const clean = str.replace(OSC52_REPLAY_RE, "").replace(OSC52_TAIL_RE, "");
+    session.logBuffer += clean;
     if (session.logBuffer.length > MAX_LOG_BUFFER_SIZE) {
         session.logBuffer = session.logBuffer.slice(-MAX_LOG_BUFFER_SIZE);
+        OSC52_REPLAY_RE.lastIndex = 0;
+        session.logBuffer = session.logBuffer.replace(OSC52_REPLAY_RE, "").replace(OSC52_TAIL_RE, "");
     }
-    session.recording?.stream?.write(JSON.stringify([(Date.now() - session.recording.startTime) / 1000, "o", data]) + "\n");
+    session.recording?.stream?.write(JSON.stringify([(Date.now() - session.recording.startTime) / 1000, "o", clean]) + "\n");
 };
 
 const markRecordingComplete = async (auditLogId, recordingType) => {
@@ -187,7 +195,12 @@ const finalizeTerminalRecording = async (sessionId) => {
     await markRecordingComplete(auditLogId, "cast");
 };
 
-module.exports.getLogBuffer = (sessionId) => module.exports.get(sessionId)?.logBuffer || "";
+module.exports.getLogBuffer = (sessionId) => {
+    const buffer = module.exports.get(sessionId)?.logBuffer || "";
+    if (!buffer) return "";
+    OSC52_REPLAY_RE.lastIndex = 0;
+    return buffer.replace(OSC52_REPLAY_RE, "").replace(OSC52_TAIL_RE, "");
+};
 
 module.exports.setActiveWs = (sessionId, ws) => {
     const session = module.exports.get(sessionId);

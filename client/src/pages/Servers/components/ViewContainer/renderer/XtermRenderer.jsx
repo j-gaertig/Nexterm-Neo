@@ -6,6 +6,7 @@ import { useKeymaps, matchesKeybind, isMac } from "@/common/contexts/KeymapConte
 import { Terminal as Xterm } from "@xterm/xterm";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { FitAddon } from "@xterm/addon-fit";
+import { attachOsc52 } from "@/common/utils/osc52.js";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/common/components/ContextMenu";
 import AIAssistant from "./components/AIAssistant";
 import CommandSuggestion from "./components/CommandSuggestion";
@@ -21,12 +22,9 @@ import ConnectionError from "./components/ConnectionError";
 import { mapConnectionError } from "@/common/utils/ConnectionErrorUtil.js";
 import { getWebSocketUrl } from "@/common/utils/ConnectionUtil.js";
 import { postRequest } from "@/common/utils/RequestUtil.js";
+import { isPasswordPrompt, updatePromptLine, readTerminalPromptLine, compilePasswordPromptPattern } from "@/common/utils/passwordPrompt.js";
 import "@xterm/xterm/css/xterm.css";
 import "./styles/xterm.sass";
-
-const PASSWORD_PROMPT_REGEX = /^[^$#%>]*(password|passphrase)[^:\r\n]*:\s?$/i;
-const ANSI_ESCAPE_REGEX = /\x1b(?:\[[0-9;?]*[a-zA-Z]|\][^\x07\x1b]*(?:\x07|\x1b\\)?|[()][0-9A-B]|[a-zA-Z=><])/g;
-const CONTROL_CHAR_REGEX = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
 
 const MIN_ZOOM_FONT_SIZE = 6;
 const MAX_ZOOM_FONT_SIZE = 40;
@@ -49,7 +47,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
     const userContext = useContext(UserContext);
     const sessionToken = userContext?.sessionToken;
-    const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, copyPasteBehavior, passwordPromptDetection } = usePreferences();
+    const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, copyPasteBehavior, passwordPromptDetection, passwordPromptPattern } = usePreferences();
 
     copyPasteBehaviorRef.current = copyPasteBehavior;
     const effectiveFont = (isShared && session.fontFamily) ? session.fontFamily : selectedFont;
@@ -99,6 +97,8 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     const passwordHintIndexRef = useRef(-1);
     const passwordIdentitiesRef = useRef([]);
     const passwordDetectionRef = useRef(passwordPromptDetection);
+    const passwordPatternRef = useRef(passwordPromptPattern);
+    const passwordCompiledRef = useRef(null);
     const promptLineRef = useRef("");
 
     const updatePasswordHintIndex = useCallback((index) => {
@@ -167,11 +167,13 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
     useEffect(() => {
         passwordDetectionRef.current = passwordPromptDetection;
+        passwordPatternRef.current = passwordPromptPattern;
+        passwordCompiledRef.current = compilePasswordPromptPattern(passwordPromptPattern);
         if (!passwordPromptDetection) {
             hidePasswordHint();
             promptLineRef.current = "";
         }
-    }, [passwordPromptDetection, hidePasswordHint]);
+    }, [passwordPromptDetection, passwordPromptPattern, hidePasswordHint]);
 
     useEffect(() => {
         layoutModeRef.current = layoutMode;
@@ -459,6 +461,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
         term.open(ref.current);
+        const osc52Disposable = attachOsc52(term, !isShared);
 
         const computePasswordHintPosition = () => {
             const cell = term._core?._renderService?.dimensions?.css?.cell;
@@ -607,10 +610,12 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
         const trackPasswordPrompt = (data) => {
             if (isShared || !passwordDetectionRef.current || passwordIdentitiesRef.current.length === 0) return;
 
-            const cleaned = data.replace(ANSI_ESCAPE_REGEX, "").replace(CONTROL_CHAR_REGEX, "");
-            promptLineRef.current = (promptLineRef.current + cleaned).split(/[\r\n]/).pop().slice(-256);
+            promptLineRef.current = updatePromptLine(promptLineRef.current, data);
+            let candidate = promptLineRef.current;
+            const bufferLine = readTerminalPromptLine(term);
+            if (bufferLine.trim().length > 0) candidate = bufferLine;
 
-            if (PASSWORD_PROMPT_REGEX.test(promptLineRef.current)) {
+            if (isPasswordPrompt(candidate, passwordCompiledRef.current || passwordPatternRef.current)) {
                 if (!passwordPromptRef.current) showPasswordHint(computePasswordHintPosition());
             } else {
                 hidePasswordHint();
@@ -878,6 +883,9 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             }
             cursorSyncDisposable.dispose();
             selectionDisposable.dispose();
+            try {
+                osc52Disposable?.dispose();
+            } catch {}
             term.dispose();
             clearInterval(interval);
             termRef.current = null;
