@@ -177,6 +177,7 @@ module.exports.updatePreferences = async (id, preferences) => {
     const currentPreferences = account.preferences || {};
     const mergedPreferences = deepMerge(currentPreferences, preferences);
     if (mergedPreferences && mergedPreferences.terminal) delete mergedPreferences.terminal.passwordPromptPattern;
+    if (mergedPreferences && mergedPreferences.terminal) delete mergedPreferences.terminal.passwordPromptPhrases;
 
     await Account.update({ preferences: mergedPreferences }, { where: { id } });
 

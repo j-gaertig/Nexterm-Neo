@@ -9,19 +9,7 @@ const terminalSchema = Joi.object({
     autoReconnect: Joi.boolean(),
     copyPasteBehavior: Joi.string().valid('none', 'smart', 'keyboard', 'mouse', 'mouseKeyboard'),
     passwordPromptDetection: Joi.boolean(),
-    passwordPromptPhrases: Joi.array().items(Joi.string().trim().min(2).max(100)).max(10000).custom((value, helpers) => {
-        const seen = new Set();
-        for (const item of value || []) {
-            if (Array.from(item).length > 100) return helpers.error("terminal.passwordPromptPhrases.tooLong");
-            const key = typeof item.normalize === "function" ? item.normalize("NFKC").toLowerCase() : String(item).toLowerCase();
-            if (seen.has(key)) return helpers.error("terminal.passwordPromptPhrases.duplicate");
-            seen.add(key);
-        }
-        return value;
-    }).messages({
-        "terminal.passwordPromptPhrases.duplicate": "Duplicate phrases are not allowed.",
-        "terminal.passwordPromptPhrases.tooLong": "Maximum 100 characters per phrase."
-    }),
+    passwordPromptPhrases: Joi.any().strip(),
     passwordPromptPattern: Joi.any().strip(),
     theme: Joi.string().max(50),
 }).unknown(false);

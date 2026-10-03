@@ -997,18 +997,7 @@
         "enabled": "Aktiviert",
         "disabled": "Deaktiviert",
         "syncEnabled": "Die Eingabeeinstellungen werden nun mit deinem Konto synchronisiert",
-        "syncDisabled": "Die Eingabeeinstellungen werden nicht mehr synchronisiert",
-        "passwordPromptPhrases": "Eigene Passwort-Phrasen",
-        "passwordPromptPhrasesPlaceholder": "z.B. Geheimcode",
-        "passwordPromptPhrasesHint": "Einfacher Text, Groß-/Kleinschreibung egal. Wird als Teil der aktuellen Terminalzeile gesucht, zusätzlich zur eingebauten Erkennung.",
-        "passwordPromptPhrasesAdd": "Hinzufügen",
-        "passwordPromptPhrasesRemove": "Phrase entfernen",
-        "passwordPromptPhrasesEmpty": "Noch keine eigenen Phrasen.",
-        "passwordPromptPhrasesEmptyInput": "Gib zuerst eine Phrase ein.",
-        "passwordPromptPhrasesDuplicate": "Diese Phrase ist bereits in der Liste.",
-        "passwordPromptPhrasesTooLong": "Maximal 100 Zeichen pro Phrase.",
-        "passwordPromptPhrasesMaxReached": "Maximal 10000 Phrasen erreicht.",
-        "passwordPromptPhrasesTooShort": "Mindestens 2 Zeichen pro Phrase."
+        "syncDisabled": "Die Eingabeeinstellungen werden nicht mehr synchronisiert"
       },
       "theme": {
         "title": "Theme",
