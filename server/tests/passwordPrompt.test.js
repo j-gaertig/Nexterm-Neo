@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { checkSudoPrompt } = require("../utils/scriptUtils.js");
+const { preferencesValidation } = require("../validations/preferences.js");
 
 let passwordPrompt;
 
@@ -61,18 +62,63 @@ test("reads prompt from xterm buffer when available", () => {
     assert.equal(passwordPrompt.isPasswordPrompt(passwordPrompt.readTerminalPromptLine(term)), true);
 });
 
-test("handles multiline input and stateful custom patterns", () => {
+test("handles multiline input", () => {
     assert.equal(passwordPrompt.isPasswordPrompt("Last login: Tue\nPassword:"), true);
-    assert.equal(passwordPrompt.isPasswordPrompt("Password:", /passwort/gi), false);
-    assert.equal(passwordPrompt.isPasswordPrompt("Password:", /password/gi), true);
-    assert.equal(passwordPrompt.isPasswordPrompt("Password:", /password/gi), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("Last login: Tue\nBitte Geheimcode eingeben!", ["geheimcode"]), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("Bitte Geheimcode eingeben!\nLast login: Tue", ["geheimcode"]), false);
 });
 
-test("supports custom pattern in addition to built-in detection", () => {
-    assert.equal(passwordPrompt.isPasswordPrompt("Bitte Geheimcode eingeben!", "Geheimcode"), true);
-    assert.equal(passwordPrompt.isPasswordPrompt("Password:", "Geheimcode"), true);
-    assert.equal(passwordPrompt.isPasswordPrompt("Password:", "["), true);
-    assert.equal(passwordPrompt.compilePasswordPromptPattern("["), null);
+test("supports custom phrases in addition to built-in detection", () => {
+    assert.equal(passwordPrompt.isPasswordPrompt("Bitte Geheimcode eingeben!", ["Geheimcode"]), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("BITTE GEHEIMCODE EINGEBEN!", ["geheimcode"]), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("Password:", ["Geheimcode"]), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("Password:", []), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("hello world", ["Geheimcode"]), false);
+    assert.equal(passwordPrompt.isPasswordPrompt("hello world", []), false);
+    assert.equal(passwordPrompt.isPasswordPrompt("hello world", ["  "]), false);
+    assert.equal(passwordPrompt.isPasswordPrompt("hello world", ["x".repeat(101)]), false);
+    assert.equal(passwordPrompt.isPasswordPrompt("a", ["a"]), false);
+});
+
+test("matches phrases case-insensitively after NFKC normalization", () => {
+    assert.equal(passwordPrompt.isPasswordPrompt("Ｂｉｔｔｅ Ｇｅｈｅｉｍｃｏｄｅ eingeben!", ["geheimcode"]), true);
+    assert.equal(passwordPrompt.isPasswordPrompt("Bitte Geheimcode eingeben!", ["Ｇｅｈｅｉｍｃｏｄｅ"]), true);
+});
+
+test("only searches the last 256 characters", () => {
+    assert.equal(passwordPrompt.isPasswordPrompt(`Geheimcode${"x".repeat(300)}`, ["geheimcode"]), false);
+    assert.equal(passwordPrompt.isPasswordPrompt(`${"x".repeat(300)}Geheimcode`, ["geheimcode"]), true);
+});
+
+test("supports precompiled phrase lists", () => {
+    const compiled = passwordPrompt.compilePasswordPhrases(["Geheimcode"]);
+    assert.deepEqual(compiled, ["geheimcode"]);
+    assert.equal(passwordPrompt.isPasswordPromptWithCompiled("Bitte Geheimcode eingeben!", compiled), true);
+    assert.equal(passwordPrompt.isPasswordPromptWithCompiled("hello world", compiled), false);
+    assert.equal(passwordPrompt.isPasswordPromptWithCompiled("Password:", []), true);
+    assert.equal(passwordPrompt.isPasswordPromptWithCompiled("hello world", []), false);
+});
+
+test("normalizes phrase lists", () => {
+    assert.deepEqual(passwordPrompt.normalizePasswordPhrases(["  Geheimcode  ", "geheimcode", "", "a", 42, "x".repeat(101), "\u200b\u200b"]), ["Geheimcode"]);
+    assert.deepEqual(passwordPrompt.normalizePasswordPhrases("Geheimcode"), []);
+    assert.deepEqual(passwordPrompt.compilePasswordPhrases(["Geheimcode"]), ["geheimcode"]);
+    const many = Array.from({ length: 10001 }, (_, i) => `phrase-${i}`);
+    assert.equal(passwordPrompt.normalizePasswordPhrases(many).length, 10000);
+});
+
+test("validates password phrases preference", () => {
+    const ok = preferencesValidation.validate({ terminal: { passwordPromptPhrases: ["Geheimcode", "otp-code"] } });
+    assert.equal(ok.error, undefined);
+    const duplicate = preferencesValidation.validate({ terminal: { passwordPromptPhrases: ["Geheimcode", "geheimcode"] } });
+    assert.ok(duplicate.error);
+    const tooShort = preferencesValidation.validate({ terminal: { passwordPromptPhrases: ["a"] } });
+    assert.ok(tooShort.error);
+    const tooLong = preferencesValidation.validate({ terminal: { passwordPromptPhrases: ["x".repeat(101)] } });
+    assert.ok(tooLong.error);
+    const legacy = preferencesValidation.validate({ terminal: { passwordPromptPattern: "Passwort.*:" } });
+    assert.equal(legacy.error, undefined);
+    assert.equal(legacy.value.terminal.passwordPromptPattern, undefined);
 });
 
 test("server sudo check covers German prompts", () => {

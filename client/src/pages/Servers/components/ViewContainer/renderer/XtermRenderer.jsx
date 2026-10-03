@@ -22,7 +22,7 @@ import ConnectionError from "./components/ConnectionError";
 import { mapConnectionError } from "@/common/utils/ConnectionErrorUtil.js";
 import { getWebSocketUrl } from "@/common/utils/ConnectionUtil.js";
 import { postRequest } from "@/common/utils/RequestUtil.js";
-import { isPasswordPrompt, updatePromptLine, readTerminalPromptLine, compilePasswordPromptPattern } from "@/common/utils/passwordPrompt.js";
+import { isPasswordPromptWithCompiled, updatePromptLine, readTerminalPromptLine, compilePasswordPhrases } from "@/common/utils/passwordPrompt.js";
 import "@xterm/xterm/css/xterm.css";
 import "./styles/xterm.sass";
 
@@ -47,7 +47,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
     const userContext = useContext(UserContext);
     const sessionToken = userContext?.sessionToken;
-    const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, copyPasteBehavior, passwordPromptDetection, passwordPromptPattern } = usePreferences();
+    const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, copyPasteBehavior, passwordPromptDetection, passwordPromptPhrases } = usePreferences();
 
     copyPasteBehaviorRef.current = copyPasteBehavior;
     const effectiveFont = (isShared && session.fontFamily) ? session.fontFamily : selectedFont;
@@ -97,8 +97,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     const passwordHintIndexRef = useRef(-1);
     const passwordIdentitiesRef = useRef([]);
     const passwordDetectionRef = useRef(passwordPromptDetection);
-    const passwordPatternRef = useRef(passwordPromptPattern);
-    const passwordCompiledRef = useRef(null);
+    const passwordCompiledRef = useRef(compilePasswordPhrases(passwordPromptPhrases));
     const promptLineRef = useRef("");
 
     const updatePasswordHintIndex = useCallback((index) => {
@@ -167,13 +166,12 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
     useEffect(() => {
         passwordDetectionRef.current = passwordPromptDetection;
-        passwordPatternRef.current = passwordPromptPattern;
-        passwordCompiledRef.current = compilePasswordPromptPattern(passwordPromptPattern);
+        passwordCompiledRef.current = compilePasswordPhrases(passwordPromptPhrases);
         if (!passwordPromptDetection) {
             hidePasswordHint();
             promptLineRef.current = "";
         }
-    }, [passwordPromptDetection, passwordPromptPattern, hidePasswordHint]);
+    }, [passwordPromptDetection, passwordPromptPhrases, hidePasswordHint]);
 
     useEffect(() => {
         layoutModeRef.current = layoutMode;
@@ -615,7 +613,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             const bufferLine = readTerminalPromptLine(term);
             if (bufferLine.trim().length > 0) candidate = bufferLine;
 
-            if (isPasswordPrompt(candidate, passwordCompiledRef.current || passwordPatternRef.current)) {
+            if (isPasswordPromptWithCompiled(candidate, passwordCompiledRef.current)) {
                 if (!passwordPromptRef.current) showPasswordHint(computePasswordHintPosition());
             } else {
                 hidePasswordHint();

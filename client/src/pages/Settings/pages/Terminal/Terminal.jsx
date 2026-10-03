@@ -2,9 +2,11 @@ import "./styles.sass";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import SelectBox from "@/common/components/SelectBox";
 import Button from "@/common/components/Button";
+import Icon from "@mdi/react";
 import { useState, useContext } from "react";
 import { useTranslation } from "react-i18next";
-import { mdiCloudSync, mdiCloudOffOutline } from "@mdi/js";
+import { mdiCloudSync, mdiCloudOffOutline, mdiPlus, mdiClose } from "@mdi/js";
+import { MAX_PASSWORD_PHRASES, MAX_PASSWORD_PHRASE_LENGTH, MIN_PASSWORD_PHRASE_LENGTH } from "@/common/utils/passwordPrompt.js";
 import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { useToast } from "@/common/contexts/ToastContext.jsx";
 
@@ -17,7 +19,7 @@ export const Terminal = () => {
         fontSize, setFontSize, cursorStyle, setCursorStyle, cursorBlink, setCursorBlink,
         copyPasteBehavior, setCopyPasteBehavior,
         passwordPromptDetection, setPasswordPromptDetection,
-        passwordPromptPattern, setPasswordPromptPattern,
+        passwordPromptPhrases, setPasswordPromptPhrases,
         autoReconnect, setAutoReconnect,
         getAvailableThemes, getAvailableFonts, getTerminalTheme, getCursorStyles,
         isGroupSynced, toggleGroupSync,
@@ -121,16 +123,46 @@ export const Terminal = () => {
         </div>
     );
 
-    const [patternError, setPatternError] = useState(null);
+    const [phraseInput, setPhraseInput] = useState("");
+    const [phraseError, setPhraseError] = useState(null);
 
-    const handlePatternChange = (value) => {
-        try {
-            if (value) new RegExp(value, "i");
-            setPatternError(null);
-        } catch {
-            setPatternError(t("settings.terminal.input.passwordPromptPatternInvalid"));
+    const normalizeKey = (value) => {
+        const s = String(value ?? "").trim();
+        return (s.normalize ? s.normalize("NFKC") : s).toLowerCase();
+    };
+
+    const handleAddPhrase = () => {
+        const trimmed = phraseInput.trim();
+        if (trimmed.length === 0) {
+            setPhraseError(t("settings.terminal.input.passwordPromptPhrasesEmptyInput"));
+            return;
         }
-        setPasswordPromptPattern(value);
+        if (Array.from(trimmed).length < MIN_PASSWORD_PHRASE_LENGTH) {
+            setPhraseError(t("settings.terminal.input.passwordPromptPhrasesTooShort"));
+            return;
+        }
+        if (Array.from(trimmed).length > MAX_PASSWORD_PHRASE_LENGTH) {
+            setPhraseError(t("settings.terminal.input.passwordPromptPhrasesTooLong"));
+            return;
+        }
+        const phrases = Array.isArray(passwordPromptPhrases) ? passwordPromptPhrases : [];
+        if (phrases.some((p) => normalizeKey(p) === normalizeKey(trimmed))) {
+            setPhraseError(t("settings.terminal.input.passwordPromptPhrasesDuplicate"));
+            return;
+        }
+        if (phrases.length >= MAX_PASSWORD_PHRASES) {
+            setPhraseError(t("settings.terminal.input.passwordPromptPhrasesMaxReached"));
+            return;
+        }
+        setPasswordPromptPhrases([...phrases, trimmed]);
+        setPhraseInput("");
+        setPhraseError(null);
+    };
+
+    const handleRemovePhrase = (index) => {
+        const phrases = Array.isArray(passwordPromptPhrases) ? passwordPromptPhrases : [];
+        setPasswordPromptPhrases(phrases.filter((_, i) => i !== index));
+        setPhraseError(null);
     };
 
     return (
@@ -155,17 +187,48 @@ export const Terminal = () => {
                     {renderFontOption(t("settings.terminal.input.passwordPromptDetection"), toggleOptions, passwordPromptDetection.toString(), (value) => setPasswordPromptDetection(value === "true"))}
                     {renderFontOption(t("settings.terminal.input.autoReconnect"), toggleOptions, autoReconnect.toString(), (value) => setAutoReconnect(value === "true"))}
                     <div className="font-option pattern-option">
-                        <label>{t("settings.terminal.input.passwordPromptPattern")}</label>
-                        <input
-                            className={`terminal-text-input${patternError ? " invalid" : ""}`}
-                            type="text"
-                            value={passwordPromptPattern || ""}
-                            placeholder={t("settings.terminal.input.passwordPromptPatternPlaceholder")}
-                            onChange={(e) => handlePatternChange(e.target.value)}
-                            spellCheck={false}
-                            autoComplete="off"
-                        />
-                        <span className="pattern-hint">{patternError || t("settings.terminal.input.passwordPromptPatternHint")}</span>
+                        <label>{t("settings.terminal.input.passwordPromptPhrases")}<span className="phrase-count">{Array.isArray(passwordPromptPhrases) ? passwordPromptPhrases.length : 0} / {MAX_PASSWORD_PHRASES}</span></label>
+                        <div className="phrase-add-row">
+                            <input
+                                className={`terminal-text-input${phraseError ? " invalid" : ""}`}
+                                type="text"
+                                value={phraseInput}
+                                placeholder={t("settings.terminal.input.passwordPromptPhrasesPlaceholder")}
+                                onChange={(e) => {
+                                    setPhraseInput(e.target.value);
+                                    if (phraseError) setPhraseError(null);
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        handleAddPhrase();
+                                    }
+                                }}
+                                spellCheck={false}
+                                autoComplete="off"
+                            />
+                            <Button text={t("settings.terminal.input.passwordPromptPhrasesAdd")} icon={mdiPlus} onClick={handleAddPhrase} />
+                        </div>
+                        {Array.isArray(passwordPromptPhrases) && passwordPromptPhrases.length > 0 ? (
+                            <div className="phrase-list">
+                                {passwordPromptPhrases.map((phrase, index) => (
+                                    <div key={`${phrase}-${index}`} className="phrase-item">
+                                        <span className="phrase-text">{phrase}</span>
+                                        <button
+                                            type="button"
+                                            className="phrase-remove"
+                                            onClick={() => handleRemovePhrase(index)}
+                                            aria-label={t("settings.terminal.input.passwordPromptPhrasesRemove")}
+                                        >
+                                            <Icon path={mdiClose} size={0.7} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <span className="pattern-hint">{t("settings.terminal.input.passwordPromptPhrasesEmpty")}</span>
+                        )}
+                        <span className="pattern-hint">{phraseError || t("settings.terminal.input.passwordPromptPhrasesHint")}</span>
                     </div>
                 </div>
             ))}
