@@ -76,6 +76,31 @@ class ConnectionService {
     }
   }
 
+  /// Pastes the password of a stored identity into the session stream.
+  /// Mirrors the web `POST /connections/:id/paste-password` call in
+  /// `XtermRenderer.jsx` (`fillIdentityPassword`). When [identityId] is null
+  /// (or 0, which the web client omits as falsy) the backend uses the
+  /// session's own identity; [submit] appends Enter, which the web client
+  /// sets while a password prompt is visible.
+  static Future<void> pasteIdentityPassword({
+    required String token,
+    required String sessionId,
+    int? identityId,
+    required bool submit,
+  }) async {
+    final response = await ApiClient.post(
+      '/connections/$sessionId/paste-password',
+      body: {
+        if (identityId != null && identityId != 0) 'identityId': identityId,
+        'submit': submit,
+      },
+      token: token,
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Failed to paste password: ${response.statusCode} - ${response.body}');
+    }
+  }
+
   static Future<void> resumeSession({required String token, required String sessionId}) async {
     final response = await ApiClient.post(
       '/connections/$sessionId/resume',

@@ -62,6 +62,8 @@ class TerminalSettings extends ChangeNotifier {
   static const String _toolbarGroupsKey = 'terminal_toolbarGroups';
   static const String _toolbarOrderKey = 'terminal_toolbarOrder';
   static const String _themeKey = 'terminal_theme';
+  static const String _passwordPromptDetectionKey =
+      'terminal_passwordPromptDetection';
 
   static const List<ToolbarGroup> defaultOrder = ToolbarGroup.values;
   static const Map<ToolbarGroup, bool> defaultEnabled = {
@@ -76,12 +78,16 @@ class TerminalSettings extends ChangeNotifier {
   Map<ToolbarGroup, bool> _groupEnabled;
   List<ToolbarGroup> _groupOrder;
   String _themeId;
+  bool _passwordPromptDetection;
 
   double get fontSize => _fontSize;
   Map<ToolbarGroup, bool> get groupEnabled => Map.unmodifiable(_groupEnabled);
   List<ToolbarGroup> get groupOrder => List.unmodifiable(_groupOrder);
   String get themeId => _themeId;
   TerminalColorTheme get colorTheme => TerminalThemes.getById(_themeId);
+  // Mirrors the web `terminal.passwordPromptDetection` preference
+  // (default true, see `PreferencesContext.jsx`).
+  bool get passwordPromptDetection => _passwordPromptDetection;
 
   bool isGroupEnabled(ToolbarGroup group) => _groupEnabled[group] ?? false;
 
@@ -90,10 +96,12 @@ class TerminalSettings extends ChangeNotifier {
     required Map<ToolbarGroup, bool> groupEnabled,
     required List<ToolbarGroup> groupOrder,
     required String themeId,
+    required bool passwordPromptDetection,
   })  : _fontSize = fontSize,
         _groupEnabled = groupEnabled,
         _groupOrder = groupOrder,
-        _themeId = themeId;
+        _themeId = themeId,
+        _passwordPromptDetection = passwordPromptDetection;
 
   static Future<TerminalSettings> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -127,6 +135,8 @@ class TerminalSettings extends ChangeNotifier {
       groupEnabled: groupEnabled,
       groupOrder: groupOrder,
       themeId: prefs.getString(_themeKey) ?? 'default',
+      passwordPromptDetection:
+          prefs.getBool(_passwordPromptDetectionKey) ?? true,
     );
   }
 
@@ -161,6 +171,13 @@ class TerminalSettings extends ChangeNotifier {
     _themeId = id;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeKey, id);
+    notifyListeners();
+  }
+
+  Future<void> setPasswordPromptDetection(bool value) async {
+    _passwordPromptDetection = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_passwordPromptDetectionKey, value);
     notifyListeners();
   }
 

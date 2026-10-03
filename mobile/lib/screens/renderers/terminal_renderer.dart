@@ -9,12 +9,18 @@ import 'package:web_socket_channel/io.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../services/session_manager.dart';
+import '../../services/connection_service.dart';
+import '../../services/server_editor_service.dart';
+import '../../models/managed_identity.dart';
 import '../../utils/ai_manager.dart';
 import '../../utils/snippet_manager.dart';
+import '../../utils/password_prompt.dart';
+import '../../utils/password_prompt_localizations.dart';
 import '../../utils/terminal_key_input.dart';
 import '../../utils/terminal_settings.dart';
 import '../widgets/ai_assistant_sheet.dart';
 import '../widgets/connection_loader.dart';
+import 'password_fill_hint.dart';
 
 class TerminalRenderer extends StatefulWidget {
   final AppSession session;
@@ -60,18 +66,268 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   static const Duration _arrowRepeatDelay = Duration(milliseconds: 400);
   static const Duration _arrowRepeatInterval = Duration(milliseconds: 80);
 
+  // Password prompt detection (mirrors web `XtermRenderer.jsx`).
+  String _promptLine = '';
+  List<PasswordIdentity> _passwordIdentities = [];
+  int _passwordHintIndex = -1;
+  bool _passwordPromptVisible = false;
+
   @override
   void initState() {
     super.initState();
     _terminal.addListener(_onTerminalChanged);
     _terminalFocusNode.addListener(_onFocusChanged);
+    widget.terminalSettings.addListener(_onTerminalSettingsChanged);
     HardwareKeyboard.instance.addHandler(_handleHardwareKey);
     widget.session.showSnippets = _showSnippets;
     widget.session.showAI = _showAISheet;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.session.onCallbacksReady?.call();
     });
+    _loadPasswordIdentities();
     _setupTerminal();
+  }
+
+  @override
+  void didUpdateWidget(covariant TerminalRenderer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Note: renderers are keyed by sessionId (`term_<id>`), so a different
+    // sessionId remounts instead of updating. This branch therefore handles
+    // token refreshes and server-data refreshes (e.g. identities edited
+    // while the terminal is open) for the same session.
+    final sessionChanged =
+        oldWidget.session.sessionId != widget.session.sessionId;
+    final tokenChanged = oldWidget.token != widget.token;
+    final identitiesChanged =
+        oldWidget.session.identityId != widget.session.identityId ||
+            !_sameIdentityIds(oldWidget.session.server.identities,
+                widget.session.server.identities);
+    if (sessionChanged || tokenChanged || identitiesChanged) {
+      _passwordPromptVisible = false;
+      _passwordHintIndex = -1;
+      _promptLine = '';
+      _passwordIdentities = [];
+      unawaited(_loadPasswordIdentities());
+    }
+    if (oldWidget.terminalSettings != widget.terminalSettings) {
+      oldWidget.terminalSettings.removeListener(_onTerminalSettingsChanged);
+      widget.terminalSettings.addListener(_onTerminalSettingsChanged);
+    }
+  }
+
+  static bool _sameIdentityIds(List<int>? a, List<int>? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  void _onTerminalSettingsChanged() {
+    // Mirrors web: disabling detection hides the hint and resets tracking.
+    if (!widget.terminalSettings.passwordPromptDetection) {
+      _promptLine = '';
+      _hidePasswordHint();
+    } else {
+      // Reload so identities added while detection was off appear.
+      unawaited(_loadPasswordIdentities());
+    }
+  }
+
+  DateTime? _lastIdentityLoadAttempt;
+  bool _identityLoadInFlight = false;
+  bool _identityLoadQueued = false;
+
+  /// Loads the server's password identities (web `IdentityContext` equivalent).
+  /// Filters the global identity list down to identities attached to this
+  /// server whose type carries a password, prioritizing the session identity
+  /// exactly like the web client.
+  ///
+  /// Like the web context, identities load independently of the detection
+  /// setting: the manual toolbar fill (web context-menu equivalent) stays
+  /// available while detection is off and pastes without submitting.
+  Future<void> _loadPasswordIdentities() async {
+    // Coalesce overlapping requests: at most one load in flight, at most one
+    // queued. A queued request whose snapshot was discarded by the guard
+    // below is retried from `finally` instead of being dropped silently.
+    if (_identityLoadInFlight) {
+      _identityLoadQueued = true;
+      return;
+    }
+    _identityLoadInFlight = true;
+    _lastIdentityLoadAttempt = DateTime.now();
+    // Snapshot request state: discard the result if the session or token
+    // changed while the request was in flight.
+    final requestToken = widget.token;
+    final requestSessionId = widget.session.sessionId;
+    final requestServerIds = <int>[
+      ...?widget.session.server.identities,
+    ];
+    final requestIdentityId = widget.session.identityId;
+    try {
+      final all = await ServerEditorService.getIdentities(requestToken);
+      if (!mounted) return;
+      if (widget.session.sessionId != requestSessionId ||
+          widget.token != requestToken) {
+        _identityLoadQueued = true;
+        return;
+      }
+      final serverIds = <int>[...requestServerIds];
+      final sessionIdentityId = requestIdentityId;
+      if (sessionIdentityId != null && !serverIds.contains(sessionIdentityId)) {
+        serverIds.insert(0, sessionIdentityId);
+      }
+      final byId = <String, ManagedIdentity>{
+        for (final identity in all) identity.id.toString(): identity,
+      };
+      final filtered = <PasswordIdentity>[];
+      for (final id in serverIds) {
+        final match = byId[id.toString()];
+        if (match == null) continue;
+        if (!passwordIdentityTypes.contains(match.authType)) continue;
+        filtered.add(PasswordIdentity(id: match.id, username: match.username));
+      }
+      final hideHint = filtered.isEmpty && _passwordPromptVisible;
+      // Prompt-race healing: the prompt may have arrived while identities
+      // were still loading and the terminal may be idle since. Re-evaluate
+      // once from the accumulated stream plus the live buffer.
+      var showHint = false;
+      if (filtered.isNotEmpty &&
+          !_passwordPromptVisible &&
+          widget.terminalSettings.passwordPromptDetection) {
+        final term = widget.session.terminal;
+        var candidate = _promptLine;
+        if (term != null) {
+          final bufferLine = readTerminalPromptLine(term);
+          if (bufferLine.trim().isNotEmpty) candidate = bufferLine;
+        }
+        showHint = isPasswordPrompt(candidate);
+      }
+      setState(() {
+        _passwordIdentities = filtered;
+        if (hideHint) {
+          _passwordPromptVisible = false;
+          _passwordHintIndex = -1;
+        } else if (showHint) {
+          _passwordPromptVisible = true;
+          _passwordHintIndex = 0;
+        }
+      });
+    } catch (_) {
+      // Best effort: without identities there is simply no hint. Backdate
+      // the attempt so a failed load retries after ~15s, not 60s.
+      _lastIdentityLoadAttempt =
+          DateTime.now().subtract(const Duration(seconds: 45));
+      if (!mounted) return;
+      if (widget.session.sessionId != requestSessionId ||
+          widget.token != requestToken) {
+        _identityLoadQueued = true;
+        return;
+      }
+      final hideHint = _passwordPromptVisible;
+      setState(() {
+        _passwordIdentities = [];
+        if (hideHint) {
+          _passwordPromptVisible = false;
+          _passwordHintIndex = -1;
+        }
+      });
+    } finally {
+      _identityLoadInFlight = false;
+      if (_identityLoadQueued && mounted) {
+        _identityLoadQueued = false;
+        unawaited(_loadPasswordIdentities());
+      }
+    }
+  }
+
+  void _trackPasswordPrompt(String data) {
+    // Always accumulate: the prompt may arrive while identities are still
+    // loading (or detection is off); evaluation below decides visibility.
+    // Bounded to the last 256 code points by `updatePromptLine`.
+    _promptLine = updatePromptLine(_promptLine, data);
+    if (_passwordIdentities.isEmpty) {
+      // An identity may have been added while this terminal was open (the
+      // web client reloads live via IdentityContext). Retry at most once a
+      // minute instead of polling on every chunk. This runs independently of
+      // the detection setting so the manual toolbar fill heals as well.
+      final last = _lastIdentityLoadAttempt;
+      if (last == null ||
+          DateTime.now().difference(last) > const Duration(seconds: 60)) {
+        unawaited(_loadPasswordIdentities());
+      }
+      return;
+    }
+    if (!widget.terminalSettings.passwordPromptDetection) return;
+    var candidate = _promptLine;
+    final bufferLine = readTerminalPromptLine(_terminal);
+    if (bufferLine.trim().isNotEmpty) candidate = bufferLine;
+    if (isPasswordPrompt(candidate)) {
+      if (!_passwordPromptVisible && mounted) {
+        setState(() {
+          _passwordPromptVisible = true;
+          _passwordHintIndex = 0;
+        });
+      }
+    } else {
+      _hidePasswordHint();
+    }
+  }
+
+  void _hidePasswordHint() {
+    if (!_passwordPromptVisible) return;
+    if (mounted) {
+      setState(() {
+        _passwordPromptVisible = false;
+        _passwordHintIndex = -1;
+      });
+    } else {
+      _passwordPromptVisible = false;
+      _passwordHintIndex = -1;
+    }
+  }
+
+  void _cyclePasswordHint([int offset = 1]) {
+    if (_passwordIdentities.length < 2 || !mounted) return;
+    setState(() {
+      final count = _passwordIdentities.length;
+      _passwordHintIndex = (_passwordHintIndex + offset) % count;
+    });
+  }
+
+  /// Fills the identity password via `POST /paste-password` (web
+  /// `fillIdentityPassword`). [identityId] null pastes the session default;
+  /// `submit` is true while a prompt is visible, exactly like the web client.
+  Future<void> _fillIdentityPassword([dynamic identityId]) async {
+    final shouldSubmit = _passwordPromptVisible;
+    _hidePasswordHint();
+    try {
+      await ConnectionService.pasteIdentityPassword(
+        token: widget.token,
+        sessionId: widget.session.sessionId,
+        identityId: identityId == null
+            ? null
+            : (identityId is int
+                ? identityId
+                : int.tryParse(identityId.toString())),
+        submit: shouldSubmit,
+      );
+    } catch (_) {
+      // A failed fill likely means the identity changed server-side; reload
+      // so the next prompt shows the current list (web heals via live push).
+      unawaited(_loadPasswordIdentities());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to paste password'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (mounted) _terminalFocusNode.requestFocus();
   }
 
   void _onTerminalChanged() => _cursorRevision.value++;
@@ -84,8 +340,50 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   bool _handleHardwareKey(KeyEvent event) {
     if (!mounted ||
         !_terminalFocusNode.hasFocus ||
-        (!_ctrlPressed && !_altPressed) ||
         event is! KeyDownEvent) {
+      return false;
+    }
+
+    // Inactive tabs stay alive in the IndexedStack: never consume keys for a
+    // session that is not currently visible.
+    if (widget.sessionManager.activeSessionId != null &&
+        widget.sessionManager.activeSessionId != widget.session.sessionId) {
+      return false;
+    }
+
+    // Mirrors web `attachCustomKeyEventHandler` while the password hint is
+    // visible: Tab/Enter fills, Escape dismisses, Up/Down cycles identities.
+    if (_passwordPromptVisible) {
+      final logicalKey = event.logicalKey;
+      final isTab = logicalKey == LogicalKeyboardKey.tab;
+      final isEnter = logicalKey == LogicalKeyboardKey.enter ||
+          logicalKey == LogicalKeyboardKey.numpadEnter;
+      final isEscape = logicalKey == LogicalKeyboardKey.escape;
+      final isUp = logicalKey == LogicalKeyboardKey.arrowUp;
+      final isDown = logicalKey == LogicalKeyboardKey.arrowDown;
+      if (isTab || isEnter) {
+        final count = _passwordIdentities.length;
+        final current = count > 0
+            ? _passwordIdentities[_passwordHintIndex < 0
+                ? 0
+                : (_passwordHintIndex >= count
+                    ? count - 1
+                    : _passwordHintIndex)]
+            : null;
+        unawaited(_fillIdentityPassword(current?.id));
+        return true;
+      }
+      if (isEscape) {
+        _hidePasswordHint();
+        return true;
+      }
+      if ((isUp || isDown) && _passwordIdentities.length > 1) {
+        _cyclePasswordHint(isUp ? -1 : 1);
+        return true;
+      }
+    }
+
+    if (!_ctrlPressed && !_altPressed) {
       return false;
     }
 
@@ -158,6 +456,12 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
     _terminal.onOutput = (data) {
       if (!mounted || _channel == null) return;
+      // Mirrors web `term.onData`: any user input dismisses the hint.
+      // Note the deliberate mobile asymmetry: a soft-keyboard Enter arrives
+      // here as plain input (it dismisses without filling), while a hardware
+      // Tab/Enter is intercepted above and fills. Tapping the hint card is
+      // the primary touch flow.
+      _hidePasswordHint();
       _sendTerminalText(data);
     };
 
@@ -174,20 +478,26 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             setState(() => _receivedData = true);
           }
           if (data is String) {
-            _terminal.write(data.startsWith('\x02') ? data.substring(1) : data);
+            // TOTP second-factor prompts (\x02) are written without the
+            // marker and never feed password detection, like the web client.
+            final isTotpPrompt = data.startsWith('\x02');
+            final text =
+                isTotpPrompt ? data.substring(1) : data;
+            _terminal.write(text);
+            if (!isTotpPrompt) _trackPasswordPrompt(text);
           }
         },
         onError: (error) {
           _stopAllArrowRepeats();
           if (mounted) setState(() { _errorMessage = 'Connection error: $error'; _connected = false; });
           widget.session.isConnected = false;
-          _attemptReconnect();
+          unawaited(_attemptReconnect());
         },
         onDone: () {
           _stopAllArrowRepeats();
           if (mounted) setState(() => _connected = false);
           widget.session.isConnected = false;
-          _attemptReconnect();
+          unawaited(_attemptReconnect());
         },
       );
 
@@ -209,6 +519,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   @override
   void dispose() {
     _terminal.removeListener(_onTerminalChanged);
+    widget.terminalSettings.removeListener(_onTerminalSettingsChanged);
     _cursorRevision.dispose();
     HardwareKeyboard.instance.removeHandler(_handleHardwareKey);
     _stopAllArrowRepeats();
@@ -217,6 +528,9 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     super.dispose();
   }
 
+  /// Reconnects a dropped terminal session with up to 5 attempts and 1-5s
+  /// backoff. On success the stream state is reset (fresh size handshake,
+  /// cleared prompt tracking) and the identity list is refreshed.
   Future<void> _attemptReconnect() async {
     if (!mounted || _reconnectAttempts >= _maxReconnectAttempts) {
       widget.onDisconnected?.call();
@@ -239,13 +553,18 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     if (success) {
       _initialized = false;
       widget.session.termSubscription = null;
+      // Fresh stream: drop prompt tracking so a stale hint cannot submit
+      // into the new shell, then refresh the identity list.
+      _promptLine = '';
+      _hidePasswordHint();
+      unawaited(_loadPasswordIdentities());
       setState(() {
         _errorMessage = null;
         _receivedData = false;
       });
       _setupTerminal();
     } else {
-      _attemptReconnect();
+      unawaited(_attemptReconnect());
     }
   }
 
@@ -262,6 +581,9 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   }
 
   void _sendTerminalText(String text) {
+    // Mirrors web `term.onData`: any user input dismisses the hint first, so
+    // a later fill cannot submit into a stale prompt.
+    _hidePasswordHint();
     final ctrl = _ctrlPressed;
     final alt = _altPressed;
     _channel?.sink.add(TerminalKeyInput.applyText(text, ctrl: ctrl, alt: alt));
@@ -269,6 +591,8 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   }
 
   void _sendTerminalKey(String key, {bool forceCtrl = false}) {
+    // Same as above: toolbar and hardware-key input dismiss the hint.
+    _hidePasswordHint();
     final ctrl = forceCtrl || _ctrlPressed;
     final alt = _altPressed;
     final data = TerminalKeyInput.applyKey(key, ctrl: ctrl, alt: alt);
@@ -396,6 +720,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                       onTap: () => _terminalFocusNode.requestFocus(),
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (_) {
+                          // Deliberate divergence from web `term.onScroll`
+                          // (which hides the hint): this card is
+                          // bottom-anchored and never misplaced by scrolling,
+                          // and hiding on every autoscroll from incoming
+                          // output would make the hint flicker.
                           _cursorRevision.value++;
                           return false;
                         },
@@ -437,6 +766,22 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                       ),
                     ),
                   ),
+                  if (_passwordPromptVisible &&
+                      _passwordIdentities.isNotEmpty &&
+                      widget.terminalSettings.passwordPromptDetection)
+                    SafeArea(
+                      top: false,
+                      // The keyboard toolbar below already applies the bottom
+                      // inset when visible; avoid padding twice.
+                      bottom: !_showKeyboardToolbar,
+                      child: PasswordFillHint(
+                        items: _passwordIdentities,
+                        selectedIndex: _passwordHintIndex,
+                        onFill: (id) => _fillIdentityPassword(id),
+                        onCycle: () => _cyclePasswordHint(1),
+                        onDismiss: _hidePasswordHint,
+                      ),
+                    ),
                   if (_showKeyboardToolbar) _buildKeyboardToolbar(),
                 ],
               ),
@@ -479,6 +824,21 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             child: Row(children: [
               _toolbarBtn('ESC'), const SizedBox(width: 8),
               _toolbarBtn('TAB'), const SizedBox(width: 8),
+              // Manual fill (web context-menu / `paste-identity-password`
+              // keybind equivalent): pastes the session default password
+              // without submitting unless a prompt is currently visible.
+              if (_passwordIdentities.isNotEmpty) ...[
+                Tooltip(
+                  message: PasswordPromptLocalizations.of(context)
+                      .pasteIdentityPassword,
+                  child: _toolbarBtn(
+                    'Password',
+                    icon: AppIcons.key,
+                    onPressed: () => _fillIdentityPassword(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               for (final group in ts.groupOrder)
                 if (ts.isGroupEnabled(group)) ..._buildGroupButtons(group),
             ]),
