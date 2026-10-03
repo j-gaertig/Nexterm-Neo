@@ -22,6 +22,16 @@ class AppSession {
   String? sftpPath;
   String? sftpRootPath;
 
+  /// Identity used for the connection (mirrors web `session.identity`).
+  /// Used to prioritize the password fill hint, like the web client
+  /// unshifting `session.identity` to the front of the identity list.
+  int? identityId;
+
+  /// True when the session was opened with an ad-hoc `directIdentity`
+  /// (quick connect) instead of a stored identity. Reconnects must not fall
+  /// back to a stored server identity in that case.
+  bool usedDirectIdentity;
+
   GuacClient? guacClient;
   GuacWebSocketTunnel? guacTunnel;
 
@@ -46,6 +56,8 @@ class AppSession {
     required this.type,
     this.isConnected = false,
     this.error,
+    this.identityId,
+    this.usedDirectIdentity = false,
     this.guacClient,
     this.guacTunnel,
     this.terminal,
@@ -143,6 +155,8 @@ class SessionManager extends ChangeNotifier {
       type: ConnectionType.terminal,
       terminal: terminal,
       termChannel: channel,
+      identityId: identityId,
+      usedDirectIdentity: directIdentity != null,
     );
 
     _sessions[session.sessionId] = session;
@@ -271,6 +285,15 @@ class SessionManager extends ChangeNotifier {
                 type: ConnectionType.terminal,
                 terminal: terminal,
                 termChannel: channel,
+                identityId: identityId is int
+                    ? identityId
+                    : int.tryParse(identityId?.toString() ?? ''),
+                // Known limitation: the session list strips ad-hoc
+                // `directIdentity` payloads, so a restored quick-connect
+                // session cannot be distinguished from a stored-identity one.
+                // Reconnect then falls back to the server identity (transport
+                // still resolves server-side); only hint prioritization may
+                // differ until the session is recreated.
               );
               break;
 
@@ -359,9 +382,14 @@ class SessionManager extends ChangeNotifier {
       session.termSubscription = null;
       try { session.termChannel?.sink.close(); } catch (_) {}
 
-      final identityId = session.server.identities?.isNotEmpty == true
-          ? session.server.identities!.first
-          : null;
+      // Ad-hoc quick-connect sessions have no stored identity; reconnecting
+      // with a server identity would silently switch credentials.
+      final identityId = session.usedDirectIdentity
+          ? null
+          : (session.identityId ??
+              (session.server.identities?.isNotEmpty == true
+                  ? session.server.identities!.first
+                  : null));
 
       final queryParams = <String, String>{
         'sessionToken': token,
@@ -376,6 +404,7 @@ class SessionManager extends ChangeNotifier {
       );
 
       session.termChannel = channel;
+      session.identityId = identityId;
       notifyListeners();
       return true;
     } catch (_) {

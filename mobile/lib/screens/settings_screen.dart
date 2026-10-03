@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../utils/app_icons.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
+import '../utils/password_prompt_localizations.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
@@ -482,6 +483,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  Divider(height: 1, indent: 16, endIndent: 16, color: cs.outlineVariant.withValues(alpha: 0.3)),
+                  Builder(builder: (innerContext) {
+                    // Mirrors web `settings.terminal.input.passwordPromptDetection`
+                    // (Enabled/Disabled dropdown) as a native switch.
+                    final strings = PasswordPromptLocalizations.of(innerContext);
+                    return SwitchListTile(
+                      contentPadding: const EdgeInsets.only(left: 16, right: 12),
+                      secondary: Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                        child: Icon(AppIcons.key, color: cs.onPrimaryContainer, size: 18),
+                      ),
+                      title: Text(strings.settingTitle, style: const TextStyle(fontSize: 15)),
+                      subtitle: Text(
+                        ts.passwordPromptDetection ? strings.enabled : strings.disabled,
+                        style: TextStyle(fontSize: 12, color: cs.outline),
+                      ),
+                      value: ts.passwordPromptDetection,
+                      onChanged: (v) => ts.setPasswordPromptDetection(v),
+                    );
+                  }),
                 ]);
               },
             ),
