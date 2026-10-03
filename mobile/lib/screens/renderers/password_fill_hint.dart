@@ -125,7 +125,6 @@ class PasswordFillHint extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
   }
-}
