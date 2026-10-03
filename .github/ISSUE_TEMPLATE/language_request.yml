@@ -1,54 +1,52 @@
-name: "💡 Suggest a feature"
-description: Suggest a focused improvement for Nexterm Neo.
-title: "[Feature] "
-labels: ["enhancement"]
+name: "🌍 Request a language"
+description: Request a new interface language for Nexterm Neo.
+title: "[Language] "
+labels: ["translation"]
 body:
+  - type: markdown
+    attributes:
+      value: "Nexterm Neo translations are managed through [Crowdin](https://crowdin.com/project/nexterm). This form is for requesting a language that is not available yet; translation contributions should be made on Crowdin."
+
   - type: checkboxes
     id: checks
     attributes:
       label: Before submitting
       options:
-        - label: I checked existing issues and discussions for a similar suggestion.
+        - label: I checked the available languages and existing issues, and this language is not already supported or requested.
           required: true
 
+  - type: input
+    id: language
+    attributes:
+      label: Requested language
+      description: Enter the language name and, if known, its locale code.
+      placeholder: e.g. German (de-DE)
+    validations:
+      required: true
+
+  - type: textarea
+    id: audience
+    attributes:
+      label: Who would benefit?
+      description: Briefly explain who would use Nexterm Neo in this language or why it would be useful.
+    validations:
+      required: true
+
   - type: dropdown
-    id: area
+    id: help
     attributes:
-      label: Affected area
+      label: Can you help with the translation on Crowdin?
       options:
-        - Server
-        - Web client
-        - Engine
-        - Connector app
-        - Mobile app
-        - CLI
-        - Landing page
-        - Documentation
-        - Other / not sure
+        - "Yes"
+        - "No"
+        - "Maybe"
     validations:
       required: true
 
   - type: textarea
-    id: problem
+    id: context
     attributes:
-      label: Problem or use case
-      description: What are you trying to do, and what gets in the way today?
-      placeholder: As a Nexterm Neo user, I want to ... because ...
-    validations:
-      required: true
-
-  - type: textarea
-    id: solution
-    attributes:
-      label: Proposed solution
-      description: Describe the behavior or improvement you would like to see.
-    validations:
-      required: true
-
-  - type: textarea
-    id: alternatives
-    attributes:
-      label: Alternatives and additional context
-      description: Mention any workarounds, alternatives, or examples that help explain the request.
+      label: Additional context
+      description: Add any relevant details, such as regional variants or terminology.
     validations:
       required: false
