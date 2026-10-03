@@ -1,44 +1,73 @@
-name: 🐛 Report a Bug
-description:  Report a bug or issue in Nexterm
+name: "🐛 Report a bug"
+description: Report a reproducible problem in Nexterm Neo.
 title: "[Bug] "
 labels: ["bug"]
 body:
   - type: checkboxes
+    id: checks
     attributes:
-      label: General
-      description: Please confirm the following statements
+      label: Before submitting
       options:
-        - label: I have updated to the latest version of Nexterm.
+        - label: I searched existing issues and did not find a report for this problem.
           required: true
-        - label: My bug has not been reported yet.
-          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Nexterm Neo version
+      description: Include the release, development tag, or image tag you are using.
+      placeholder: e.g. development or v1.2.3
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Server
+        - Web client
+        - Engine
+        - Connector app
+        - Mobile app
+        - CLI
+        - Other / not sure
+    validations:
+      required: true
+
   - type: textarea
+    id: problem
     attributes:
-      label: The Bug
-      description: Describe the bug/issue in detail. If possible, include screenshots and provide steps to reproduce the error.
-      placeholder: An error occurs when ...
+      label: Problem
+      description: Describe what happened and where you encountered it.
+      placeholder: When I ..., Nexterm Neo ...
     validations:
       required: true
-  - type: dropdown
-    id: browsers
+
+  - type: textarea
+    id: steps
     attributes:
-      label: What device are you using to access the page?
-      multiple: true
-      options:
-        - In the browser
-        - On mobile
-        - On a tablet
-        - On the connector app
+      label: Steps to reproduce
+      description: List the steps and any setup needed to reproduce the problem.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
     validations:
       required: true
-  - type: dropdown
-    id: server
+
+  - type: textarea
+    id: expected
     attributes:
-      label: Which operating system is your Nexterm instance running on?
-      multiple: true
-      options:
-        - Linux
-        - Windows
-        - macOS
+      label: Expected behavior
+      description: What did you expect Nexterm Neo to do?
     validations:
       required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and additional context
+      description: Include relevant OS, browser/device, deployment details, logs, or screenshots. Remove passwords, tokens, private keys, and other sensitive data before sharing.
+    validations:
+      required: false
