@@ -586,46 +586,34 @@ class _ServersScreenState extends State<ServersScreen> {
     ]);
   }
 
-  int _effectiveColumns(double maxWidth, int depth, int wanted) {
-    final cappedDepth = depth.clamp(0, 2);
-    final indent = 24.0 + cappedDepth * 16.0;
-    final available = (maxWidth - indent).clamp(200.0, 1200.0);
-    final maxByWidth = (available / 158.0).floor().clamp(2, 4);
-    return wanted.clamp(2, 4).clamp(2, maxByWidth);
+  int _effectiveColumns(int wanted) {
+    return wanted.clamp(2, 4);
   }
 
   double _gridRatio(int columns) {
-    if (columns <= 2) return 0.82;
-    if (columns == 3) return 0.68;
-    return 0.58;
+    if (columns <= 2) return 0.78;
+    if (columns == 3) return 0.64;
+    return 0.54;
   }
 
   Widget _buildServerGrid(List<Server> servers, int depth) {
-    final wanted = widget.serverViewSettings.gridColumns.clamp(2, 4);
+    final columns = _effectiveColumns(widget.serverViewSettings.gridColumns);
     final cappedDepth = depth.clamp(0, 2);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : MediaQuery.of(context).size.width;
-        final columns = _effectiveColumns(maxWidth, depth, wanted);
-        return Padding(
-          padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12, top: 4, bottom: 4),
-          child: GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: columns,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: _gridRatio(columns),
-            ),
-            itemCount: servers.length,
-            itemBuilder: (_, i) => _buildServerGridCard(servers[i], key: ValueKey('grid:${servers[i].id ?? servers[i].name}')),
-          ),
-        );
-      },
+    return Padding(
+      padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12, top: 4, bottom: 4),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: _gridRatio(columns),
+        ),
+        itemCount: servers.length,
+        itemBuilder: (_, i) => _buildServerGridCard(servers[i], key: ValueKey('grid:${servers[i].id ?? servers[i].name}')),
+      ),
     );
   }
 
@@ -645,8 +633,6 @@ class _ServersScreenState extends State<ServersScreen> {
       sub = ip;
     }
     final tags = server.tags ?? const <Tag>[];
-    final shownTags = tags.take(2).toList();
-    final extraTags = tags.length - shownTags.length;
     final statusLabel = offline ? 'Offline' : 'Online';
     return Semantics(
       key: key,
@@ -682,39 +668,44 @@ class _ServersScreenState extends State<ServersScreen> {
                 ]),
               ),
               ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 22),
+                constraints: const BoxConstraints(minHeight: 22, maxHeight: 78),
                 child: tags.isEmpty
                     ? const SizedBox.shrink()
-                    : Row(children: [
-                        for (final t in shownTags)
-                          Flexible(
-                            child: Semantics(
-                              button: true,
-                              label: 'Filter by ${t.name}',
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () => setState(() {
-                                  _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
-                                  _filterFolders();
-                                }),
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 4),
-                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: _parseColor(t.color).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(7),
-                                  border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
+                    : LayoutBuilder(
+                        builder: (_, tc) {
+                          final mw = tc.maxWidth.isFinite ? tc.maxWidth : 160.0;
+                          return Wrap(
+                            runSpacing: 4,
+                            children: [
+                              for (final t in tags)
+                                Semantics(
+                                  button: true,
+                                  label: 'Filter by ${t.name}',
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => setState(() {
+                                      _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
+                                      _filterFolders();
+                                    }),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 4),
+                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                      constraints: BoxConstraints(maxWidth: mw),
+                                      decoration: BoxDecoration(
+                                        color: _parseColor(t.color).withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(7),
+                                        border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
+                                      ),
+                                      child: Text(t.name,
+                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
+                                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
                                 ),
-                                child: Text(t.name,
-                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (extraTags > 0)
-                          Text('+$extraTags', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.outline)),
-                      ]),
+                            ],
+                          );
+                        },
+                      ),
               ),
             ]),
           ),
@@ -741,7 +732,7 @@ class _ServersScreenState extends State<ServersScreen> {
       sub = ip;
     }
     final tags = server.tags ?? const <Tag>[];
-    final shownTags = tags.take(2).toList();
+    final shownTags = tags.take(3).toList();
     final extraTags = tags.length - shownTags.length;
     final cappedDepth = depth.clamp(0, 2);
     final statusLabel = offline ? 'Offline' : 'Online';
@@ -773,44 +764,19 @@ class _ServersScreenState extends State<ServersScreen> {
                   child: Text(sub, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis)),
               ])),
               if (tags.isNotEmpty)
-                Flexible(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Padding(padding: const EdgeInsets.only(right: 4),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Padding(padding: const EdgeInsets.only(right: 4),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
                     for (final t in shownTags)
-                      Semantics(
-                        button: true,
-                        label: 'Filter by ${t.name}',
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() {
-                            _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
-                            _filterFolders();
-                          }),
-                          child: Container(
-                            margin: const EdgeInsets.only(left: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                            constraints: const BoxConstraints(maxWidth: 90),
-                            decoration: BoxDecoration(
-                              color: _parseColor(t.color).withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(7),
-                              border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
-                            ),
-                            child: Text(t.name,
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
-                              maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ),
-                        ),
+                      Container(
+                        width: 8, height: 8, margin: const EdgeInsets.only(left: 4),
+                        decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
                       ),
                     if (extraTags > 0)
                       Padding(
                         padding: const EdgeInsets.only(left: 4),
-                        child: Text('+$extraTags', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.outline)),
+                        child: Text('+$extraTags', style: TextStyle(fontSize: 10, color: cs.outline)),
                       ),
                   ])),
-                    ),
-                  ),
               Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
             ]),
           ),
