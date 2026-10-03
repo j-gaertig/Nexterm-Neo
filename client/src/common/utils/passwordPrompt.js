@@ -5,7 +5,17 @@ const PASSWORD_PROMPT_REGEX = new RegExp(
   "iu"
 );
 
+export const MAX_PASSWORD_PHRASE_LENGTH = 100;
+export const MIN_PASSWORD_PHRASE_LENGTH = 2;
+export const MAX_PASSWORD_PHRASES = 10000;
+
 const takeLast = (s, n) => Array.from(s).slice(-n).join("");
+
+const normalizePhraseKey = (value) => {
+  let s = String(value).trim();
+  if (s.normalize) s = s.normalize("NFKC");
+  return s.toLowerCase();
+};
 
 export const stripTerminalNoise = (value) => {
   if (value === null || value === undefined) return "";
@@ -25,29 +35,37 @@ export const stripTerminalNoise = (value) => {
   return s;
 };
 
-export const compilePasswordPromptPattern = (source) => {
-  if (source instanceof RegExp) {
-    const base = String(source.flags || "").replace(/[^dimsuvy]/g, "").replace(/g/g, "");
-    const withI = base.includes("i") ? base : base + "i";
-    try {
-      return new RegExp(source.source, withI);
-    } catch {
-      try {
-        return new RegExp(source.source, "i");
-      } catch {
-        return null;
-      }
-    }
+export const normalizePasswordPhrases = (value) => {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    const length = Array.from(trimmed).length;
+    if (length < MIN_PASSWORD_PHRASE_LENGTH || length > MAX_PASSWORD_PHRASE_LENGTH) continue;
+    if (stripTerminalNoise(trimmed).trim().length === 0) continue;
+    const key = normalizePhraseKey(trimmed);
+    if (key.length === 0) continue;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(trimmed);
+    if (out.length >= MAX_PASSWORD_PHRASES) break;
   }
-  if (typeof source !== "string") return null;
-  const text = source.trim();
-  if (text.length === 0) return null;
-  if (text.length > 500) return null;
-  try {
-    return new RegExp(text, "iu");
-  } catch {
-    return null;
+  return out;
+};
+
+export const compilePasswordPhrases = (value) => {
+  const list = normalizePasswordPhrases(value);
+  const compiled = [];
+  for (const phrase of list) {
+    let s = phrase.trim();
+    if (s.normalize) s = s.normalize("NFKC");
+    s = s.toLowerCase();
+    if (s.length === 0) continue;
+    compiled.push(s);
   }
+  return compiled;
 };
 
 export const updatePromptLine = (prev, chunk) => {
@@ -96,7 +114,7 @@ export const readTerminalPromptLine = (term) => {
   }
 };
 
-export const isPasswordPrompt = (line, customPattern) => {
+export const isPasswordPrompt = (line, customPhrases) => {
   if (line === null || line === undefined) return false;
   const cleaned = stripTerminalNoise(line);
   if (cleaned.trim().length === 0) return false;
@@ -110,18 +128,48 @@ export const isPasswordPrompt = (line, customPattern) => {
   }
   if (target.length === 0) return false;
   target = takeLast(target, 256);
-  const custom = compilePasswordPromptPattern(customPattern);
-  if (custom) {
-    try {
-      custom.lastIndex = 0;
-      const hit = custom.test(target);
-      custom.lastIndex = 0;
-      if (hit) return true;
-    } catch {
-      return PASSWORD_PROMPT_REGEX.test(target);
-    }
-  } else if (typeof customPattern === "string" && customPattern.trim().length > 0) {
-    return PASSWORD_PROMPT_REGEX.test(target);
+  if (PASSWORD_PROMPT_REGEX.test(target)) return true;
+  if (!Array.isArray(customPhrases) || customPhrases.length === 0) return false;
+  let lower = target;
+  if (lower.normalize) lower = lower.normalize("NFKC");
+  lower = lower.toLowerCase();
+  for (const entry of customPhrases) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    const length = Array.from(trimmed).length;
+    if (length < MIN_PASSWORD_PHRASE_LENGTH || length > MAX_PASSWORD_PHRASE_LENGTH) continue;
+    if (stripTerminalNoise(trimmed).trim().length === 0) continue;
+    let needle = trimmed;
+    if (needle.normalize) needle = needle.normalize("NFKC");
+    needle = needle.toLowerCase();
+    if (needle.length === 0) continue;
+    if (lower.includes(needle)) return true;
   }
-  return PASSWORD_PROMPT_REGEX.test(target);
+  return false;
+};
+
+export const isPasswordPromptWithCompiled = (line, compiledPhrases) => {
+  if (line === null || line === undefined) return false;
+  const cleaned = stripTerminalNoise(line);
+  if (cleaned.trim().length === 0) return false;
+  const rows = cleaned.split(/[\r\n]/);
+  let target = "";
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i].trim().length > 0) {
+      target = rows[i];
+      break;
+    }
+  }
+  if (target.length === 0) return false;
+  target = takeLast(target, 256);
+  if (PASSWORD_PROMPT_REGEX.test(target)) return true;
+  if (!Array.isArray(compiledPhrases) || compiledPhrases.length === 0) return false;
+  let lower = target;
+  if (lower.normalize) lower = lower.normalize("NFKC");
+  lower = lower.toLowerCase();
+  for (const needle of compiledPhrases) {
+    if (typeof needle !== "string" || needle.length === 0) continue;
+    if (lower.includes(needle)) return true;
+  }
+  return false;
 };
