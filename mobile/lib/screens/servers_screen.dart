@@ -667,15 +667,21 @@ class _ServersScreenState extends State<ServersScreen> {
                     ),
                 ]),
               ),
-              ConstrainedBox(
-                constraints: const BoxConstraints(minHeight: 22, maxHeight: 78),
+              SizedBox(
+                height: 24,
                 child: tags.isEmpty
                     ? const SizedBox.shrink()
-                    : LayoutBuilder(
-                        builder: (_, tc) {
-                          final mw = tc.maxWidth.isFinite ? tc.maxWidth : 160.0;
-                          return Wrap(
-                            runSpacing: 4,
+                    : ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [Colors.white, Colors.white, Colors.transparent],
+                          stops: [0.0, 0.88, 1.0],
+                        ).createShader(bounds),
+                        blendMode: BlendMode.dstIn,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
                             children: [
                               for (final t in tags)
                                 Semantics(
@@ -690,7 +696,6 @@ class _ServersScreenState extends State<ServersScreen> {
                                     child: Container(
                                       margin: const EdgeInsets.only(right: 4),
                                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                      constraints: BoxConstraints(maxWidth: mw),
                                       decoration: BoxDecoration(
                                         color: _parseColor(t.color).withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(7),
@@ -698,13 +703,13 @@ class _ServersScreenState extends State<ServersScreen> {
                                       ),
                                       child: Text(t.name,
                                         style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
-                                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                                        maxLines: 1, softWrap: false),
                                     ),
                                   ),
                                 ),
                             ],
-                          );
-                        },
+                          ),
+                        ),
                       ),
               ),
             ]),
