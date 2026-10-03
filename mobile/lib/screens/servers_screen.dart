@@ -612,12 +612,12 @@ class _ServersScreenState extends State<ServersScreen> {
           childAspectRatio: _gridRatio(columns),
         ),
         itemCount: servers.length,
-        itemBuilder: (_, i) => _buildServerGridCard(servers[i], key: ValueKey('grid:${servers[i].id ?? servers[i].name}')),
+        itemBuilder: (_, i) => _buildServerGridCard(servers[i], compact: columns >= 3, key: ValueKey('grid:${servers[i].id ?? servers[i].name}')),
       ),
     );
   }
 
-  Widget _buildServerGridCard(Server server, {Key? key}) {
+  Widget _buildServerGridCard(Server server, {Key? key, bool compact = false}) {
     final cs = Theme.of(context).colorScheme;
     final offline = !server.isRunning;
     final pve = server.isPve;
@@ -650,16 +650,16 @@ class _ServersScreenState extends State<ServersScreen> {
             padding: const EdgeInsets.all(12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-                child: Center(child: Icon(icon, color: fg, size: 20)),
+                width: compact ? 32 : 40, height: compact ? 32 : 40,
+                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(compact ? 10 : 12)),
+                child: Center(child: Icon(icon, color: fg, size: compact ? 17 : 20)),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: compact ? 8 : 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                   Text(server.name,
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: offline ? cs.outline : cs.onSurface),
-                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                    maxLines: compact ? 1 : 2, overflow: TextOverflow.ellipsis),
                   if (sub != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),
