@@ -1,15 +1,7 @@
 name: Sync upstream Nexterm
 
 on:
-  schedule:
-    - cron: '7 2 * * *'
-      timezone: "Europe/Berlin"
-    - cron: '7 8 * * *'
-      timezone: "Europe/Berlin"
-    - cron: '7 14 * * *'
-      timezone: "Europe/Berlin"
-    - cron: '7 20 * * *'
-      timezone: "Europe/Berlin"
+  # ghacron: "0 */4 * * *"
   workflow_dispatch:
 
 concurrency:
