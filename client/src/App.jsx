@@ -27,6 +27,7 @@ const Link = lazy(() => import("@/pages/Link"));
 
 export const GITHUB_URL = "https://github.com/j-gaertig/Nexterm-Neo";
 export const DISCORD_URL = "https://dc.gnm.dev/";
+export const DOCS_URL = "https://docs.nexterm.dev/";
 
 const App = () => {
     const [translationsLoaded, setTranslationsLoaded] = useState(false);
