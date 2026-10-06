@@ -1,0 +1,60 @@
+name: Build Connector (Linux x64 AppImage)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-connector:
+    name: Build 64-bit Linux AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "26"
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - name: Install Yarn
+        run: npm install --global yarn
+
+      - name: Install client dependencies
+        working-directory: client
+        run: yarn install
+
+      - name: Build client
+        working-directory: client
+        run: yarn build
+
+      - name: Install connector dependencies
+        working-directory: connector
+        run: yarn install
+
+      - name: Build connector AppImage
+        working-directory: connector
+        run: yarn tauri build --target x86_64-unknown-linux-gnu --bundles appimage
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Upload Linux x64 AppImage
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexterm-connector-linux-x64-appimage-${{ github.run_number }}
+          path: connector/src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+          if-no-files-found: error
+          retention-days: 30
