@@ -16,10 +16,6 @@
   top: 0
   z-index: 10
 
-  @supports (-webkit-touch-callout: none)
-    height: 100dvh
-    height: -webkit-fill-available
-
   @media (max-width: breakpoints.$mobile)
     display: none
 
@@ -90,6 +86,7 @@
     align-items: center
     flex-shrink: 0
     padding: 0.5rem
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px))
     width: 100%
     box-sizing: border-box
 

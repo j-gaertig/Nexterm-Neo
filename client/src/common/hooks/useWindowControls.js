@@ -93,7 +93,7 @@ export const useWindowControls = (initialSize = { width: 800, height: 600 }, ini
 
     const getWindowStyle = () => {
         return isMaximized
-            ? { top: 0, left: 0, width: "100vw", height: "100vh", zIndex }
+            ? { top: "var(--title-bar-height, 0px)", left: 0, width: "100vw", height: "var(--content-height, 100vh)", zIndex }
             : {
                 top: `${position.y}px`,
                 left: `${position.x}px`,
