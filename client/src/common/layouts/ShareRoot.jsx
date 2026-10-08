@@ -13,7 +13,7 @@ export default () => {
                 <ToastProvider>
                     <KeymapProvider>
                         <Suspense fallback={<Loading />}>
-                            <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+                            <div style={{ width: '100vw', height: 'var(--content-height, 100vh)', overflow: 'hidden' }}>
                                 <Outlet />
                             </div>
                         </Suspense>
