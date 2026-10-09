@@ -1,14 +1,22 @@
-import 'dart:math';
-
-/// Monitoring models for the monitoring page (UI-only shapes).
+/// Monitoring models with live-API parsing (`GET /api/monitoring[/:id]`).
 ///
-/// NOTE: these are NOT the API shapes. When wiring the API
-/// (TODO below), map `GET /api/monitoring` items
-/// (`{id, name, ip, status, port, icon, type, monitoring: {...}}`) and
-/// `GET /api/monitoring/:serverId?timeRange=` detail
-/// (`{server, data, latest}`) — see `mobile_v2/API.md` §15.
+/// Parsing is defensive: SQLite may stringify numbers and fields may be
+/// missing — see `mobile_v2/API.md` §15 and
+/// `server/controllers/monitoring.js`.
+library;
 
-/// A monitored server card (subset of `GET /api/monitoring` items).
+double? _num(dynamic v) =>
+    v is num ? v.toDouble() : double.tryParse('$v');
+
+int? _int(dynamic v) =>
+    v is num ? v.toInt() : int.tryParse('$v');
+
+double _gb(dynamic bytes) => (_num(bytes) ?? 0) / 1073741824;
+
+Map<String, dynamic> _map(dynamic v) =>
+    v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+
+/// A monitored server card (`GET /api/monitoring/` item).
 class MonitoredServer {
   const MonitoredServer({
     required this.id,
@@ -43,6 +51,29 @@ class MonitoredServer {
   bool get isOnline => status == 'online';
 
   String get address => port == null ? ip : '$ip:$port';
+
+  factory MonitoredServer.fromJson(Map<String, dynamic> json) {
+    final mon = _map(json['monitoring']);
+    final load = mon['loadAverage'];
+    return MonitoredServer(
+      id: '${json['id']}',
+      name: json['name'] as String? ?? 'Server',
+      ip: json['ip'] as String? ?? '',
+      port: _int(json['port']),
+      icon: json['icon'] as String?,
+      type: json['type'] as String? ?? 'server',
+      status: json['status'] as String? ??
+          mon['status'] as String? ??
+          'unknown',
+      cpu: _num(mon['cpuUsage']),
+      mem: _num(mon['memoryUsage']),
+      load: load is List && load.isNotEmpty ? _num(load.first) : null,
+      processes: _int(mon['processes']),
+      uptimeSeconds: _int(mon['uptime']),
+      lastSeen: DateTime.tryParse(
+          '${mon['lastSeen'] ?? mon['timestamp'] ?? mon['updatedAt'] ?? ''}'),
+    );
+  }
 }
 
 /// One history sample for charts (`GET /api/monitoring/:id` `data`).
@@ -61,6 +92,33 @@ class ServerHistory {
   final List<MetricPoint> cpu;
   final List<MetricPoint> mem;
   final List<MetricPoint> processes;
+
+  static const empty =
+      ServerHistory(cpu: [], mem: [], processes: []);
+}
+
+/// Parse `data` rows (`{timestamp, cpuUsage, memoryUsage, processes}`),
+/// oldest first for charts.
+ServerHistory parseHistory(List<dynamic> data) {
+  List<MetricPoint> series(String key) {
+    final pts = <MetricPoint>[];
+    for (final row in data) {
+      if (row is! Map) continue;
+      final map = Map<String, dynamic>.from(row);
+      final t = DateTime.tryParse(
+          '${map['timestamp'] ?? map['createdAt'] ?? ''}');
+      final v = _num(map[key]);
+      if (t != null && v != null) pts.add(MetricPoint(t, v));
+    }
+    pts.sort((a, b) => a.time.compareTo(b.time));
+    return pts;
+  }
+
+  return ServerHistory(
+    cpu: series('cpuUsage'),
+    mem: series('memoryUsage'),
+    processes: series('processes'),
+  );
 }
 
 class DiskPartition {
@@ -118,7 +176,8 @@ class ProcInfo {
   final double mem;
 }
 
-/// Extended detail (web "ServerDetails" equivalent).
+/// Extended detail (web "ServerDetails" equivalent), parsed from
+/// the `latest` object of `GET /api/monitoring/:serverId`.
 class ServerDetail {
   const ServerDetail({
     required this.hostname,
@@ -151,6 +210,102 @@ class ServerDetail {
   final List<DiskInfo> disks;
   final List<NetIface> network;
   final List<ProcInfo> procs;
+
+  factory ServerDetail.fromLatest(Map<String, dynamic> latest) {
+    final os = _map(latest['osInfo']);
+    final loadRaw = latest['loadAverage'];
+    final disks = <DiskInfo>[];
+    final diskRaw = latest['disk'];
+    if (diskRaw is List) {
+      for (final d in diskRaw) {
+        if (d is! Map) continue;
+        final dm = Map<String, dynamic>.from(d);
+        final parts = <DiskPartition>[];
+        final partRaw = dm['partitions'];
+        if (partRaw is List) {
+          for (final p in partRaw) {
+            if (p is! Map) continue;
+            final pm = Map<String, dynamic>.from(p);
+            parts.add(DiskPartition(
+              name: pm['name'] as String? ?? 'part',
+              mount: pm['mountPoint'] as String? ?? pm['mount'] as String?,
+              usagePercent:
+                  _num(pm['usagePercent'] ?? pm['usage']) ?? 0,
+              usedGb: _gb(pm['used']),
+              totalGb: _gb(pm['size'] ?? pm['total']),
+            ));
+          }
+        }
+        disks.add(DiskInfo(
+          name: dm['name'] as String? ?? 'disk',
+          model: dm['model'] as String?,
+          sizeGb: _gb(dm['size']),
+          partitions: parts,
+        ));
+      }
+    }
+    final ifaces = <NetIface>[];
+    final netRaw = latest['network'];
+    if (netRaw is List) {
+      for (final n in netRaw) {
+        if (n is! Map) continue;
+        final nm = Map<String, dynamic>.from(n);
+        final v4 = <String>[];
+        final rawV4 = nm['ipv4'];
+        if (rawV4 is List) {
+          for (final ip in rawV4) {
+            v4.add('$ip');
+          }
+        }
+        ifaces.add(NetIface(
+          name: nm['name'] as String? ?? 'iface',
+          mac: nm['mac'] as String?,
+          state: nm['state'] as String?,
+          ipv4: v4,
+          rxGb: _gb(nm['rxBytes']),
+          txGb: _gb(nm['txBytes']),
+          speedMbps: _int(nm['speed']),
+        ));
+      }
+    }
+    final procs = <ProcInfo>[];
+    final procRaw = latest['processList'];
+    if (procRaw is List) {
+      for (final p in procRaw) {
+        if (p is! Map) continue;
+        final pm = Map<String, dynamic>.from(p);
+        procs.add(ProcInfo(
+          name: pm['name'] as String? ??
+              (pm['pid'] != null ? 'PID ${pm['pid']}' : 'process'),
+          cpu: _num(pm['cpu'] ?? pm['cpuPercent']) ?? 0,
+          mem: _num(pm['mem'] ?? pm['memoryPercent']) ?? 0,
+        ));
+      }
+    }
+    final loads = <double>[];
+    if (loadRaw is List) {
+      for (final v in loadRaw) {
+        final n = _num(v);
+        if (n != null) loads.add(n);
+      }
+    }
+    return ServerDetail(
+      hostname: os['hostname'] as String? ?? '',
+      os: os['name'] as String? ?? os['platform'] as String? ?? '',
+      version: os['version'] as String? ?? '',
+      arch: os['architecture'] as String? ?? os['arch'] as String? ?? '',
+      kernel: os['kernel'] as String?,
+      uptimeSeconds: _int(latest['uptime']) ?? 0,
+      cpu: _num(latest['cpuUsage']) ?? 0,
+      mem: _num(latest['memoryUsage']) ?? 0,
+      memTotalGb: _gb(latest['memoryTotal']),
+      load: loads,
+      processes: _int(latest['processes']) ?? procs.length,
+      disks: disks,
+      network: ifaces,
+      procs: procs,
+    );
+  }
 }
 
 /// "2d 4h" / "3h 12m" / "8m" / "—" (mirrors the web grid).
@@ -167,165 +322,5 @@ String formatUptime(int? seconds) {
 String formatGb(double gb) =>
     gb >= 100 ? '${gb.toStringAsFixed(0)} GB' : '${gb.toStringAsFixed(1)} GB';
 
-/// Demo servers for UI iteration (TODO: API wiring).
-List<MonitoredServer> demoMonitoredServers() {
-  final now = DateTime.now();
-  return [
-    MonitoredServer(
-      id: '1',
-      name: 'Webserver',
-      ip: '192.168.1.10',
-      port: 22,
-      status: 'online',
-      cpu: 23.5,
-      mem: 61.2,
-      load: 0.87,
-      processes: 132,
-      uptimeSeconds: 2 * 86400 + 4 * 3600 + 12 * 60,
-    ),
-    MonitoredServer(
-      id: '3',
-      name: 'NAS',
-      ip: '192.168.1.30',
-      port: 2222,
-      status: 'online',
-      cpu: 8.1,
-      mem: 34.7,
-      load: 0.21,
-      processes: 87,
-      uptimeSeconds: 14 * 86400 + 2 * 3600,
-    ),
-    MonitoredServer(
-      id: '2',
-      name: 'Windows Box',
-      ip: '192.168.1.20',
-      status: 'offline',
-      lastSeen: now.subtract(const Duration(hours: 3, minutes: 22)),
-    ),
-  ];
-}
-
-/// Demo detail for UI iteration (TODO: API wiring).
-ServerDetail demoServerDetail(String id) {
-  if (id == '3') {
-    return const ServerDetail(
-      hostname: 'nas',
-      os: 'Debian GNU/Linux',
-      version: '12 (bookworm)',
-      arch: 'x86_64',
-      kernel: '6.1.0-18-amd64',
-      uptimeSeconds: 14 * 86400 + 2 * 3600,
-      cpu: 8.1,
-      mem: 34.7,
-      memTotalGb: 16,
-      load: [0.21, 0.18, 0.15],
-      processes: 87,
-      disks: [
-        DiskInfo(name: 'sda', model: 'WDC WD40EFRX', sizeGb: 3726, partitions: [
-          DiskPartition(
-              name: 'sda1',
-              mount: '/mnt/data',
-              usagePercent: 62,
-              usedGb: 2310,
-              totalGb: 3726),
-        ]),
-      ],
-      network: [
-        NetIface(
-            name: 'eth0',
-            mac: '02:42:ac:11:00:02',
-            state: 'up',
-            ipv4: ['192.168.1.30/24'],
-            rxGb: 812.4,
-            txGb: 203.1,
-            speedMbps: 1000),
-      ],
-      procs: [
-        ProcInfo(name: 'smbd', cpu: 2.1, mem: 1.2),
-        ProcInfo(name: 'docker', cpu: 1.4, mem: 3.8),
-        ProcInfo(name: 'snapraid', cpu: 0.6, mem: 0.4),
-      ],
-    );
-  }
-  return const ServerDetail(
-    hostname: 'web-01',
-    os: 'Ubuntu',
-    version: '24.04 LTS',
-    arch: 'x86_64',
-    kernel: '6.8.0-41-generic',
-    uptimeSeconds: 2 * 86400 + 4 * 3600 + 12 * 60,
-    cpu: 23.5,
-    mem: 61.2,
-    memTotalGb: 32,
-    load: [0.87, 0.72, 0.65],
-    processes: 132,
-    disks: [
-      DiskInfo(name: 'sda', model: 'Samsung SSD 970', sizeGb: 512, partitions: [
-        DiskPartition(
-            name: 'sda1',
-            mount: '/',
-            usagePercent: 44,
-            usedGb: 225,
-            totalGb: 512),
-        DiskPartition(
-            name: 'sda2',
-            mount: '/var/lib/docker',
-            usagePercent: 71,
-            usedGb: 142,
-            totalGb: 200),
-      ]),
-    ],
-    network: [
-      NetIface(
-          name: 'eth0',
-          mac: '02:42:ac:11:00:05',
-          state: 'up',
-          ipv4: ['192.168.1.10/24'],
-          rxGb: 128.7,
-          txGb: 342.9,
-          speedMbps: 1000),
-      NetIface(
-          name: 'docker0',
-          state: 'up',
-          ipv4: ['172.17.0.1/16'],
-          rxGb: 12.3,
-          txGb: 11.8),
-    ],
-    procs: [
-      ProcInfo(name: 'nginx', cpu: 4.2, mem: 2.1),
-      ProcInfo(name: 'node', cpu: 11.8, mem: 8.4),
-      ProcInfo(name: 'postgres', cpu: 3.3, mem: 12.6),
-      ProcInfo(name: 'dockerd', cpu: 1.1, mem: 1.9),
-    ],
-  );
-}
-
-/// Demo history: seeded random walk (TODO: API wiring with timeRange).
-ServerHistory demoHistory(String id, String range) {
-  final points = switch (range) {
-    '6h' => 72,
-    '24h' => 96,
-    '7d' => 84,
-    _ => 60,
-  };
-  final seed = id.hashCode ^ range.hashCode;
-  List<MetricPoint> walk(double base, double amp, double max) {
-    final rnd = Random(seed ^ base.toInt());
-    var v = base;
-    final now = DateTime.now();
-    return List.generate(points, (i) {
-      v = (v + (rnd.nextDouble() - 0.5) * amp).clamp(1.0, max);
-      return MetricPoint(
-          now.subtract(Duration(minutes: (points - i) * 2)), v);
-    });
-  }
-
-  return ServerHistory(
-    cpu: walk(24, 9, 96),
-    mem: walk(60, 3, 94),
-    processes: walk(130, 12, 220),
-  );
-}
-
-/// Available history ranges (API supports 1h/6h/24h/7d).
-const List<String> historyRanges = ['1h', '6h', '24h', '7d'];
+/// Available history ranges (server supports 1h/6h/24h).
+const List<String> historyRanges = ['1h', '6h', '24h'];

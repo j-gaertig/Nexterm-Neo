@@ -1,34 +1,56 @@
 import 'package:flutter/material.dart';
 
+import '../../remote/session_opener.dart';
+import '../../servers/identity.dart';
 import '../../servers/server_models.dart';
 import 'servers_page.dart' show protocolIcon;
 
 /// Bottom sheet for a server: active sessions + new session,
-/// or quick actions on long-press. UI only — no backend calls yet.
+/// or quick actions on long-press.
 class ServerDetailSheet extends StatelessWidget {
-  const ServerDetailSheet.sessions(
-      {super.key, required this.entry, this.sessions = const []})
-      : _mode = _SheetMode.sessions;
+  const ServerDetailSheet.sessions({
+    super.key,
+    required this.entry,
+    this.sessions = const [],
+    this.onStartSession,
+    this.onOpenSession,
+    this.onCloseSession,
+    this.onCloseAll,
+    this.onAction,
+  }) : _mode = _SheetMode.sessions;
 
-  const ServerDetailSheet.actions({super.key, required this.entry})
+  const ServerDetailSheet.actions(
+      {super.key, required this.entry, this.onAction})
       : sessions = const [],
+        onStartSession = null,
+        onOpenSession = null,
+        onCloseSession = null,
+        onCloseAll = null,
         _mode = _SheetMode.actions;
 
   final ServerEntry entry;
 
-  /// Active sessions of this server (empty until connections are wired).
-  final List<ServerSessionInfo> sessions;
+  /// Active sessions of this server.
+  final List<ConnectionInfo> sessions;
+
+  /// Start a new session of this kind (null = placeholder snackbar).
+  final ValueChanged<SessionKind>? onStartSession;
+
+  /// Reopen an existing session in its viewer.
+  final ValueChanged<ConnectionInfo>? onOpenSession;
+
+  /// Close one session.
+  final ValueChanged<ConnectionInfo>? onCloseSession;
+
+  /// Close all sessions of this server.
+  final VoidCallback? onCloseAll;
+
+  /// Quick action id (quick-connect, wake-on-lan, duplicate, edit,
+  /// delete) — null = placeholder snackbar.
+  final ValueChanged<String>? onAction;
   final _SheetMode _mode;
 
-  // TODO: wire GET /api/connections for this server.
-
   static const double _rowHeight = 68;
-
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Coming soon')),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,17 +69,18 @@ class ServerDetailSheet extends StatelessWidget {
               if (_mode == _SheetMode.sessions) ...[
                 _SessionsSection(
                   sessions: sessions,
-                  onCloseAll: () => _comingSoon(context),
-                  onCloseSession: (_) => _comingSoon(context),
+                  onCloseAll: onCloseAll ?? () {},
+                  onCloseSession: onCloseSession ?? (_) {},
+                  onOpenSession: onOpenSession ?? (_) {},
                 ),
                 const SizedBox(height: 16),
                 _NewSessionSection(
                   entry: entry,
-                  onStart: (_) => _comingSoon(context),
+                  onStart: onStartSession ?? (_) {},
                 ),
               ] else
                 _ActionsSection(
-                  onAction: (_) => _comingSoon(context),
+                  onAction: onAction ?? (_) {},
                 ),
             ],
           ),
@@ -134,11 +157,13 @@ class _SessionsSection extends StatelessWidget {
   const _SessionsSection(
       {required this.sessions,
       required this.onCloseAll,
-      required this.onCloseSession});
+      required this.onCloseSession,
+      required this.onOpenSession});
 
-  final List<ServerSessionInfo> sessions;
+  final List<ConnectionInfo> sessions;
   final VoidCallback onCloseAll;
-  final ValueChanged<ServerSessionInfo> onCloseSession;
+  final ValueChanged<ConnectionInfo> onCloseSession;
+  final ValueChanged<ConnectionInfo> onOpenSession;
 
   @override
   Widget build(BuildContext context) {
@@ -189,6 +214,7 @@ class _SessionsSection extends StatelessWidget {
                   height: ServerDetailSheet._rowHeight,
                   child: _SessionRow(
                     session: session,
+                    onOpen: () => onOpenSession(session),
                     onClose: () => onCloseSession(session),
                   ),
                 );
@@ -201,49 +227,60 @@ class _SessionsSection extends StatelessWidget {
 }
 
 class _SessionRow extends StatelessWidget {
-  const _SessionRow({required this.session, required this.onClose});
+  const _SessionRow(
+      {required this.session, required this.onOpen, required this.onClose});
 
-  final ServerSessionInfo session;
+  final ConnectionInfo session;
+  final VoidCallback onOpen;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(10),
+    final kindLabel =
+        (session.kind ?? 'ssh').toUpperCase();
+    return InkWell(
+      onTap: onOpen,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(protocolIcon(session.kind),
+                  color: cs.onPrimaryContainer, size: 18),
             ),
-            child: Icon(protocolIcon(session.kind),
-                color: cs.onPrimaryContainer, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(session.kind.toUpperCase(),
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('Opened ${formatOpenedAt(session.openedAt)}',
-                    style:
-                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-              ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(kindLabel,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(
+                    session.hibernated
+                        ? 'Hibernated — tap to resume'
+                        : 'Active — tap to open',
+                    style: TextStyle(
+                        fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            tooltip: 'Close session',
-            onPressed: onClose,
-          ),
-        ],
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Close session',
+              onPressed: onClose,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -253,13 +290,12 @@ class _NewSessionSection extends StatelessWidget {
   const _NewSessionSection({required this.entry, required this.onStart});
 
   final ServerEntry entry;
-  final ValueChanged<String> onStart;
+  final ValueChanged<SessionKind> onStart;
 
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
-    final primary =
-        entry.primaryProtocol == 'rdp' ? 'RDP' : 'SSH';
+    final isRdp = entry.primaryProtocol == 'rdp';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -271,11 +307,11 @@ class _NewSessionSection extends StatelessWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => onStart(primary.toLowerCase()),
-                icon: Icon(primary == 'RDP'
-                    ? Icons.monitor
-                    : Icons.terminal),
-                label: Text(primary),
+                onPressed: () => onStart(
+                    isRdp ? SessionKind.desktop : SessionKind.terminal),
+                icon: Icon(
+                    isRdp ? Icons.monitor : Icons.terminal),
+                label: Text(isRdp ? 'RDP' : 'SSH'),
                 style: FilledButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(vertical: 14)),
@@ -284,7 +320,7 @@ class _NewSessionSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () => onStart('sftp'),
+                onPressed: () => onStart(SessionKind.files),
                 icon: const Icon(Icons.folder),
                 label: const Text('SFTP'),
                 style: OutlinedButton.styleFrom(
@@ -339,9 +375,8 @@ class _ActionsSection extends StatelessWidget {
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12)),
       onTap: () {
-        // Snackbar first: this context is deactivated after pop.
+        // No pop here: the caller (page handler) closes the sheet.
         onAction(action);
-        Navigator.pop(context);
       },
       contentPadding: const EdgeInsets.symmetric(horizontal: 8),
     );

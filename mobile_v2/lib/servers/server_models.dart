@@ -86,27 +86,6 @@ class ServerEntry {
   }
 }
 
-/// An active connection of a server (subset of `GET /api/connections`).
-class ServerSessionInfo {
-  const ServerSessionInfo({
-    required this.id,
-    required this.serverId,
-    required this.kind,
-    required this.openedAt,
-  });
-
-  final String id;
-  final int serverId;
-  final String kind;
-  final DateTime openedAt;
-}
-
-/// "09.10. 14:32" — no intl dependency needed for the skeleton.
-String formatOpenedAt(DateTime dt) {
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(dt.day)}.${two(dt.month)}. ${two(dt.hour)}:${two(dt.minute)}';
-}
-
 /// Subtitle for list + sheet headers: "ip • SSH", "SSH" or "No address".
 String formatServerSubtitle(ServerEntry entry) {
   final parts = <String>[
@@ -116,27 +95,79 @@ String formatServerSubtitle(ServerEntry entry) {
   if (parts.length == 1 && entry.address.isEmpty) return 'No address';
   return parts.join(' • ');
 }
-/// Collect all `type == 'server'` leaves of a `GET /api/entries/list`
-/// tree (folders/organizations nest via `entries`), preserving API order.
-/// Corrupt nodes are skipped so one bad entry never kills the list.
-List<ServerEntry> flattenServerEntries(List<dynamic> nodes) {
-  final out = <ServerEntry>[];
-  void walk(dynamic node) {
-    if (node is Map) {
-      final map = Map<String, dynamic>.from(node);
-      if (map['type'] == 'server') {
+/// Tree node of `GET /api/entries/list` (folders nest via `entries`).
+sealed class EntryNode {
+  const EntryNode();
+}
+
+/// A `type == 'server'` leaf.
+class ServerNode extends EntryNode {
+  const ServerNode(this.entry);
+
+  final ServerEntry entry;
+}
+
+/// A `type == 'folder'` or `type == 'organization'` branch.
+class FolderNode extends EntryNode {
+  const FolderNode(
+      {required this.id,
+      required this.name,
+      this.children = const [],
+      this.isOrganization = false});
+
+  final String id;
+  final String name;
+  final List<EntryNode> children;
+  final bool isOrganization;
+}
+
+/// Parse a `GET /api/entries/list` tree, preserving folders.
+/// Folders without visible servers are pruned; `pve-*` nodes are skipped
+/// (they get their own place later).
+List<EntryNode> parseEntryTree(List<dynamic> nodes) {
+  List<EntryNode>? parseNodes(List<dynamic> items) {
+    final out = <EntryNode>[];
+    for (final item in items) {
+      if (item is! Map) continue;
+      final map = Map<String, dynamic>.from(item);
+      final type = map['type'] as String?;
+      if (type == 'server') {
         try {
-          out.add(ServerEntry.fromJson(map));
+          out.add(ServerNode(ServerEntry.fromJson(map)));
         } catch (_) {
           // Skip corrupt entries.
         }
+      } else if (type == 'folder' || type == 'organization') {
+        final children = map['entries'];
+        final parsed =
+            children is List ? parseNodes(children) : null;
+        if (parsed != null && parsed.isNotEmpty) {
+          out.add(FolderNode(
+            id: '${map['id']}',
+            name: map['name'] as String? ?? 'Folder',
+            children: parsed,
+            isOrganization: type == 'organization',
+          ));
+        }
       }
-      final children = map['entries'];
-      if (children is List) {
+    }
+    return out;
+  }
+
+  return parseNodes(nodes) ?? const [];
+}
+
+/// Collect all servers of a parsed tree, preserving order.
+List<ServerEntry> flattenNodes(List<EntryNode> nodes) {
+  final out = <ServerEntry>[];
+  void walk(EntryNode node) {
+    switch (node) {
+      case ServerNode(:final entry):
+        out.add(entry);
+      case FolderNode(:final children):
         for (final child in children) {
           walk(child);
         }
-      }
     }
   }
 

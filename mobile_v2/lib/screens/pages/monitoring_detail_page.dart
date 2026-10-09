@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../api/nexterm_api.dart';
 import '../../monitoring/monitoring_models.dart';
+import '../../monitoring/monitoring_repository.dart';
 
 /// Extended server detail (web "ServerDetails" equivalent):
 /// Overview, Charts (with time range), Storage, Network, Processes.
 class MonitoringDetailPage extends StatefulWidget {
-  const MonitoringDetailPage({super.key, required this.server});
+  const MonitoringDetailPage(
+      {super.key, required this.server, required this.repository});
 
   final MonitoredServer server;
+  final MonitoringRepository repository;
 
   @override
   State<MonitoringDetailPage> createState() => _MonitoringDetailPageState();
@@ -16,6 +20,9 @@ class MonitoringDetailPage extends StatefulWidget {
 class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
   int _tab = 0;
   String _range = '1h';
+  MonitoredDetail? _detail;
+  String? _error;
+  bool _loading = true;
 
   static const _tabs = [
     (Icons.info_outline, 'Overview'),
@@ -25,10 +32,44 @@ class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
     (Icons.terminal, 'Processes'),
   ];
 
-  // TODO: replace demo data with GET /api/monitoring/:id?timeRange=.
-  ServerDetail get _detail => demoServerDetail(widget.server.id);
-  ServerHistory get _history =>
-      demoHistory(widget.server.id, _range);
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final detail =
+          await widget.repository.fetchDetail(widget.server.id, _range);
+      if (!mounted) return;
+      setState(() {
+        _detail = detail;
+        _loading = false;
+      });
+    } on NextermApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load server details.';
+        _loading = false;
+      });
+    }
+  }
+
+  void _selectRange(String range) {
+    setState(() => _range = range);
+    _load();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,16 +98,34 @@ class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
           if (_tab == 1)
             _RangeChips(
               selected: _range,
-              onSelect: (r) => setState(() => _range = r),
+              onSelect: _selectRange,
             ),
           Expanded(
-            child: switch (_tab) {
-              0 => _OverviewTab(detail: _detail),
-              1 => _ChartsTab(history: _history),
-              2 => _StorageTab(detail: _detail),
-              3 => _NetworkTab(detail: _detail),
-              _ => _ProcessesTab(detail: _detail),
-            },
+            child: _loading && _detail == null
+                ? const Center(child: CircularProgressIndicator())
+                : _error != null && _detail == null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_error!, textAlign: TextAlign.center),
+                              const SizedBox(height: 16),
+                              FilledButton(
+                                  onPressed: _load,
+                                  child: const Text('Retry')),
+                            ],
+                          ),
+                        ),
+                      )
+                    : switch (_tab) {
+                        0 => _OverviewTab(detail: _detail!.detail),
+                        1 => _ChartsTab(history: _detail!.history),
+                        2 => _StorageTab(detail: _detail!.detail),
+                        3 => _NetworkTab(detail: _detail!.detail),
+                        _ => _ProcessesTab(detail: _detail!.detail),
+                      },
           ),
         ],
       ),

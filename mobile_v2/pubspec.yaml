@@ -38,7 +38,13 @@ dependencies:
   shared_preferences: ^2.3.4
   mobile_scanner: ^7.2.0
   url_launcher: ^6.2.5
+  guacamole_common_dart:
+    path: packages/guacamole_common_dart
   flutter_secure_storage: ^11.2.0
+  xterm: ^4.0.0
+  web_socket_channel: ^3.0.3
+  file_picker: ^13.1.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

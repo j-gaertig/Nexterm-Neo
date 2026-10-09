@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../api/nexterm_api.dart';
 import '../../monitoring/monitoring_models.dart';
+import '../../monitoring/monitoring_repository.dart';
 import 'monitoring_detail_page.dart';
 
 /// Monitoring overview: one card per monitored server (mirrors the web
 /// grid). Tap a card for the extended detail view.
 class MonitoringPage extends StatefulWidget {
-  const MonitoringPage({super.key});
+  const MonitoringPage({super.key, required this.repository});
+
+  final MonitoringRepository repository;
 
   @override
   State<MonitoringPage> createState() => _MonitoringPageState();
@@ -15,9 +19,42 @@ class MonitoringPage extends StatefulWidget {
 class _MonitoringPageState extends State<MonitoringPage> {
   final _searchController = TextEditingController();
   String _query = '';
+  List<MonitoredServer>? _servers;
+  String? _error;
+  bool _loading = true;
 
-  // TODO: replace demo data with GET /api/monitoring (refresh 15s).
-  List<MonitoredServer> get _servers => demoMonitoredServers();
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final servers = await widget.repository.fetchServers();
+      if (!mounted) return;
+      setState(() {
+        _servers = servers;
+        _loading = false;
+      });
+    } on NextermApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load monitoring data.';
+        _loading = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -30,7 +67,8 @@ class _MonitoringPageState extends State<MonitoringPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MonitoringDetailPage(server: server),
+        builder: (_) => MonitoringDetailPage(
+            server: server, repository: widget.repository),
       ),
     );
   }
@@ -38,9 +76,10 @@ class _MonitoringPageState extends State<MonitoringPage> {
   @override
   Widget build(BuildContext context) {
     final q = _query.trim().toLowerCase();
+    final all = _servers ?? const <MonitoredServer>[];
     final servers = q.isEmpty
-        ? _servers
-        : _servers
+        ? all
+        : all
             .where((s) =>
                 s.name.toLowerCase().contains(q) ||
                 s.ip.toLowerCase().contains(q))
@@ -61,32 +100,69 @@ class _MonitoringPageState extends State<MonitoringPage> {
             ),
           ),
           Expanded(
-            child: servers.isEmpty
-                ? Center(
-                    child: Text(
-                      _query.isEmpty
-                          ? 'No monitored servers.'
-                          : 'No servers match "$_query".',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                    itemCount: servers.length,
-                    itemBuilder: (context, index) {
-                      final server = servers[index];
-                      return _MonitorCard(
-                        server: server,
-                        onTap: () => _openDetail(server),
-                      );
-                    },
-                  ),
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _loading && _servers == null
+                  ? ListView(
+                      physics:
+                          const AlwaysScrollableScrollPhysics(),
+                      children: const [
+                        SizedBox(height: 120),
+                        Center(child: CircularProgressIndicator()),
+                      ],
+                    )
+                  : _error != null && _servers == null
+                      ? ListView(
+                          physics:
+                              const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(32),
+                          children: [
+                            const SizedBox(height: 64),
+                            Text(_error!,
+                                textAlign: TextAlign.center),
+                            const SizedBox(height: 16),
+                            FilledButton(
+                                onPressed: _load,
+                                child: const Text('Retry')),
+                          ],
+                        )
+                      : servers.isEmpty
+                          ? ListView(
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(32),
+                              children: [
+                                Center(
+                                  child: Text(
+                                    _query.isEmpty
+                                        ? 'No monitored servers.'
+                                        : 'No servers match "$_query".',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              physics:
+                                  const AlwaysScrollableScrollPhysics(),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                              itemCount: servers.length,
+                              itemBuilder: (context, index) {
+                                final server = servers[index];
+                                return _MonitorCard(
+                                  server: server,
+                                  onTap: () => _openDetail(server),
+                                );
+                              },
+                            ),
+            ),
           ),
         ],
       ),

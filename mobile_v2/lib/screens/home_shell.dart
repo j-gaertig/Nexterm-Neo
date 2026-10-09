@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../account/account_models.dart';
 import '../auth/session_store.dart';
+import '../monitoring/monitoring_repository.dart';
+import '../remote/session_opener.dart';
+import '../servers/server_models.dart';
 import '../servers/server_repository.dart';
 import '../api/nexterm_api.dart';
 import '../widgets/wobbly_nav_bar.dart';
+import 'pages/home_page.dart';
 import 'pages/monitoring_page.dart';
-import 'pages/placeholder_page.dart';
+import 'pages/more_page.dart';
 import 'pages/servers_page.dart';
 import 'pages/settings_page.dart';
 
@@ -18,13 +23,31 @@ class HomeShell extends StatefulWidget {
       {super.key,
       required this.session,
       required this.onLogout,
-      this.serversRepository});
+      this.serversRepository,
+      this.monitoringRepository,
+      this.recentsLoader,
+      this.moreLoader,
+      this.settingsProfileLoader,
+      this.settingsSessionsLoader});
 
   final SessionInfo session;
   final VoidCallback onLogout;
 
   /// Test seam: avoids real HTTP in widget tests.
   final ServerRepository? serversRepository;
+
+  /// Test seam: avoids real HTTP in widget tests.
+  final MonitoringRepository? monitoringRepository;
+
+  /// Test seam: recents loader for the home page.
+  final Future<List<ServerEntry>> Function()? recentsLoader;
+
+  /// Test seam: library loader for the more page.
+  final Future<MoreData> Function()? moreLoader;
+
+  /// Test seams: profile + sessions loaders for settings.
+  final Future<UserInfo> Function()? settingsProfileLoader;
+  final Future<List<LoginSession>> Function()? settingsSessionsLoader;
 
   @visibleForTesting
   static const int defaultIndex = 2;
@@ -36,6 +59,8 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   late final PageController _controller;
   late final ServerRepository _serversRepository;
+  late final SessionOpener _opener;
+  late final MonitoringRepository _monitoringRepository;
   int _index = HomeShell.defaultIndex;
 
   static const _items = [
@@ -44,8 +69,8 @@ class _HomeShellState extends State<HomeShell> {
         selectedIcon: Icons.dns,
         label: 'Servers'),
     WobblyNavItem(
-        icon: Icons.monitor_heart_outlined,
-        selectedIcon: Icons.monitor_heart,
+        icon: Icons.bar_chart_outlined,
+        selectedIcon: Icons.bar_chart,
         label: 'Monitoring'),
     WobblyNavItem(
         icon: Icons.home_outlined,
@@ -65,11 +90,13 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _controller = PageController(initialPage: _index);
+    final api = NextermApi(baseUrl: widget.session.baseUrl);
     _serversRepository = widget.serversRepository ??
-        ApiServerRepository(
-          api: NextermApi(baseUrl: widget.session.baseUrl),
-          token: widget.session.token,
-        );
+        ApiServerRepository(api: api, token: widget.session.token);
+    _opener = SessionOpener(api: api, token: widget.session.token);
+    _monitoringRepository = widget.monitoringRepository ??
+        ApiMonitoringRepository(
+            api: api, token: widget.session.token);
   }
 
   @override
@@ -97,21 +124,31 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           ServersPage(
             repository: _serversRepository,
+            api: NextermApi(baseUrl: widget.session.baseUrl),
+            token: widget.session.token,
+            connections: _opener,
             onSessionExpired: widget.onLogout,
           ),
-          const MonitoringPage(),
-          PlaceholderPage(
-            icon: Icons.home,
-            title: 'Home',
-            subtitle: 'Connected to ${widget.session.label}.',
+          MonitoringPage(repository: _monitoringRepository),
+          HomePage(
+            api: NextermApi(baseUrl: widget.session.baseUrl),
+            token: widget.session.token,
+            label: widget.session.label,
+            loadRecents: widget.recentsLoader,
           ),
-          const PlaceholderPage(
-            icon: Icons.grid_view,
-            title: 'More',
-            subtitle: 'Snippets, scripts and more will appear here.',
+          MorePage(
+            api: NextermApi(baseUrl: widget.session.baseUrl),
+            token: widget.session.token,
+            loader: widget.moreLoader,
           ),
           SettingsPage(
-              session: widget.session, onLogout: widget.onLogout),
+            session: widget.session,
+            api: NextermApi(baseUrl: widget.session.baseUrl),
+            token: widget.session.token,
+            onLogout: widget.onLogout,
+            loadProfile: widget.settingsProfileLoader,
+            loadSessions: widget.settingsSessionsLoader,
+          ),
         ],
       ),
       bottomNavigationBar: SafeArea(
