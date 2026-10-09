@@ -59,7 +59,50 @@ void main() {
       matching: find.text('Servers'),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Your server list will appear here.'), findsOneWidget);
+    expect(find.text('Webserver'), findsOneWidget);
+    expect(find.text('Windows Box'), findsOneWidget);
+  });
+
+  testWidgets('Tapping a server opens the sessions sheet', (tester) async {
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Servers'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Webserver'));
+    await tester.pumpAndSettle();
+    expect(find.text('Active sessions (3)'), findsOneWidget);
+    expect(find.text('New session'), findsOneWidget);
+    expect(find.text('SFTP'), findsWidgets);
+    expect(find.text('Close all'), findsOneWidget);
+  });
+
+  testWidgets('Long-pressing a server opens the actions sheet',
+      (tester) async {
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Servers'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('Webserver'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quick connect'), findsOneWidget);
+    expect(find.text('Wake on LAN'), findsOneWidget);
+    expect(find.text('Duplicate'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Edit'), findsOneWidget);
   });
 
   test('Apple glass only on iOS/macOS', () {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/session_store.dart';
 import '../widgets/wobbly_nav_bar.dart';
 import 'pages/placeholder_page.dart';
+import 'pages/servers_page.dart';
 import 'pages/settings_page.dart';
 
 /// Main shell after login: 5 pages + WobblyNavBar.
@@ -79,11 +80,7 @@ class _HomeShellState extends State<HomeShell> {
         controller: _controller,
         onPageChanged: (index) => setState(() => _index = index),
         children: [
-          const PlaceholderPage(
-            icon: Icons.dns,
-            title: 'Servers',
-            subtitle: 'Your server list will appear here.',
-          ),
+          const ServersPage(),
           const PlaceholderPage(
             icon: Icons.monitor_heart,
             title: 'Monitoring',
