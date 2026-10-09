@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../auth/session_store.dart';
+import '../servers/server_repository.dart';
+import '../api/nexterm_api.dart';
 import '../widgets/wobbly_nav_bar.dart';
 import 'pages/monitoring_page.dart';
 import 'pages/placeholder_page.dart';
@@ -13,10 +15,16 @@ import 'pages/settings_page.dart';
 /// More, Settings.
 class HomeShell extends StatefulWidget {
   const HomeShell(
-      {super.key, required this.session, required this.onLogout});
+      {super.key,
+      required this.session,
+      required this.onLogout,
+      this.serversRepository});
 
   final SessionInfo session;
   final VoidCallback onLogout;
+
+  /// Test seam: avoids real HTTP in widget tests.
+  final ServerRepository? serversRepository;
 
   @visibleForTesting
   static const int defaultIndex = 2;
@@ -27,6 +35,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   late final PageController _controller;
+  late final ServerRepository _serversRepository;
   int _index = HomeShell.defaultIndex;
 
   static const _items = [
@@ -56,6 +65,11 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     _controller = PageController(initialPage: _index);
+    _serversRepository = widget.serversRepository ??
+        ApiServerRepository(
+          api: NextermApi(baseUrl: widget.session.baseUrl),
+          token: widget.session.token,
+        );
   }
 
   @override
@@ -81,7 +95,10 @@ class _HomeShellState extends State<HomeShell> {
         controller: _controller,
         onPageChanged: (index) => setState(() => _index = index),
         children: [
-          const ServersPage(),
+          ServersPage(
+            repository: _serversRepository,
+            onSessionExpired: widget.onLogout,
+          ),
           const MonitoringPage(),
           PlaceholderPage(
             icon: Icons.home,

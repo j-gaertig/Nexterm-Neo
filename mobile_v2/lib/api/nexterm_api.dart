@@ -11,11 +11,22 @@ import '../app_info.dart';
 /// All paths from `mobile_v2/API.md`. Auth via session token
 /// (`Authorization: Bearer <96hex>`), see `server/middlewares/auth.js`.
 class NextermApiException implements Exception {
-  NextermApiException(this.message);
+  const NextermApiException(this.message);
   final String message;
 
   @override
   String toString() => 'NextermApiException: $message';
+}
+
+/// Thrown when the server rejects the session token (HTTP 401).
+/// Callers should drop the stored session and show the login.
+class SessionExpiredException implements Exception {
+  const SessionExpiredException([this.message = 'Session expired.']);
+
+  final String message;
+
+  @override
+  String toString() => 'SessionExpiredException: $message';
 }
 
 /// Response of `POST /api/auth/device/create`.
@@ -213,5 +224,36 @@ class NextermApi {
               headers: _headers(null), body: json.encode({'token': token}))
           .timeout(NextermApi.timeout);
     } catch (_) {}
+  }
+
+  /// `GET /api/entries/list` — full entry tree (folders/organizations
+  /// nest servers via `entries`). Throws [SessionExpiredException] on
+  /// HTTP 401 so callers can return to the login.
+  Future<List<dynamic>> fetchEntries(String token) async {
+    late http.Response response;
+    try {
+      response = await http
+          .get(Uri.parse('$baseUrl/entries/list'), headers: _headers(token))
+          .timeout(NextermApi.timeout);
+    } on TimeoutException {
+      throw NextermApiException('Server is not responding (timeout).');
+    } on SocketException {
+      throw NextermApiException('Server unreachable.');
+    } catch (_) {
+      throw NextermApiException('Connection failed.');
+    }
+    if (response.statusCode == 401) throw SessionExpiredException();
+    if (response.statusCode != 200) {
+      throw NextermApiException(
+          'Could not load servers (HTTP ${response.statusCode}).');
+    }
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is List) return decoded;
+      throw NextermApiException('Invalid server response.');
+    } catch (e) {
+      if (e is NextermApiException) rethrow;
+      throw NextermApiException('Invalid server response.');
+    }
   }
 }

@@ -6,17 +6,21 @@ import 'servers_page.dart' show protocolIcon;
 /// Bottom sheet for a server: active sessions + new session,
 /// or quick actions on long-press. UI only — no backend calls yet.
 class ServerDetailSheet extends StatelessWidget {
-  const ServerDetailSheet.sessions({super.key, required this.entry})
+  const ServerDetailSheet.sessions(
+      {super.key, required this.entry, this.sessions = const []})
       : _mode = _SheetMode.sessions;
 
   const ServerDetailSheet.actions({super.key, required this.entry})
-      : _mode = _SheetMode.actions;
+      : sessions = const [],
+        _mode = _SheetMode.actions;
 
   final ServerEntry entry;
+
+  /// Active sessions of this server (empty until connections are wired).
+  final List<ServerSessionInfo> sessions;
   final _SheetMode _mode;
 
-  // TODO: replace demo data with GET /api/connections.
-  List<ServerSessionInfo> get _sessions => demoSessions(entry.id);
+  // TODO: wire GET /api/connections for this server.
 
   static const double _rowHeight = 68;
 
@@ -42,7 +46,7 @@ class ServerDetailSheet extends StatelessWidget {
               const SizedBox(height: 16),
               if (_mode == _SheetMode.sessions) ...[
                 _SessionsSection(
-                  sessions: _sessions,
+                  sessions: sessions,
                   onCloseAll: () => _comingSoon(context),
                   onCloseSession: (_) => _comingSoon(context),
                 ),
@@ -115,7 +119,7 @@ class _Header extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis),
               Text(
-                '${entry.address} • ${(entry.protocol ?? 'ssh').toUpperCase()}',
+                formatServerSubtitle(entry),
                 style: TextStyle(fontSize: 12, color: cs.outline),
               ),
             ],
