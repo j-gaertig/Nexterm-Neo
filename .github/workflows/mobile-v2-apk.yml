@@ -1,0 +1,85 @@
+name: Mobile V2 APK (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-type:
+        description: "Build type"
+        required: false
+        default: "release"
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  build-apk:
+    name: Build mobile_v2 APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.7"
+          channel: "stable"
+
+      - name: Setup Android release signing
+        if: inputs.build-type == 'release'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -o pipefail
+          : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 secret missing}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD secret missing}"
+          : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret missing}"
+          : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret missing}"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > mobile_v2/android/app/release.keystore
+          cat > mobile_v2/android/key.properties << EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=release.keystore
+          EOF
+          test -s mobile_v2/android/app/release.keystore
+          test -s mobile_v2/android/key.properties
+
+      - name: Install dependencies
+        working-directory: mobile_v2
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: mobile_v2
+        run: flutter analyze
+
+      - name: Run tests
+        working-directory: mobile_v2
+        run: flutter test
+
+      - name: Build APK
+        working-directory: mobile_v2
+        run: flutter build apk --${{ inputs.build-type }}
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexterm-v2-${{ inputs.build-type }}-apk
+          path: mobile_v2/build/app/outputs/flutter-apk/app-${{ inputs.build-type }}.apk
+
+      - name: Remove signing artifacts
+        if: always()
+        run: rm -f mobile_v2/android/key.properties mobile_v2/android/app/release.keystore
