@@ -23,8 +23,8 @@
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Die Kamera wird zum Scannen von QR-Codes für den Login benötigt.</string>
-	<!-- TODO: Cleartext nur für lokale/dev-Server; später auf Ausnahmen pro Domain einschränken. -->
+	<string>Camera access is needed to scan QR codes for login.</string>
+	<!-- TODO: Cleartext for local/dev servers only; restrict to per-domain exceptions later. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

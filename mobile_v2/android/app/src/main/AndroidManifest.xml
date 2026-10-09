@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
-    <!-- Kamera optional: Geräte ohne Kamera nicht aus dem Play Store ausschließen. -->
+    <!-- Camera optional: don't exclude devices without a camera from the Play Store. -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
-    <!-- TODO: Cleartext nur für lokale/dev-Server; später per networkSecurityConfig einschränken. -->
+    <!-- TODO: Cleartext for local/dev servers only; restrict via networkSecurityConfig later. -->
     <application
         android:label="Nexterm V2"
         android:usesCleartextTraffic="true"

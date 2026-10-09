@@ -31,8 +31,8 @@ class _NextermAppState extends State<NextermApp> {
     final session = await _store.load();
     var keptSession = session;
     if (session != null) {
-      // Gespeicherte Session prüfen. Nur bei expliziter Ablehnung (401)
-      // verwerfen — bei Netzwerkfehlern (offline) behalten.
+      // Verify the stored session. Only discard on explicit rejection (401)
+      // — keep it on network errors (offline start).
       final status = await NextermApi(baseUrl: session.baseUrl).checkSession(
         session.token,
         timeout: const Duration(seconds: 10),
@@ -53,7 +53,7 @@ class _NextermAppState extends State<NextermApp> {
   Future<void> _logout() async {
     final session = _session;
     if (session != null) {
-      // Server-Session beenden (Fehler egal), dann lokal löschen.
+      // End the server session (errors don't matter), then clear locally.
       await NextermApi(baseUrl: session.baseUrl).logout(session.token);
       await _store.clear();
     }

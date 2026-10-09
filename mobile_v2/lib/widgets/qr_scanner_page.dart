@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-/// Vollbild-QR-Scanner. [onDetect] erhält den Rohwert; `true` schließt den
-/// Scanner, `false` zeigt "Ungültiger QR-Code" und scannt weiter.
+/// Full-screen QR scanner. [onDetect] receives the raw value; `true` closes
+/// the scanner, `false` shows "Invalid QR code" and keeps scanning.
 class QrScannerPage extends StatefulWidget {
   const QrScannerPage(
       {super.key,
@@ -37,8 +37,8 @@ class _QrScannerPageState extends State<QrScannerPage> {
       _handled = true;
       _controller.stop();
     } else if (_error == null) {
-      // Nur bei Änderung rebuilden (Kamera liefert viele Frames).
-      setState(() => _error = 'Ungültiger QR-Code');
+      // Only rebuild on change (camera delivers many frames).
+      setState(() => _error = 'Invalid QR code');
     }
   }
 
@@ -57,7 +57,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
-                    tooltip: 'Zurück',
+                    tooltip: 'Back',
                     onPressed: () => Navigator.pop(context),
                   ),
                   const SizedBox(width: 4),
@@ -71,7 +71,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                       icon: Icon(state.torchState == TorchState.on
                           ? Icons.flash_on
                           : Icons.flash_off),
-                      tooltip: 'Taschenlampe umschalten',
+                      tooltip: 'Toggle flashlight',
                       onPressed: () => _controller.toggleTorch(),
                     ),
                   ),
@@ -98,7 +98,7 @@ class _QrScannerPageState extends State<QrScannerPage> {
                                     size: 48, color: cs.onSurfaceVariant),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'Kamera nicht verfügbar. Bitte Kamera-Zugriff in den Systemeinstellungen erlauben und erneut versuchen.',
+                                  'Camera unavailable. Please allow camera access in the system settings and try again.',
                                   style: TextStyle(
                                       fontSize: 14, color: cs.onSurfaceVariant),
                                   textAlign: TextAlign.center,

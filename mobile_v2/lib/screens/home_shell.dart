@@ -5,10 +5,10 @@ import '../widgets/wobbly_nav_bar.dart';
 import 'pages/placeholder_page.dart';
 import 'pages/settings_page.dart';
 
-/// Haupt-Shell nach dem Login: 5 Seiten + WobblyNavBar.
+/// Main shell after login: 5 pages + WobblyNavBar.
 ///
-/// Reihenfolge (links → rechts): Server, Monitoring, Home (Standard),
-/// Sonstiges, Einstellungen.
+/// Order (left → right): Servers, Monitoring, Home (default),
+/// More, Settings.
 class HomeShell extends StatefulWidget {
   const HomeShell(
       {super.key, required this.session, required this.onLogout});
@@ -31,7 +31,7 @@ class _HomeShellState extends State<HomeShell> {
     WobblyNavItem(
         icon: Icons.dns_outlined,
         selectedIcon: Icons.dns,
-        label: 'Server'),
+        label: 'Servers'),
     WobblyNavItem(
         icon: Icons.monitor_heart_outlined,
         selectedIcon: Icons.monitor_heart,
@@ -43,11 +43,11 @@ class _HomeShellState extends State<HomeShell> {
     WobblyNavItem(
         icon: Icons.grid_view_outlined,
         selectedIcon: Icons.grid_view,
-        label: 'Sonstiges'),
+        label: 'More'),
     WobblyNavItem(
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings,
-        label: 'Einstellungen'),
+        label: 'Settings'),
   ];
 
   @override
@@ -81,23 +81,23 @@ class _HomeShellState extends State<HomeShell> {
         children: [
           const PlaceholderPage(
             icon: Icons.dns,
-            title: 'Server',
-            subtitle: 'Deine Server-Liste erscheint hier.',
+            title: 'Servers',
+            subtitle: 'Your server list will appear here.',
           ),
           const PlaceholderPage(
             icon: Icons.monitor_heart,
             title: 'Monitoring',
-            subtitle: 'Status und Metriken erscheinen hier.',
+            subtitle: 'Status and metrics will appear here.',
           ),
           PlaceholderPage(
             icon: Icons.home,
             title: 'Home',
-            subtitle: 'Verbunden mit ${widget.session.label}.',
+            subtitle: 'Connected to ${widget.session.label}.',
           ),
           const PlaceholderPage(
             icon: Icons.grid_view,
-            title: 'Sonstiges',
-            subtitle: 'Snippets, Skripte und mehr erscheinen hier.',
+            title: 'More',
+            subtitle: 'Snippets, scripts and more will appear here.',
           ),
           SettingsPage(
               session: widget.session, onLogout: widget.onLogout),

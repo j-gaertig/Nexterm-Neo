@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Ein Navigations-Eintrag der unteren Leiste.
+/// One entry of the bottom navigation bar.
 class WobblyNavItem {
   const WobblyNavItem({required this.icon, required this.label, this.selectedIcon});
 
@@ -12,13 +12,15 @@ class WobblyNavItem {
   final String label;
 }
 
-/// Untere Navigationsleiste mit "Wobble"-Auswahl.
+/// Bottom navigation bar with a "wobbly" selection indicator.
 ///
-/// Der Auswahl-Indikator gleitet mit einer elastischen Kurve zum aktiven
-/// Button ([Curves.elasticOut]) und das Icon poppt per Feder-Animation.
-/// Auf Apple-Plattformen (iOS/macOS) wird ein heller Liquid-Glass-Look
-/// verwendet, auf Android ein Acrylic-Look (Blur + Flächen-Tönung).
-class WobblyNavBar extends StatelessWidget {
+/// The indicator slides to the active button with a single soft overshoot
+/// ([Curves.easeOutBack]) and the icon pops with a spring animation.
+/// Animation duration scales with the jump distance so far jumps stay
+/// smooth instead of oscillating back and forth.
+/// Apple platforms (iOS/macOS) use a bright liquid-glass look,
+/// Android uses an acrylic look (blur + surface tint).
+class WobblyNavBar extends StatefulWidget {
   const WobblyNavBar(
       {super.key,
       required this.items,
@@ -28,6 +30,27 @@ class WobblyNavBar extends StatelessWidget {
   final List<WobblyNavItem> items;
   final int selectedIndex;
   final ValueChanged<int> onTap;
+
+  @override
+  State<WobblyNavBar> createState() => _WobblyNavBarState();
+}
+
+class _WobblyNavBarState extends State<WobblyNavBar> {
+  late int _previousIndex = widget.selectedIndex;
+
+  @override
+  void didUpdateWidget(covariant WobblyNavBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedIndex != widget.selectedIndex) {
+      _previousIndex = oldWidget.selectedIndex;
+    }
+  }
+
+  /// Slide duration grows with jump distance (350–700 ms).
+  Duration get _slideDuration {
+    final distance = (widget.selectedIndex - _previousIndex).abs();
+    return Duration(milliseconds: (350 + distance * 110).clamp(350, 700));
+  }
 
   static bool _isApple(BuildContext context) {
     final platform = Theme.of(context).platform;
@@ -83,14 +106,15 @@ class WobblyNavBar extends StatelessWidget {
               const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final itemWidth = constraints.maxWidth / items.length;
+              final itemWidth = constraints.maxWidth / widget.items.length;
               return Stack(
                 children: [
-                  // Gleitender Auswahl-Blob mit Wobble.
+                  // Sliding selection blob: single soft overshoot, no
+                  // back-and-forth oscillation on far jumps.
                   AnimatedPositioned(
-                    duration: const Duration(milliseconds: 650),
-                    curve: Curves.elasticOut,
-                    left: selectedIndex * itemWidth + 4,
+                    duration: _slideDuration,
+                    curve: Curves.easeOutBack,
+                    left: widget.selectedIndex * itemWidth + 4,
                     top: 0,
                     bottom: 0,
                     width: itemWidth - 8,
@@ -114,14 +138,14 @@ class WobblyNavBar extends StatelessWidget {
                   ),
                   Row(
                     children: [
-                      for (var i = 0; i < items.length; i++)
+                      for (var i = 0; i < widget.items.length; i++)
                         Expanded(
                           child: _NavButton(
-                            item: items[i],
-                            selected: i == selectedIndex,
+                            item: widget.items[i],
+                            selected: i == widget.selectedIndex,
                             onTap: () {
                               HapticFeedback.selectionClick();
-                              onTap(i);
+                              widget.onTap(i);
                             },
                           ),
                         ),
@@ -162,7 +186,8 @@ class _NavButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon mit Feder-Pop beim Auswählen.
+              // Icon with spring pop on selection (short travel, keeps the
+            // playful elastic feel without oscillation).
               TweenAnimationBuilder<double>(
                 key: ValueKey<bool>(selected),
                 tween: Tween(begin: selected ? 0.6 : 1, end: 1),
@@ -195,7 +220,7 @@ class _NavButton extends StatelessWidget {
   }
 }
 
-/// Plattform-Helfer für Tests und Previews.
+/// Platform helper for tests and previews.
 @visibleForTesting
 bool wobblyNavUsesAppleGlass(TargetPlatform platform) =>
     platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;

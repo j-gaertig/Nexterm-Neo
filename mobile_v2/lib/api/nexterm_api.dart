@@ -6,10 +6,10 @@ import 'package:http/http.dart' as http;
 
 import '../app_info.dart';
 
-/// Minimaler HTTP-Client für die Nexterm-REST-API.
+/// Minimal HTTP client for the Nexterm REST API.
 ///
-/// Alle Pfade aus `mobile_v2/API.md`. Auth per Session-Token
-/// (`Authorization: Bearer <96hex>`), siehe `server/middlewares/auth.js`.
+/// All paths from `mobile_v2/API.md`. Auth via session token
+/// (`Authorization: Bearer <96hex>`), see `server/middlewares/auth.js`.
 class NextermApiException implements Exception {
   NextermApiException(this.message);
   final String message;
@@ -18,7 +18,7 @@ class NextermApiException implements Exception {
   String toString() => 'NextermApiException: $message';
 }
 
-/// Antwort von `POST /api/auth/device/create`.
+/// Response of `POST /api/auth/device/create`.
 class DeviceCode {
   DeviceCode({required this.code, required this.token, required this.expiresAt});
 
@@ -27,18 +27,18 @@ class DeviceCode {
   final DateTime expiresAt;
 }
 
-/// Ergebnis einer Session-Prüfung.
+/// Session check result.
 enum SessionStatus {
-  /// Token gültig (HTTP 200).
+  /// Token valid (HTTP 200).
   valid,
 
-  /// Token abgelehnt (HTTP 401) — Session verwerfen.
+  /// Token rejected (HTTP 401) — discard the session.
   invalid,
 
-  /// Unklar (Netzwerkfehler, Timeout, Serverfehler) — Session behalten.
+  /// Unclear (network error, timeout, server error) — keep the session.
   unknown,
 }
-/// Antwort von `POST /api/auth/device/poll`.
+/// Response of `POST /api/auth/device/poll`.
 class DevicePoll {
   DevicePoll({required this.status, this.token});
 
@@ -60,9 +60,9 @@ class NextermApi {
   static String get userAgent =>
       'NextermMobileV2/${AppInfo.version} (${Platform.operatingSystem}; ${Platform.operatingSystemVersion})';
 
-  /// Server-URL normalisieren: Schema ergänzen, `/api` anhängen.
-  /// Das Schema wird case-insensitiv erkannt; ein vorhandenes
-  /// `/api`-Suffix (exakt) bleibt unverändert.
+  /// Normalize a server URL: add scheme, append `/api`.
+  /// The scheme is detected case-insensitively; an existing
+  /// `/api` suffix (exact) is kept as is.
   static String normalizeBaseUrl(String url) {
     url = url.trim();
     final lower = url.toLowerCase();
@@ -74,7 +74,7 @@ class NextermApi {
     return url;
   }
 
-  /// Web-Basis ohne `/api`-Suffix (für "Im Browser öffnen").
+  /// Web base without `/api` suffix (for "open in browser").
   static String webBaseUrl(String apiBaseUrl) {
     var url = apiBaseUrl;
     if (url.endsWith('/api')) url = url.substring(0, url.length - 4);
@@ -87,7 +87,7 @@ class NextermApi {
         if (token != null) 'Authorization': 'Bearer $token',
       };
 
-  /// `GET /api/service/is-fts` — Erreichbarkeit prüfen.
+  /// `GET /api/service/is-fts` — check reachability.
   Future<void> checkServer() async {
     late http.Response response;
     try {
@@ -95,19 +95,19 @@ class NextermApi {
           .get(Uri.parse('$baseUrl/service/is-fts'), headers: _headers(null))
           .timeout(timeout);
     } on TimeoutException {
-      throw NextermApiException('Server antwortet nicht (Timeout).');
+      throw NextermApiException('Server is not responding (timeout).');
     } on SocketException {
-      throw NextermApiException('Server nicht erreichbar.');
+      throw NextermApiException('Server unreachable.');
     } catch (_) {
-      throw NextermApiException('Verbindung fehlgeschlagen.');
+      throw NextermApiException('Connection failed.');
     }
     if (response.statusCode != 200) {
       throw NextermApiException(
-          'Kein Nexterm-Server (HTTP ${response.statusCode}).');
+          'Not a Nexterm server (HTTP ${response.statusCode}).');
     }
   }
 
-  /// `POST /api/auth/device/create` — Geräte-Code für den Login erzeugen.
+  /// `POST /api/auth/device/create` — create a device code for login.
   Future<DeviceCode> createDeviceCode() async {
     late http.Response response;
     try {
@@ -117,32 +117,32 @@ class NextermApi {
               body: json.encode({'clientType': 'mobile'}))
           .timeout(timeout);
     } on TimeoutException {
-      throw NextermApiException('Server antwortet nicht (Timeout).');
+      throw NextermApiException('Server is not responding (timeout).');
     } on SocketException {
-      throw NextermApiException('Server nicht erreichbar.');
+      throw NextermApiException('Server unreachable.');
     } catch (_) {
-      throw NextermApiException('Verbindung fehlgeschlagen.');
+      throw NextermApiException('Connection failed.');
     }
     if (response.statusCode == 429) {
       throw NextermApiException(
-          'Zu viele Versuche. Bitte später erneut versuchen.');
+          'Too many attempts. Please try again later.');
     }
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw NextermApiException(
-          'Code konnte nicht erstellt werden (HTTP ${response.statusCode}).');
+          'Could not create code (HTTP ${response.statusCode}).');
     }
     late final Map<String, dynamic> data;
     try {
       data = json.decode(response.body) as Map<String, dynamic>;
     } catch (_) {
-      throw NextermApiException('Ungültige Server-Antwort.');
+      throw NextermApiException('Invalid server response.');
     }
     final Object? code = data['code'];
     final Object? token = data['token'];
     if (code is! String || token is! String || code.isEmpty || token.isEmpty) {
       final Object? message = data['message'];
       throw NextermApiException(
-          message is String ? message : 'Ungültige Server-Antwort.');
+          message is String ? message : 'Invalid server response.');
     }
     final Object? expiresAt = data['expiresAt'];
     return DeviceCode(
@@ -155,7 +155,7 @@ class NextermApi {
     );
   }
 
-  /// `POST /api/auth/device/poll` — auf Freigabe warten.
+  /// `POST /api/auth/device/poll` — wait for approval.
   Future<DevicePoll> pollDeviceCode(String token) async {
     try {
       final response = await http
@@ -163,7 +163,7 @@ class NextermApi {
               headers: _headers(null), body: json.encode({'token': token}))
           .timeout(timeout);
       if (response.statusCode != 200) {
-        // Nur Client-Fehler beenden das Warten; 429/5xx → weiter pollen.
+        // Only client errors end the wait; 429/5xx → keep polling.
         if (response.statusCode == 400 ||
             response.statusCode == 401 ||
             response.statusCode == 404 ||
@@ -185,11 +185,11 @@ class NextermApi {
     }
   }
 
-  /// `GET /api/accounts/me` — Session-Token prüfen.
+  /// `GET /api/accounts/me` — check the session token.
   ///
-  /// Nur HTTP 401 bedeutet "ungültig". Netzwerkfehler/Timeouts und
-  /// Serverfehler ergeben [SessionStatus.unknown] — die gespeicherte
-  /// Session darf dann nicht gelöscht werden (Offline-Start).
+  /// Only HTTP 401 means "invalid". Network errors/timeouts and
+  /// server errors yield [SessionStatus.unknown] — the stored
+  /// session must not be deleted then (offline start).
   Future<SessionStatus> checkSession(String token,
       {Duration? timeout}) async {
     try {
@@ -204,8 +204,8 @@ class NextermApi {
     }
   }
 
-  /// `POST /api/auth/logout` — Server-Session beenden (Token im Body).
-  /// Fehler werden ignoriert — lokales Abmelden folgt ohnehin.
+  /// `POST /api/auth/logout` — end the server session (token in body).
+  /// Errors are ignored — local logout happens anyway.
   Future<void> logout(String token) async {
     try {
       await http

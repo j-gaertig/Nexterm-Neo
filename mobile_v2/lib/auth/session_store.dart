@@ -1,10 +1,10 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Persistierte Login-Session.
+/// Persisted login session.
 ///
-/// Das Session-Token liegt verschlüsselt im Secure Storage (Keychain/
-/// Keystore), nur Server-URL und Label in den SharedPreferences.
+/// The session token is stored encrypted in secure storage (Keychain/
+/// Keystore); only server URL and label live in SharedPreferences.
 class SessionInfo {
   const SessionInfo(
       {required this.token, required this.baseUrl, required this.label});
@@ -26,7 +26,7 @@ class SessionStore {
 
   Future<SessionInfo?> load() async {
     try {
-      // Timeout: löst nie auf, wenn das Plugin fehlt (z. B. Widget-Tests).
+      // Timeout: never resolves when the plugin is missing (e.g. widget tests).
       final token = await _secure
           .read(key: _kToken)
           .timeout(const Duration(seconds: 5), onTimeout: () => null);
@@ -44,7 +44,7 @@ class SessionStore {
         label: prefs.getString(_kLabel) ?? baseUrl,
       );
     } catch (_) {
-      // Secure Storage nicht verfügbar (z. B. in Widget-Tests).
+      // Secure Storage unavailable (e.g. in widget tests).
       return null;
     }
   }
@@ -56,7 +56,7 @@ class SessionStore {
       await prefs.setString(_kBaseUrl, session.baseUrl);
       await prefs.setString(_kLabel, session.label);
     } catch (_) {
-      // Rollback: kein verwaistes Token ohne baseUrl zurücklassen.
+      // Rollback: don't leave an orphaned token without baseUrl behind.
       try {
         await _secure.delete(key: _kToken);
       } catch (_) {}

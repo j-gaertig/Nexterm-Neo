@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Leere Platzhalter-Seite (Inhalt folgt in späteren Schritten).
+/// Empty placeholder page (content follows in later steps).
 class PlaceholderPage extends StatelessWidget {
   const PlaceholderPage(
       {super.key,

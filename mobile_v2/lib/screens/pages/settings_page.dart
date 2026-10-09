@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app_info.dart';
 import '../../auth/session_store.dart';
 
-/// Einstellungen: Server-Info + Logout.
+/// Settings: server info + logout.
 class SettingsPage extends StatelessWidget {
   const SettingsPage(
       {super.key, required this.session, required this.onLogout});
@@ -18,7 +18,7 @@ class SettingsPage extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Einstellungen',
+          Text('Settings',
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall
@@ -63,9 +63,9 @@ class SettingsPage extends StatelessWidget {
                 child: Icon(Icons.logout,
                     color: cs.onErrorContainer, size: 20),
               ),
-              title: const Text('Abmelden',
+              title: const Text('Log out',
                   style: TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: const Text('Session auf diesem Gerät löschen',
+              subtitle: const Text('Delete the session on this device',
                   style: TextStyle(fontSize: 12)),
               onTap: () => _confirmLogout(context),
               shape: RoundedRectangleBorder(
@@ -88,17 +88,17 @@ class SettingsPage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Abmelden?'),
+        title: const Text('Log out?'),
         content: const Text(
-            'Die Session auf diesem Gerät wird gelöscht. Fortfahren?'),
+            'This deletes the session on this device. Continue?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Abbrechen'),
+            child: const Text('Cancel'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Abmelden'),
+            child: const Text('Log out'),
           ),
         ],
       ),

@@ -8,10 +8,10 @@ import '../api/nexterm_api.dart';
 import '../auth/session_store.dart';
 import '../widgets/qr_scanner_page.dart';
 
-/// Login per Geräte-Code (`POST /api/auth/device/*`, siehe `API.md` §2).
+/// Login via device code (`POST /api/auth/device/*`, see `API.md` §2).
 ///
-/// Ablauf: Server-URL eingeben → Code anzeigen lassen (oder QR scannen) →
-/// Code im Web-Interface / Browser freigeben → Polling erkennt die Freigabe.
+/// Flow: enter server URL → show code (or scan QR) →
+/// approve code in the web interface / browser → polling detects approval.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.onLoggedIn});
 
@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _connect() async {
     final raw = _urlController.text.trim();
     if (raw.isEmpty) {
-      setState(() => _error = 'Bitte eine Server-URL eingeben.');
+      setState(() => _error = 'Please enter a server URL.');
       return;
     }
     setState(() {
@@ -76,8 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  /// Erzeugt einen Geräte-Code und startet das Polling.
-  /// Gibt an, ob ein Code erstellt wurde.
+  /// Creates a device code and starts polling.
+  /// Returns whether a code was created.
   Future<bool> _createCode(NextermApi api) async {
     try {
       final code = await api.createDeviceCode();
@@ -113,13 +113,13 @@ class _LoginScreenState extends State<LoginScreen> {
         final status = await api.checkSession(result.token!);
         if (!mounted) return;
         if (status == SessionStatus.unknown) {
-          // Netzblip nach Freigabe — weiter warten statt Sackgasse.
+          // Transient blip after approval — keep waiting instead of dead-ending.
           return;
         }
         _pollTimer?.cancel();
         if (status == SessionStatus.invalid) {
           setState(() {
-            _error = 'Session wurde nicht bestätigt. Bitte erneut verbinden.';
+            _error = 'Session was not confirmed. Please connect again.';
             _step = _Step.server;
             _deviceCode = null;
             _deviceToken = null;
@@ -139,7 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } catch (_) {
           if (!mounted) return;
           setState(() {
-            _error = 'Session konnte nicht gespeichert werden.';
+            _error = 'Session could not be saved.';
             _step = _Step.server;
             _deviceCode = null;
             _deviceToken = null;
@@ -151,27 +151,27 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (result.isInvalid) {
         _pollTimer?.cancel();
         setState(() {
-          _error = 'Code ist abgelaufen. Bitte erneut verbinden.';
+          _error = 'Code expired. Please connect again.';
           _step = _Step.server;
           _deviceCode = null;
           _deviceToken = null;
         });
       }
-      // pending/error → weiter warten.
+      // pending/error → keep waiting.
     } finally {
       _polling = false;
     }
   }
 
-  /// QR vom Web-Interface ("Gerät verknüpfen", `nexterm://devicelink`).
+  /// QR code from the web interface ("link device", `nexterm://devicelink`).
   Future<void> _scanQr() async {
     final result = await Navigator.push<Map<String, String>>(
       context,
       MaterialPageRoute(
         builder: (_) => QrScannerPage(
-          title: 'QR-Code scannen',
+          title: 'Scan QR code',
           hint:
-              'Im Browser „Gerät verknüpfen“ öffnen und den QR-Code scannen.',
+              'Open "Link device" in your browser and scan the QR code.',
           onDetect: (raw) {
             try {
               final uri = Uri.parse(raw);
@@ -179,8 +179,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 final token = uri.queryParameters['token'];
                 final server = uri.queryParameters['server'];
                 if (token != null && server != null) {
-                  // Guard: Scanner könnte gerade per Zurück geschlossen worden
-                  // sein — dann keine Route poppen.
+                  // Guard: scanner may have been closed via back button
+                  // in the meantime — then don't pop any route.
                   if (Navigator.canPop(context)) {
                     Navigator.pop(
                         context, {'token': token, 'server': server});
@@ -202,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _error = null;
     });
-    // Uri.queryParameters ist bereits prozentdekodiert — kein decode nötig.
+    // Uri.queryParameters is already percent-decoded — no decode needed.
     final api = NextermApi(baseUrl: server);
     try {
       await api.checkServer();
@@ -228,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _startPolling(api);
   }
 
-  /// `$server/link?code=...` im Browser öffnen zur Freigabe.
+  /// `$server/link?code=...` opened in the browser for approval.
   Future<void> _openInBrowser() async {
     final code = _deviceCode;
     if (code == null) return;
@@ -242,14 +242,14 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!opened && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Browser konnte nicht geöffnet werden.')),
+              content: Text('Could not open the browser.')),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Browser konnte nicht geöffnet werden.')),
+              content: Text('Could not open the browser.')),
         );
       }
     }
@@ -261,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
     await Clipboard.setData(ClipboardData(text: code));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Code kopiert')),
+        const SnackBar(content: Text('Code copied')),
       );
     }
   }
@@ -288,7 +288,15 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.terminal, size: 72, color: cs.primary),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(28),
+                  child: Image.asset(
+                    'assets/logo.png',
+                    width: 96,
+                    height: 96,
+                    fit: BoxFit.contain,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 Text(
                   'Nexterm',
@@ -300,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Server-Verwaltung für unterwegs',
+                  'Server management on the go',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
@@ -323,7 +331,7 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'URL deines Nexterm-Servers eingeben, um dich zu verbinden.',
+          'Enter your Nexterm server URL to connect.',
           style: Theme.of(context)
               .textTheme
               .bodyMedium
@@ -334,7 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
         TextFormField(
           controller: _urlController,
           decoration: InputDecoration(
-            labelText: 'Server-URL',
+            labelText: 'Server URL',
             hintText: 'nexterm.example.com',
             prefixIcon: const Icon(Icons.dns),
             border: const OutlineInputBorder(),
@@ -354,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 20,
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Verbinden'),
+              : const Text('Connect'),
         ),
         const SizedBox(height: 16),
         Row(
@@ -362,7 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Expanded(child: Divider(color: cs.outlineVariant)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text('oder',
+              child: Text('or',
                   style: Theme.of(context)
                       .textTheme
                       .bodySmall
@@ -375,7 +383,7 @@ class _LoginScreenState extends State<LoginScreen> {
         OutlinedButton.icon(
           onPressed: _isLoading ? null : _scanQr,
           icon: const Icon(Icons.qr_code_scanner),
-          label: const Text('QR-Code scannen'),
+          label: const Text('Scan QR code'),
           style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16)),
         ),
@@ -389,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
       children: [
         if (_deviceCode != null) ...[
           Text(
-            'Diesen Code im Nexterm-Webinterface eingeben.',
+            'Enter this code in the Nexterm web interface.',
             style: Theme.of(context)
                 .textTheme
                 .bodyMedium
@@ -419,14 +427,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 IconButton(
                   onPressed: _copyCode,
                   icon: const Icon(Icons.content_copy),
-                  tooltip: 'Code kopieren',
+                  tooltip: 'Copy code',
                 ),
               ],
             ),
           ),
         ] else ...[
           Text(
-            'QR-Code erkannt — warte auf Freigabe …',
+            'QR code detected — waiting for approval…',
             style: Theme.of(context)
                 .textTheme
                 .bodyMedium
@@ -436,7 +444,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
         const SizedBox(height: 24),
         Text(
-          'Warte auf Freigabe …',
+          'Waiting for approval…',
           style: Theme.of(context)
               .textTheme
               .bodyMedium
@@ -463,7 +471,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 onPressed: _back,
                 style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16)),
-                child: const Text('Zurück'),
+                child: const Text('Back'),
               ),
             ),
             const SizedBox(width: 12),
@@ -471,7 +479,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: FilledButton.icon(
                 onPressed: _deviceCode == null ? null : _openInBrowser,
                 icon: const Icon(Icons.open_in_new),
-                label: const Text('Im Browser öffnen'),
+                label: const Text('Open in browser'),
                 style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16)),
               ),

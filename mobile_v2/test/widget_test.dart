@@ -11,7 +11,7 @@ import 'package:nexterm_v2/widgets/wobbly_nav_bar.dart';
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  test('normalizeBaseUrl hängt /api an und ergänzt https', () {
+  test('normalizeBaseUrl appends /api and adds https', () {
     expect(NextermApi.normalizeBaseUrl('nexterm.example.com'),
         'https://nexterm.example.com/api');
     expect(NextermApi.normalizeBaseUrl('http://host:6989/'),
@@ -24,30 +24,30 @@ void main() {
         'https://host/API');
   });
 
-  testWidgets('Login-Screen zeigt Server-URL-Feld', (tester) async {
+  testWidgets('Login screen shows server URL field', (tester) async {
     await tester.pumpWidget(const NextermApp());
     await tester.pumpAndSettle();
-    expect(find.text('Server-URL'), findsOneWidget);
-    expect(find.text('Verbinden'), findsOneWidget);
-    expect(find.text('QR-Code scannen'), findsOneWidget);
+    expect(find.text('Server URL'), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Scan QR code'), findsOneWidget);
   });
 
-  testWidgets('HomeShell startet auf Home (Mitte)', (tester) async {
+  testWidgets('HomeShell starts on Home (center)', (tester) async {
     const session = SessionInfo(
         token: 't', baseUrl: 'https://host/api', label: 'host');
     await tester.pumpWidget(
       const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
     );
     await tester.pumpAndSettle();
-    // Navbar zeigt alle 5 Einträge, Home-Seite ist sichtbar.
+    // Navbar shows all 5 entries, Home page is visible.
     for (final label
-        in ['Server', 'Monitoring', 'Home', 'Sonstiges', 'Einstellungen']) {
+        in ['Servers', 'Monitoring', 'Home', 'More', 'Settings']) {
       expect(find.text(label), findsWidgets);
     }
-    expect(find.text('Verbunden mit host.'), findsOneWidget);
+    expect(find.text('Connected to host.'), findsOneWidget);
   });
 
-  testWidgets('Tap auf Server wechselt die Seite', (tester) async {
+  testWidgets('Tapping Servers switches the page', (tester) async {
     const session = SessionInfo(
         token: 't', baseUrl: 'https://host/api', label: 'host');
     await tester.pumpWidget(
@@ -56,13 +56,13 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.descendant(
       of: find.byType(WobblyNavBar),
-      matching: find.text('Server'),
+      matching: find.text('Servers'),
     ));
     await tester.pumpAndSettle();
-    expect(find.text('Deine Server-Liste erscheint hier.'), findsOneWidget);
+    expect(find.text('Your server list will appear here.'), findsOneWidget);
   });
 
-  test('Apple-Glass nur auf iOS/macOS', () {
+  test('Apple glass only on iOS/macOS', () {
     expect(wobblyNavUsesAppleGlass(TargetPlatform.iOS), isTrue);
     expect(wobblyNavUsesAppleGlass(TargetPlatform.macOS), isTrue);
     expect(wobblyNavUsesAppleGlass(TargetPlatform.android), isFalse);
