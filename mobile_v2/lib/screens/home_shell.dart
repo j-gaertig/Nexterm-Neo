@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/session_store.dart';
 import '../widgets/wobbly_nav_bar.dart';
+import 'pages/monitoring_page.dart';
 import 'pages/placeholder_page.dart';
 import 'pages/servers_page.dart';
 import 'pages/settings_page.dart';
@@ -81,11 +82,7 @@ class _HomeShellState extends State<HomeShell> {
         onPageChanged: (index) => setState(() => _index = index),
         children: [
           const ServersPage(),
-          const PlaceholderPage(
-            icon: Icons.monitor_heart,
-            title: 'Monitoring',
-            subtitle: 'Status and metrics will appear here.',
-          ),
+          const MonitoringPage(),
           PlaceholderPage(
             icon: Icons.home,
             title: 'Home',

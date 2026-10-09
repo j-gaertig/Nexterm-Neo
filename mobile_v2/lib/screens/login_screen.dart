@@ -295,6 +295,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 96,
                     height: 96,
                     fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const Icon(
+                      Icons.terminal,
+                      size: 72,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),

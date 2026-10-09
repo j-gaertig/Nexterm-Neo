@@ -14,10 +14,10 @@ class WobblyNavItem {
 
 /// Bottom navigation bar with a "wobbly" selection indicator.
 ///
-/// The indicator slides to the active button with a single soft overshoot
-/// ([Curves.easeOutBack]) and the icon pops with a spring animation.
-/// Animation duration scales with the jump distance so far jumps stay
-/// smooth instead of oscillating back and forth.
+/// Neighbor hops slide with a single soft overshoot ([Curves.easeOutBack])
+/// and a springy icon pop; far jumps glide smoothly ([Curves.easeInOutCubic],
+/// calm icon settle) so the indicator never oscillates mid-way.
+/// Animation duration scales with the jump distance.
 /// Apple platforms (iOS/macOS) use a bright liquid-glass look,
 /// Android uses an acrylic look (blur + surface tint).
 class WobblyNavBar extends StatefulWidget {
@@ -46,10 +46,24 @@ class _WobblyNavBarState extends State<WobblyNavBar> {
     }
   }
 
-  /// Slide duration grows with jump distance (350–700 ms).
+  /// Slide duration: playful on neighbor tabs, degressive on far jumps
+  /// so peak velocity stays roughly constant (300–600 ms).
   Duration get _slideDuration {
     final distance = (widget.selectedIndex - _previousIndex).abs();
-    return Duration(milliseconds: (350 + distance * 110).clamp(350, 700));
+    if (distance <= 1) return const Duration(milliseconds: 350);
+    return Duration(milliseconds: (280 + distance * 90).clamp(280, 600));
+  }
+
+  /// Overshoot only reads well on short travel: elastic neighbor hops,
+  /// smooth glide (no oscillation) on far jumps.
+  Curve get _slideCurve {
+    final distance = (widget.selectedIndex - _previousIndex).abs();
+    return distance <= 1 ? Curves.easeOutBack : Curves.easeInOutCubic;
+  }
+
+  /// Springy icon pop only for neighbor hops; far jumps settle calmly.
+  bool get _springyIcon {
+    return (widget.selectedIndex - _previousIndex).abs() <= 1;
   }
 
   static bool _isApple(BuildContext context) {
@@ -107,14 +121,19 @@ class _WobblyNavBarState extends State<WobblyNavBar> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final itemWidth = constraints.maxWidth / widget.items.length;
+              final rtl =
+                  Directionality.of(context) == TextDirection.rtl;
+              final position = widget.selectedIndex * itemWidth + 4;
               return Stack(
                 children: [
-                  // Sliding selection blob: single soft overshoot, no
-                  // back-and-forth oscillation on far jumps.
+                  // Sliding selection blob: single soft overshoot on
+                  // neighbor hops, smooth glide (no oscillation) on far
+                  // jumps. Position is RTL-aware.
                   AnimatedPositioned(
                     duration: _slideDuration,
-                    curve: Curves.easeOutBack,
-                    left: widget.selectedIndex * itemWidth + 4,
+                    curve: _slideCurve,
+                    left: rtl ? null : position,
+                    right: rtl ? position : null,
                     top: 0,
                     bottom: 0,
                     width: itemWidth - 8,
@@ -143,6 +162,7 @@ class _WobblyNavBarState extends State<WobblyNavBar> {
                           child: _NavButton(
                             item: widget.items[i],
                             selected: i == widget.selectedIndex,
+                            springy: _springyIcon,
                             onTap: () {
                               HapticFeedback.selectionClick();
                               widget.onTap(i);
@@ -163,10 +183,14 @@ class _WobblyNavBarState extends State<WobblyNavBar> {
 
 class _NavButton extends StatelessWidget {
   const _NavButton(
-      {required this.item, required this.selected, required this.onTap});
+      {required this.item,
+      required this.selected,
+      required this.springy,
+      required this.onTap});
 
   final WobblyNavItem item;
   final bool selected;
+  final bool springy;
   final VoidCallback onTap;
 
   @override
@@ -186,13 +210,15 @@ class _NavButton extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon with spring pop on selection (short travel, keeps the
-            // playful elastic feel without oscillation).
+              // Icon pop: springy on neighbor hops, calm settle on far jumps
+              // (avoids wobbling after arrival).
               TweenAnimationBuilder<double>(
                 key: ValueKey<bool>(selected),
-                tween: Tween(begin: selected ? 0.6 : 1, end: 1),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.elasticOut,
+                tween:
+                    Tween(begin: selected && springy ? 0.6 : 0.85, end: 1),
+                duration: Duration(
+                    milliseconds: springy ? 600 : 250),
+                curve: springy ? Curves.elasticOut : Curves.easeOut,
                 builder: (context, scale, child) =>
                     Transform.scale(scale: scale, child: child),
                 child: Icon(

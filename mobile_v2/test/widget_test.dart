@@ -110,6 +110,71 @@ void main() {
     expect(wobblyNavUsesAppleGlass(TargetPlatform.macOS), isTrue);
     expect(wobblyNavUsesAppleGlass(TargetPlatform.android), isFalse);
   });
+
+  testWidgets('Monitoring list shows monitored servers', (tester) async {
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Monitoring'),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Webserver'), findsOneWidget);
+    expect(find.text('NAS'), findsOneWidget);
+    expect(find.text('Windows Box'), findsOneWidget);
+    expect(find.text('Search servers'), findsOneWidget);
+  });
+
+  testWidgets('Monitoring search filters servers', (tester) async {
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Monitoring'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'nas');
+    await tester.pumpAndSettle();
+    expect(find.text('NAS'), findsOneWidget);
+    expect(find.text('Webserver'), findsNothing);
+  });
+
+  testWidgets('Tapping a monitored server opens the detail view',
+      (tester) async {
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      const MaterialApp(home: HomeShell(session: session, onLogout: _noop)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Monitoring'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Webserver'));
+    await tester.pumpAndSettle();
+    // Overview tab with system + performance sections.
+    expect(find.text('System'), findsOneWidget);
+    expect(find.text('Performance'), findsOneWidget);
+    // Switch to Charts tab with time ranges.
+    await tester.tap(find.text('Charts'));
+    await tester.pumpAndSettle();
+    expect(find.text('CPU usage'), findsOneWidget);
+    expect(find.text('Memory usage'), findsOneWidget);
+    expect(find.text('24h'), findsOneWidget);
+    await tester.tap(find.text('24h'));
+    await tester.pumpAndSettle();
+    expect(find.text('CPU usage'), findsOneWidget);
+  });
 }
 
 void _noop() {}
