@@ -1,16 +1,17 @@
 /// A reusable command snippet (`GET /api/snippets/all`).
+/// Server field name is `command` (`server/validations/snippet.js`).
 class Snippet {
   const Snippet({
     required this.id,
     required this.name,
-    required this.content,
+    required this.command,
     this.description,
     this.organizationId,
   });
 
   final int id;
   final String name;
-  final String content;
+  final String command;
   final String? description;
   final int? organizationId;
 
@@ -20,7 +21,7 @@ class Snippet {
     return Snippet(
       id: rawId is num ? rawId.toInt() : int.tryParse('$rawId') ?? 0,
       name: json['name'] as String? ?? 'Snippet',
-      content: json['content'] as String? ?? '',
+      command: json['command'] as String? ?? '',
       description: json['description'] as String?,
       organizationId:
           rawOrg == null ? null : int.tryParse('$rawOrg'),

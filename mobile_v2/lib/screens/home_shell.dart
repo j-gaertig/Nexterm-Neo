@@ -7,6 +7,8 @@ import '../remote/session_opener.dart';
 import '../servers/server_models.dart';
 import '../servers/server_repository.dart';
 import '../api/nexterm_api.dart';
+import '../settings/app_settings.dart';
+import '../settings/settings_scope.dart';
 import '../widgets/wobbly_nav_bar.dart';
 import 'pages/home_page.dart';
 import 'pages/monitoring_page.dart';
@@ -23,6 +25,7 @@ class HomeShell extends StatefulWidget {
       {super.key,
       required this.session,
       required this.onLogout,
+      required this.settings,
       this.serversRepository,
       this.monitoringRepository,
       this.recentsLoader,
@@ -32,6 +35,7 @@ class HomeShell extends StatefulWidget {
 
   final SessionInfo session;
   final VoidCallback onLogout;
+  final AppSettings settings;
 
   /// Test seam: avoids real HTTP in widget tests.
   final ServerRepository? serversRepository;
@@ -117,7 +121,9 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SettingsScope(
+      settings: widget.settings,
+      child: Scaffold(
       body: PageView(
         controller: _controller,
         onPageChanged: (index) => setState(() => _index = index),
@@ -127,27 +133,38 @@ class _HomeShellState extends State<HomeShell> {
             api: NextermApi(baseUrl: widget.session.baseUrl),
             token: widget.session.token,
             connections: _opener,
+            initialGridView: widget.settings.serversGridDefault,
             onSessionExpired: widget.onLogout,
           ),
-          MonitoringPage(repository: _monitoringRepository),
+          MonitoringPage(
+            repository: _monitoringRepository,
+            onSessionExpired: widget.onLogout,
+            autoRefresh: widget.settings.monitoringAutoRefresh,
+            refreshInterval: Duration(
+                seconds: widget.settings.monitoringIntervalSec),
+          ),
           HomePage(
             api: NextermApi(baseUrl: widget.session.baseUrl),
             token: widget.session.token,
             label: widget.session.label,
             loadRecents: widget.recentsLoader,
+            onSessionExpired: widget.onLogout,
           ),
           MorePage(
             api: NextermApi(baseUrl: widget.session.baseUrl),
             token: widget.session.token,
             loader: widget.moreLoader,
+            onSessionExpired: widget.onLogout,
           ),
           SettingsPage(
             session: widget.session,
             api: NextermApi(baseUrl: widget.session.baseUrl),
             token: widget.session.token,
             onLogout: widget.onLogout,
+            settings: widget.settings,
             loadProfile: widget.settingsProfileLoader,
             loadSessions: widget.settingsSessionsLoader,
+            onSessionExpired: widget.onLogout,
           ),
         ],
       ),
@@ -161,6 +178,7 @@ class _HomeShellState extends State<HomeShell> {
             onTap: _goTo,
           ),
         ),
+      ),
       ),
     );
   }

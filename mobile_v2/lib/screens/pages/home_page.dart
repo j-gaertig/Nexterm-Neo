@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../api/nexterm_api.dart';
-import '../../remote/session_opener.dart';
 import '../../remote/viewer.dart';
 import '../../servers/server_models.dart';
 import '../pages/servers_page.dart' show protocolIcon;
@@ -12,11 +11,15 @@ class HomePage extends StatefulWidget {
       {super.key,
       required this.api,
       required this.token,
+      this.onSessionExpired,
       required this.label,
       this.loadRecents});
 
   final NextermApi api;
   final String token;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
   final String label;
 
   /// Test seam (defaults to `GET /api/entries/recent`).
@@ -63,6 +66,10 @@ class _HomePageState extends State<HomePage> {
         _recents = recents;
         _loading = false;
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+      widget.onSessionExpired?.call();
+      return;
     } on NextermApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -83,9 +90,7 @@ class _HomePageState extends State<HomePage> {
         api: widget.api,
         token: widget.token,
         entry: entry,
-        kind: entry.primaryProtocol == 'rdp'
-            ? SessionKind.desktop
-            : SessionKind.terminal);
+        kind: entry.quickConnectKind);
   }
 
   @override

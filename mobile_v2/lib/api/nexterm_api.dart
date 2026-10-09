@@ -116,6 +116,17 @@ class NextermApi {
       throw NextermApiException(
           'Not a Nexterm server (HTTP ${response.statusCode}).');
     }
+    // The dev server answers every unknown path with the SPA shell —
+    // require a recognizable body (bool for is-fts).
+    try {
+      final decoded = json.decode(response.body);
+      if (decoded is! bool) {
+        throw NextermApiException('Not a Nexterm server.');
+      }
+    } catch (e) {
+      if (e is NextermApiException) rethrow;
+      throw NextermApiException('Not a Nexterm server.');
+    }
   }
 
   /// `POST /api/auth/device/create` — create a device code for login.
@@ -335,11 +346,21 @@ class NextermApi {
   dynamic _decode(http.Response response, {bool allowEmpty = false}) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       if (allowEmpty && response.body.isEmpty) return null;
+      dynamic decoded;
       try {
-        return json.decode(response.body);
+        decoded = json.decode(response.body);
       } catch (_) {
         throw NextermApiException('Invalid server response.');
       }
+      // Several routes answer HTTP 200 with `{code, message}` on error
+      // (e.g. entries wake/duplicate). Numeric code = failure.
+      // (Device codes use a *string* code and are unaffected.)
+      if (decoded is Map && decoded['code'] is int) {
+        final m = decoded['message'];
+        throw NextermApiException(
+            m is String ? m : 'Request failed.');
+      }
+      return decoded;
     }
     String? message;
     try {
@@ -422,6 +443,27 @@ class NextermApi {
         .whereType<Map>()
         .map(Map<String, dynamic>.from)
         .toList();
+  }
+
+  /// `PUT /api/identities/` — create (`server/routes/identity.js`,
+  /// `server/validations/identity.js`: name/type required).
+  Future<void> createIdentity(
+      String token, Map<String, dynamic> payload) async {
+    _decode(await _authed('PUT', '/identities/', token, body: payload));
+  }
+
+  /// `PATCH /api/identities/:id` — update.
+  Future<void> updateIdentity(
+      String token, int identityId, Map<String, dynamic> payload) async {
+    _decode(await _authed(
+        'PATCH', '/identities/$identityId', token,
+        body: payload));
+  }
+
+  /// `DELETE /api/identities/:id` — delete.
+  Future<void> deleteIdentity(String token, int identityId) async {
+    _decode(
+        await _authed('DELETE', '/identities/$identityId', token));
   }
 
   // -- Connections -----------------------------------------------------
@@ -614,5 +656,59 @@ class NextermApi {
   /// `DELETE /api/sessions/:id` — revoke a login session.
   Future<void> revokeLoginSession(String token, String id) async {
     _decode(await _authed('DELETE', '/sessions/$id', token));
+  }
+
+  /// `PATCH /api/accounts/name` — update first/last name
+  /// (`server/validations/account.js`: at least one required).
+  Future<void> updateProfileName(String token,
+      {String? firstName, String? lastName}) async {
+    if (firstName == null && lastName == null) {
+      throw ArgumentError(
+          'First or last name is required.');
+    }
+    final body = <String, dynamic>{};
+    final f = firstName;
+    if (f != null) body['firstName'] = f;
+    final l = lastName;
+    if (l != null) body['lastName'] = l;
+    _decode(await _authed('PATCH', '/accounts/name', token, body: body));
+  }
+
+  /// `PATCH /api/accounts/password` — change password (min 3 chars).
+  Future<void> changePassword(String token, String newPassword) async {
+    _decode(await _authed('PATCH', '/accounts/password', token,
+        body: {'password': newPassword}));
+  }
+
+  /// `GET /api/monitoring/settings/global` — admin only (403 otherwise).
+  Future<Map<String, dynamic>> fetchMonitoringGlobalSettings(
+      String token) async {
+    final data =
+        _decode(await _authed('GET', '/monitoring/settings/global', token));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `PATCH /monitoring/settings/global` — admin only.
+  /// Only known keys are sent (the GET response may carry read-only
+  /// extras like `id`/timestamps that fail server validation).
+  Future<void> updateMonitoringGlobalSettings(
+      String token, Map<String, dynamic> payload) async {
+    const allowed = {
+      'statusCheckerEnabled',
+      'statusInterval',
+      'monitoringEnabled',
+      'monitoringInterval',
+      'dataRetentionHours',
+      'connectionTimeout',
+      'batchSize',
+    };
+    final body = <String, dynamic>{
+      for (final e in payload.entries)
+        if (allowed.contains(e.key)) e.key: e.value,
+    };
+    _decode(await _authed('PATCH', '/monitoring/settings/global', token,
+        body: body));
   }
 }

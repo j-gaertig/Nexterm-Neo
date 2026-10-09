@@ -22,6 +22,7 @@ class ServersPage extends StatefulWidget {
     required this.token,
     required this.connections,
     required this.onSessionExpired,
+    this.initialGridView = false,
   });
 
   final ServerRepository repository;
@@ -29,6 +30,9 @@ class ServersPage extends StatefulWidget {
   final String token;
   final ConnectionListProvider connections;
   final VoidCallback onSessionExpired;
+
+  /// Initial list/grid mode (device preference).
+  final bool initialGridView;
 
   @override
   State<ServersPage> createState() => _ServersPageState();
@@ -39,7 +43,7 @@ class _ServersPageState extends State<ServersPage> {
   Map<int, List<ConnectionInfo>> _conns = {};
   String? _error;
   bool _loading = true;
-  bool _gridView = false;
+  late bool _gridView;
   String _query = '';
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -52,6 +56,7 @@ class _ServersPageState extends State<ServersPage> {
   @override
   void initState() {
     super.initState();
+    _gridView = widget.initialGridView;
     _load();
   }
 
@@ -222,11 +227,7 @@ class _ServersPageState extends State<ServersPage> {
   Future<void> _handleAction(ServerEntry entry, String action) async {
     switch (action) {
       case 'quick-connect':
-        await _startSession(
-            entry,
-            entry.primaryProtocol == 'rdp'
-                ? SessionKind.desktop
-                : SessionKind.terminal);
+        await _startSession(entry, entry.quickConnectKind);
       case 'wake-on-lan':
         try {
           await _mutations.wake(entry.id);

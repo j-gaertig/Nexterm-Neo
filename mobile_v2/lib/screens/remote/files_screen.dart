@@ -4,12 +4,14 @@
 // and `server/routes/sftpWS.js`); up/download use the REST endpoints
 // (see `server/routes/sftp.js`) with query-token auth.
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'package:nexterm_v2/api/nexterm_api.dart';
 import 'package:nexterm_v2/remote/session_opener.dart';
+import 'package:nexterm_v2/settings/settings_scope.dart';
 
 import 'sftp_protocol.dart';
 import 'sftp_service.dart';
@@ -184,6 +186,7 @@ class _FilesScreenState extends State<FilesScreen> {
         _error ??= 'Connection closed.';
       }
     });
+    _showSnack('Connection lost.');
   }
 
   void _completeListWait() {
@@ -217,12 +220,34 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _refresh() async {
+    if (!_requireLiveConnection()) {
+      _completeListWait();
+      return;
+    }
     _requestList(_currentPath, silent: _entries.isNotEmpty);
     final pending = _listCompleter;
     if (pending != null) {
-      await pending.future
-          .timeout(const Duration(seconds: 15), onTimeout: () {});
+      await pending.future.timeout(
+        const Duration(seconds: 15),
+        onTimeout: () {
+          if (mounted && !_tornDown) {
+            setState(() {
+              _error ??= 'Request timed out.';
+            });
+          }
+        },
+      );
     }
+  }
+
+  /// Guard mutations/transfers against a dead channel with feedback
+  /// instead of silently dropping requests.
+  bool _requireLiveConnection() {
+    if (_connected && _connection != null) return true;
+    if (mounted) {
+      _showSnack('Connection lost. Pull to refresh to reconnect.');
+    }
+    return false;
   }
 
   void _navigateTo(String path) {
@@ -291,6 +316,7 @@ class _FilesScreenState extends State<FilesScreen> {
       confirmLabel: 'Create',
     );
     if (name == null || name.isEmpty || !mounted) return;
+    if (!_requireLiveConnection()) return;
     _connection?.createFolder(sftpJoin(_currentPath, name));
   }
 
@@ -301,6 +327,7 @@ class _FilesScreenState extends State<FilesScreen> {
       confirmLabel: 'Create',
     );
     if (name == null || name.isEmpty || !mounted) return;
+    if (!_requireLiveConnection()) return;
     _connection?.createFile(sftpJoin(_currentPath, name));
   }
 
@@ -314,6 +341,7 @@ class _FilesScreenState extends State<FilesScreen> {
     if (name == null || name.isEmpty || name == entry.name || !mounted) {
       return;
     }
+    if (!_requireLiveConnection()) return;
     _connection?.rename(
       sftpJoin(_currentPath, entry.name),
       sftpJoin(_currentPath, name),
@@ -321,29 +349,34 @@ class _FilesScreenState extends State<FilesScreen> {
   }
 
   Future<void> _delete(SftpEntry entry) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete'),
-        content: Text(entry.isDir
-            ? 'Delete folder "${entry.name}" and its contents?'
-            : 'Delete "${entry.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
+    final confirm =
+        SettingsScope.of(context)?.sftpConfirmDelete ?? true;
+    if (confirm) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Delete'),
+          content: Text(entry.isDir
+              ? 'Delete folder "${entry.name}" and its contents?'
+              : 'Delete "${entry.name}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
             ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(ctx).colorScheme.error,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    if (!_requireLiveConnection()) return;
     final path = sftpJoin(_currentPath, entry.name);
     if (entry.isDir) {
       _connection?.deleteFolder(path);
@@ -355,13 +388,14 @@ class _FilesScreenState extends State<FilesScreen> {
   // -- Transfers ----------------------------------------------------------
 
   Future<void> _uploadFiles() async {
+    if (!_requireLiveConnection()) return;
     if (_transferring) return;
     late final List<PlatformFile> picked;
     try {
       picked = await FilePicker.pickFiles();
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showSnack('Could not open the file picker: $e');
+      _showSnack('Could not open the file picker.');
       return;
     }
     if (picked.isEmpty || !mounted) return;
@@ -372,14 +406,27 @@ class _FilesScreenState extends State<FilesScreen> {
       for (final file in picked) {
         final remotePath = sftpJoin(_currentPath, file.name);
         try {
-          final bytes = await file.readAsBytes();
-          await uploadSftpFile(
-            baseUrl: widget.api.baseUrl,
-            sessionToken: widget.sessionToken,
-            sessionId: widget.session.sessionId,
-            remotePath: remotePath,
-            bytes: bytes,
-          );
+          final localPath = file.path;
+          if (localPath != null && localPath.isNotEmpty) {
+            final local = File(localPath);
+            await uploadSftpFileStreamed(
+              baseUrl: widget.api.baseUrl,
+              sessionToken: widget.sessionToken,
+              sessionId: widget.session.sessionId,
+              remotePath: remotePath,
+              stream: local.openRead(),
+              contentLength: await local.length(),
+            );
+          } else {
+            final bytes = await file.readAsBytes();
+            await uploadSftpFile(
+              baseUrl: widget.api.baseUrl,
+              sessionToken: widget.sessionToken,
+              sessionId: widget.session.sessionId,
+              remotePath: remotePath,
+              bytes: bytes,
+            );
+          }
           uploaded++;
         } catch (_) {
           failed++;
@@ -397,29 +444,32 @@ class _FilesScreenState extends State<FilesScreen> {
 
   Future<void> _download(SftpEntry entry) async {
     if (_transferring || !mounted) return;
+    if (!_requireLiveConnection()) return;
+    final dir = await FilePicker.getDirectoryPath();
+    if (dir == null || !mounted) {
+      if (mounted && dir == null) _showSnack('Save canceled.');
+      return;
+    }
     setState(() => _transferring = true);
     try {
-      final bytes = await downloadSftpFile(
+      final fileName =
+          entry.isDir ? '${entry.name}.zip' : entry.name;
+      final target = File(sftpJoin(dir, fileName));
+      await downloadSftpFileTo(
         baseUrl: widget.api.baseUrl,
         sessionToken: widget.sessionToken,
         sessionId: widget.session.sessionId,
         remotePath: sftpJoin(_currentPath, entry.name),
+        targetFile: target,
       );
       if (!mounted) return;
-      final fileName =
-          entry.isDir ? '${entry.name}.zip' : entry.name;
-      final Uri? saved = await FilePicker.saveFile(
-        fileName: fileName,
-        bytes: bytes,
-      );
-      if (!mounted) return;
-      _showSnack(saved == null ? 'Save canceled.' : 'File saved.');
+      _showSnack('Saved to ${target.path}.');
     } on SftpTransferException catch (e) {
       if (!mounted) return;
       _showSnack(e.message);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      _showSnack('Download failed: $e');
+      _showSnack('Download failed.');
     } finally {
       if (mounted) setState(() => _transferring = false);
     }
@@ -629,10 +679,32 @@ class _FilesScreenState extends State<FilesScreen> {
         ],
       );
     }
+    // Device preference: hide dotfiles unless enabled in Settings.
+    final showHidden =
+        SettingsScope.of(context)?.sftpShowHidden ?? false;
+    final visible = showHidden
+        ? _entries
+        : _entries
+            .where((e) => !e.name.startsWith('.'))
+            .toList();
+    if (visible.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(32),
+        children: [
+          const SizedBox(height: 64),
+          Icon(Icons.visibility_off_outlined,
+              size: 56, color: cs.onSurfaceVariant),
+          const SizedBox(height: 16),
+          const Text('Only hidden files here.',
+              textAlign: TextAlign.center),
+        ],
+      );
+    }
     final showUp = _currentPath != _rootPath;
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: _entries.length + (showUp ? 1 : 0),
+      itemCount: visible.length + (showUp ? 1 : 0),
       itemBuilder: (context, index) {
         if (showUp && index == 0) {
           return ListTile(
@@ -642,7 +714,7 @@ class _FilesScreenState extends State<FilesScreen> {
             onTap: _goUp,
           );
         }
-        final entry = _entries[showUp ? index - 1 : index];
+        final entry = visible[showUp ? index - 1 : index];
         return ListTile(
           leading: Icon(
             entry.isDir ? Icons.folder : Icons.description,

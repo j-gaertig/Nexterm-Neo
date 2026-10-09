@@ -12,6 +12,9 @@ import 'package:nexterm_v2/remote/session_opener.dart';
 import 'package:nexterm_v2/remote/viewer.dart';
 import 'package:nexterm_v2/screens/pages/more_page.dart';
 import 'package:nexterm_v2/screens/home_shell.dart';
+import 'package:nexterm_v2/screens/pages/settings_identities_page.dart';
+import 'package:nexterm_v2/screens/pages/settings_monitoring_page.dart';
+import 'package:nexterm_v2/settings/app_settings.dart';
 import 'package:nexterm_v2/screens/pages/server_detail_sheet.dart';
 import 'package:nexterm_v2/screens/pages/server_editor_screen.dart';
 import 'package:nexterm_v2/screens/pages/servers_page.dart';
@@ -120,6 +123,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               recentsLoader: () async => const [
@@ -127,7 +131,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -152,6 +156,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               monitoringRepository:
@@ -161,7 +166,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -179,6 +184,10 @@ void main() {
   });
 
   testWidgets('Settings page shows profile and logout', (tester) async {
+    // Tall viewport so the whole hub builds without scrolling.
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
     const session = SessionInfo(
         token: 't', baseUrl: 'https://host/api', label: 'host');
     await tester.pumpWidget(
@@ -186,6 +195,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               monitoringRepository:
@@ -195,7 +205,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -220,6 +230,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               recentsLoader: () async => const [
@@ -227,7 +238,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -697,6 +708,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               monitoringRepository:
@@ -706,7 +718,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -732,6 +744,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               monitoringRepository:
@@ -741,7 +754,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -768,6 +781,7 @@ void main() {
           home: HomeShell(
               session: session,
               onLogout: _noop,
+              settings: AppSettings(),
               serversRepository:
                   _FakeServers(nodes: _fakeTree()),
               monitoringRepository:
@@ -777,7 +791,7 @@ void main() {
                         id: 1, name: 'Webserver', ip: '192.168.1.10'),
                   ],
               moreLoader: () async => const MoreData(snippets: [
-                    Snippet(id: 1, name: 'Hello', content: 'echo hi'),
+                    Snippet(id: 1, name: 'Hello', command: 'echo hi'),
                   ], scripts: []),
               settingsProfileLoader: () async => const UserInfo(
                   id: 1, username: 'admin', firstName: 'Ada'),
@@ -803,6 +817,115 @@ void main() {
     await tester.tap(find.text('24h'));
     await tester.pumpAndSettle();
     expect(find.text('CPU usage'), findsOneWidget);
+  });
+
+  testWidgets('Settings hub shows account, server and app groups',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 4000);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    const session = SessionInfo(
+        token: 't', baseUrl: 'https://host/api', label: 'host');
+    await tester.pumpWidget(
+      MaterialApp(
+          home: HomeShell(
+              session: session,
+              onLogout: _noop,
+              settings: AppSettings(),
+              serversRepository:
+                  _FakeServers(nodes: _fakeTree()),
+              recentsLoader: () async => const [],
+              moreLoader: () async =>
+                  const MoreData(snippets: [], scripts: []),
+              settingsProfileLoader: () async => const UserInfo(
+                  id: 1, username: 'admin', firstName: 'Ada'),
+              settingsSessionsLoader: () async => const [])),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.descendant(
+      of: find.byType(WobblyNavBar),
+      matching: find.text('Settings'),
+    ));
+    await tester.pumpAndSettle();
+    for (final label in [
+      'Account',
+      'Server',
+      'Appearance',
+      'Terminal & files',
+      'Lists & monitoring',
+      'Identities',
+      'Edit name',
+      'Change password',
+      'Grid by default',
+    ]) {
+      expect(find.text(label), findsWidgets);
+    }
+  });
+
+  testWidgets('Identities page shows empty state', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsIdentitiesPage(
+          api: NextermApi(baseUrl: 'https://host/api'),
+          token: 't',
+          loader: () async => const [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Identities'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
+  });
+
+  testWidgets('Identities page lists identities', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsIdentitiesPage(
+          api: NextermApi(baseUrl: 'https://host/api'),
+          token: 't',
+          loader: () async => const [
+            Identity(
+                id: 1, name: 'Prod key', type: 'ssh', username: 'root'),
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Prod key'), findsOneWidget);
+    expect(find.text('root • ssh'), findsOneWidget);
+  });
+
+  testWidgets('Monitoring settings page loads values', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsMonitoringPage(
+          api: NextermApi(baseUrl: 'https://host/api'),
+          token: 't',
+          loader: () async => const {
+            'statusCheckerEnabled': true,
+            'monitoringEnabled': false,
+            'statusInterval': 60,
+            'monitoringInterval': 120,
+            'dataRetentionHours': 6,
+            'connectionTimeout': 10,
+            'batchSize': 10,
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Collectors'), findsOneWidget);
+    expect(find.text('Intervals & limits'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+  });
+
+  test('AppSettings persists theme mode', () async {
+    final settings = await AppSettings.load();
+    expect(settings.themeMode, ThemeMode.system);
+    await settings.setThemeMode(ThemeMode.dark);
+    final reloaded = await AppSettings.load();
+    expect(reloaded.themeMode, ThemeMode.dark);
+    await settings.setThemeMode(ThemeMode.system);
   });
 }
 
@@ -835,3 +958,4 @@ List<MonitoredServer> _fakeMonitored() => [
     ];
 
 void _noop() {}
+

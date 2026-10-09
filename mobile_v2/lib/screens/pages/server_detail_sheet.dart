@@ -295,7 +295,15 @@ class _NewSessionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tt = Theme.of(context).textTheme;
-    final isRdp = entry.primaryProtocol == 'rdp';
+    final proto = (entry.protocol ?? '').toLowerCase();
+    final isGraphical = proto == 'rdp' || proto == 'vnc';
+    final label = proto == 'rdp'
+        ? 'RDP'
+        : proto == 'vnc'
+            ? 'VNC'
+            : 'SSH';
+    final primaryKind =
+        isGraphical ? SessionKind.desktop : SessionKind.terminal;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -307,11 +315,9 @@ class _NewSessionSection extends StatelessWidget {
           children: [
             Expanded(
               child: FilledButton.icon(
-                onPressed: () => onStart(
-                    isRdp ? SessionKind.desktop : SessionKind.terminal),
-                icon: Icon(
-                    isRdp ? Icons.monitor : Icons.terminal),
-                label: Text(isRdp ? 'RDP' : 'SSH'),
+                onPressed: () => onStart(primaryKind),
+                icon: Icon(isGraphical ? Icons.monitor : Icons.terminal),
+                label: Text(label),
                 style: FilledButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(vertical: 14)),

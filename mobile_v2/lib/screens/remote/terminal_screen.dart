@@ -6,6 +6,7 @@ import 'package:xterm/xterm.dart';
 
 import 'package:nexterm_v2/api/nexterm_api.dart';
 import 'package:nexterm_v2/remote/session_opener.dart';
+import 'package:nexterm_v2/settings/settings_scope.dart';
 
 import 'terminal_protocol.dart';
 
@@ -147,11 +148,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
       },
       cancelOnError: false,
     );
-
-    setState(() {
-      _connecting = false;
-      _connected = true;
-    });
+    // Stay in "connecting" until the first frame arrives (or an error/
+    // close fires) — never claim a live connection upfront.
     // Initial size handshake so the server can size the pty before the
     // first automatic resize arrives from the layout.
     Future.delayed(const Duration(milliseconds: 100), () {
@@ -216,9 +214,64 @@ class _TerminalScreenState extends State<TerminalScreen> {
     super.dispose();
   }
 
+  /// Password fill (`POST /api/connections/:id/paste-password` with the
+  /// session's default identity). Plain paste keeps the prompt open,
+  /// paste + Enter submits (e.g. `sudo` prompts).
+  Future<void> _pastePasswordMenu() async {
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Paste password'),
+        content: const Text(
+            'Type the session identity password into the terminal.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Paste'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Paste + Enter'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    await _pastePassword(submit: choice);
+  }
+
+  Future<void> _pastePassword({required bool submit}) async {
+    try {
+      await widget.api.pasteIdentityPassword(
+        widget.sessionToken,
+        widget.session.sessionId,
+        submit: submit,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password pasted.')),
+      );
+    } on NextermApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } on SessionExpiredException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password fill failed.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final disconnected = !_connected && !_connecting;
+    final prefs = SettingsScope.of(context);
+    final showPasswordFill = prefs?.terminalPasswordHint ?? true;
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -227,6 +280,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (showPasswordFill)
+            IconButton(
+              icon: const Icon(Icons.key_outlined),
+              tooltip: 'Paste identity password',
+              onPressed: _connected ? _pastePasswordMenu : null,
+            ),
           IconButton(
             icon: const Icon(Icons.close),
             tooltip: 'Disconnect',
@@ -285,6 +344,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       focusNode: _focusNode,
                       autofocus: true,
                       deleteDetection: true,
+                      textStyle: TerminalStyle(
+                        fontSize:
+                            SettingsScope.of(context)
+                                    ?.terminalFontSize ??
+                                14,
+                      ),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                     ),

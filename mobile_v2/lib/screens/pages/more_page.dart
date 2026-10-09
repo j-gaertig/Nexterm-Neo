@@ -14,10 +14,13 @@ class MoreData {
 /// More page: snippet library (view/create/delete) + script library.
 class MorePage extends StatefulWidget {
   const MorePage(
-      {super.key, required this.api, required this.token, this.loader});
+      {super.key, required this.api, required this.token, this.loader, this.onSessionExpired});
 
   final NextermApi api;
   final String token;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
 
   /// Test seam (defaults to live `GET /api/snippets/all` + scripts).
   final Future<MoreData> Function()? loader;
@@ -76,6 +79,10 @@ class _MorePageState extends State<MorePage> {
         _data = data;
         _loading = false;
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+      widget.onSessionExpired?.call();
+      return;
     } on NextermApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -152,7 +159,7 @@ class _MorePageState extends State<MorePage> {
             TextField(
               controller: content,
               decoration: const InputDecoration(
-                  labelText: 'Content',
+                  labelText: 'Command',
                   border: OutlineInputBorder()),
               maxLines: 5,
               keyboardType: TextInputType.multiline,
@@ -175,14 +182,14 @@ class _MorePageState extends State<MorePage> {
     if (name.text.trim().isEmpty || content.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Name and content are required.')),
+            content: Text('Name and command are required.')),
       );
       return;
     }
     try {
       await widget.api.createSnippet(widget.token, {
         'name': name.text.trim(),
-        'content': content.text.trim(),
+        'command': content.text.trim(),
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -388,7 +395,7 @@ class _SnippetTile extends StatelessWidget {
                 color: cs.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: SelectableText(snippet.content,
+              child: SelectableText(snippet.command,
                   style: const TextStyle(
                       fontFamily: 'monospace', fontSize: 13)),
             ),

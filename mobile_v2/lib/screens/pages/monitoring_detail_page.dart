@@ -8,10 +8,16 @@ import '../../monitoring/monitoring_repository.dart';
 /// Overview, Charts (with time range), Storage, Network, Processes.
 class MonitoringDetailPage extends StatefulWidget {
   const MonitoringDetailPage(
-      {super.key, required this.server, required this.repository});
+      {super.key,
+      required this.server,
+      required this.repository,
+      this.onSessionExpired});
 
   final MonitoredServer server;
   final MonitoringRepository repository;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
 
   @override
   State<MonitoringDetailPage> createState() => _MonitoringDetailPageState();
@@ -51,6 +57,10 @@ class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
         _detail = detail;
         _loading = false;
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+      widget.onSessionExpired?.call();
+      return;
     } on NextermApiException catch (e) {
       if (!mounted) return;
       setState(() {

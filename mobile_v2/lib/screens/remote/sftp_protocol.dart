@@ -191,9 +191,15 @@ String sftpBasename(String path) {
 List<String> sftpSegments(String path) =>
     path.split('/').where((s) => s.isNotEmpty).toList();
 
-/// Absolute path from segments (`[]` -> `/`).
-String sftpFromSegments(List<String> segments) =>
-    segments.isEmpty ? '/' : '/${segments.join('/')}';
+/// Absolute path from segments (`[]` -> `/`; a leading `C:` drive
+/// segment keeps Windows form without a leading slash).
+String sftpFromSegments(List<String> segments) {
+  if (segments.isEmpty) return '/';
+  if (RegExp(r'^[A-Za-z]:$').hasMatch(segments.first)) {
+    return segments.join('/');
+  }
+  return '/${segments.join('/')}';
+}
 
 /// True when [path] is [root] or below it (`/` contains everything).
 bool sftpIsWithin(String path, String root) {

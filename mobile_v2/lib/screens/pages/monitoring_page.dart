@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../api/nexterm_api.dart';
@@ -8,9 +10,21 @@ import 'monitoring_detail_page.dart';
 /// Monitoring overview: one card per monitored server (mirrors the web
 /// grid). Tap a card for the extended detail view.
 class MonitoringPage extends StatefulWidget {
-  const MonitoringPage({super.key, required this.repository});
+  const MonitoringPage(
+      {super.key,
+      required this.repository,
+      this.onSessionExpired,
+      this.autoRefresh = true,
+      this.refreshInterval = const Duration(seconds: 30)});
 
   final MonitoringRepository repository;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
+
+  /// Reload automatically on an interval (device preference).
+  final bool autoRefresh;
+  final Duration refreshInterval;
 
   @override
   State<MonitoringPage> createState() => _MonitoringPageState();
@@ -18,6 +32,7 @@ class MonitoringPage extends StatefulWidget {
 
 class _MonitoringPageState extends State<MonitoringPage> {
   final _searchController = TextEditingController();
+  Timer? _refreshTimer;
   String _query = '';
   List<MonitoredServer>? _servers;
   String? _error;
@@ -27,13 +42,36 @@ class _MonitoringPageState extends State<MonitoringPage> {
   void initState() {
     super.initState();
     _load();
+    _startRefreshTimer();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  @override
+  void didUpdateWidget(MonitoringPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // App prefs (interval/toggle) arrive as constructor params —
+    // restart the timer so changes apply without an app restart.
+    if (oldWidget.autoRefresh != widget.autoRefresh ||
+        oldWidget.refreshInterval != widget.refreshInterval) {
+      _startRefreshTimer();
+    }
+  }
+
+  void _startRefreshTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+    if (widget.autoRefresh) {
+      _refreshTimer = Timer.periodic(
+          widget.refreshInterval, (_) => _load(silent: true));
+    }
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final servers = await widget.repository.fetchServers();
       if (!mounted) return;
@@ -41,6 +79,10 @@ class _MonitoringPageState extends State<MonitoringPage> {
         _servers = servers;
         _loading = false;
       });
+    } on SessionExpiredException {
+      if (!mounted) return;
+      widget.onSessionExpired?.call();
+      return;
     } on NextermApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -58,6 +100,7 @@ class _MonitoringPageState extends State<MonitoringPage> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -68,7 +111,9 @@ class _MonitoringPageState extends State<MonitoringPage> {
       context,
       MaterialPageRoute(
         builder: (_) => MonitoringDetailPage(
-            server: server, repository: widget.repository),
+            server: server,
+            repository: widget.repository,
+            onSessionExpired: widget.onSessionExpired),
       ),
     );
   }

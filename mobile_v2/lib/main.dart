@@ -4,6 +4,7 @@ import 'api/nexterm_api.dart';
 import 'auth/session_store.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
+import 'settings/app_settings.dart';
 
 void main() {
   runApp(const NextermApp());
@@ -19,6 +20,7 @@ class NextermApp extends StatefulWidget {
 class _NextermAppState extends State<NextermApp> {
   final _store = SessionStore();
   SessionInfo? _session;
+  AppSettings? _settings;
   bool _loading = true;
 
   @override
@@ -28,7 +30,12 @@ class _NextermAppState extends State<NextermApp> {
   }
 
   Future<void> _restore() async {
-    final session = await _store.load();
+    final results = await Future.wait([
+      _store.load(),
+      AppSettings.load(),
+    ]);
+    final session = results[0] as SessionInfo?;
+    final settings = results[1] as AppSettings;
     var keptSession = session;
     if (session != null) {
       // Verify the stored session. Only discard on explicit rejection (401)
@@ -45,6 +52,7 @@ class _NextermAppState extends State<NextermApp> {
     if (mounted) {
       setState(() {
         _session = keptSession;
+        _settings = settings;
         _loading = false;
       });
     }
@@ -65,18 +73,27 @@ class _NextermAppState extends State<NextermApp> {
     final light = ColorScheme.fromSeed(seedColor: Colors.indigo);
     final dark = ColorScheme.fromSeed(
         seedColor: Colors.indigo, brightness: Brightness.dark);
-    return MaterialApp(
-      title: 'Nexterm V2',
-      theme: ThemeData(colorScheme: light, useMaterial3: true),
-      darkTheme: ThemeData(colorScheme: dark, useMaterial3: true),
-      home: _loading
-          ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()))
-          : _session == null
-              ? LoginScreen(
-                  onLoggedIn: (session) =>
-                      setState(() => _session = session))
-              : HomeShell(session: _session!, onLogout: _logout),
+    final settings = _settings;
+    return AnimatedBuilder(
+      animation: settings ?? ChangeNotifier(),
+      builder: (context, _) => MaterialApp(
+        title: 'Nexterm V2',
+        theme: ThemeData(colorScheme: light, useMaterial3: true),
+        darkTheme: ThemeData(colorScheme: dark, useMaterial3: true),
+        themeMode: settings?.themeMode ?? ThemeMode.system,
+        home: _loading || settings == null
+            ? const Scaffold(
+                body: Center(child: CircularProgressIndicator()))
+            : _session == null
+                ? LoginScreen(
+                    onLoggedIn: (session) =>
+                        setState(() => _session = session))
+                : HomeShell(
+                    session: _session!,
+                    onLogout: _logout,
+                    settings: settings,
+                  ),
+      ),
     );
   }
 }

@@ -35,6 +35,17 @@ class _LoginScreenState extends State<LoginScreen> {
   String _baseUrl = '';
   Timer? _pollTimer;
   bool _polling = false;
+  DateTime? _pollStartedAt;
+  int _pollFailures = 0;
+
+  /// Device codes expire after ~10 minutes; stop polling then instead
+  /// of looping forever. Backs off after repeated transport errors.
+  bool _pollExpired() {
+    final started = _pollStartedAt;
+    if (started == null) return false;
+    return DateTime.now().difference(started) >
+        const Duration(minutes: 10);
+  }
 
   @override
   void dispose() {
@@ -97,6 +108,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _startPolling(NextermApi api) {
     _pollTimer?.cancel();
+    _pollStartedAt = DateTime.now();
+    _pollFailures = 0;
     _pollTimer =
         Timer.periodic(const Duration(seconds: 3), (_) => _poll(api));
   }
@@ -105,10 +118,32 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_polling) return;
     final pollToken = _deviceToken;
     if (pollToken == null) return;
+    if (_pollExpired()) {
+      _pollTimer?.cancel();
+      if (!mounted) return;
+      setState(() {
+        _error = 'Code expired. Please connect again.';
+        _step = _Step.server;
+        _deviceCode = null;
+        _deviceToken = null;
+      });
+      return;
+    }
+    // Back off after repeated transport failures (status 'error').
+    if (_pollFailures >= 3) {
+      _pollFailures = 0;
+      await Future<void>.delayed(const Duration(seconds: 5));
+      if (!mounted || _deviceToken != pollToken) return;
+    }
     _polling = true;
     try {
       final result = await api.pollDeviceCode(pollToken);
       if (!mounted) return;
+      if (result.status == 'error') {
+        _pollFailures++;
+      } else {
+        _pollFailures = 0;
+      }
       if (result.isAuthorized && result.token != null) {
         final status = await api.checkSession(result.token!);
         if (!mounted) return;

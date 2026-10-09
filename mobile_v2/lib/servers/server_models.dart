@@ -7,6 +7,8 @@
 /// `sessionId`/`entryId`/`configuration.type` (see `mobile_v2/API.md`).
 library;
 
+import '../remote/session_opener.dart';
+
 /// A server entry (`type == 'server'` leaf of `GET /api/entries/list`).
 class ServerEntry {
   const ServerEntry({
@@ -78,11 +80,23 @@ class ServerEntry {
     return port == null ? ip : '$ip:$port';
   }
 
-  /// Primary connect protocol: ssh or rdp (format helper for the sheet).
+  /// Primary connect protocol: ssh, rdp or vnc (anything else opens
+  /// a terminal and lets the server decide).
   String get primaryProtocol {
     final p = (protocol ?? '').toLowerCase();
-    if (p == 'rdp') return 'rdp';
+    if (p == 'rdp' || p == 'vnc') return p;
     return 'ssh';
+  }
+
+  /// Viewer for quick-connect: graphical protocols go to the desktop
+  /// viewer, `sftp`/`ftp`/`ftps` to files, everything else to terminal.
+  SessionKind get quickConnectKind {
+    final p = (protocol ?? '').toLowerCase();
+    if (p == 'rdp' || p == 'vnc') return SessionKind.desktop;
+    if (p == 'sftp' || p == 'ftp' || p == 'ftps') {
+      return SessionKind.files;
+    }
+    return SessionKind.terminal;
   }
 }
 
