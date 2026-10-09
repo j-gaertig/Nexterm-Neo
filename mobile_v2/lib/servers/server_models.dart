@@ -1,13 +1,15 @@
 /// Server list models for the servers page (UI-only shapes).
 ///
-/// NOTE: these are NOT the API shapes. When wiring the API
-/// (TODO below), map `GET /api/entries/list` entries via
-/// `config.ip`/`config.port`/`config.protocol`, and
-/// `GET /api/connections` items via
-/// `sessionId`/`entryId`/`configuration.type` (see `mobile_v2/API.md`).
+/// List items (`GET /api/entries/list` via `parseEntryTree`) carry
+/// top-level `id`/`name`/`ip`/`protocol` — there is no `port`
+/// (dropped server-side) and no nested-config mapping needed here.
+/// Connection items (`GET /api/connections`) carry
+/// `sessionId`/`entryId`/`configuration.type`
+/// (see `mobile_v2/API.md`).
 library;
 
 import '../remote/session_opener.dart';
+import 'tag_models.dart';
 
 /// A server entry (`type == 'server'` leaf of `GET /api/entries/list`).
 class ServerEntry {
@@ -22,6 +24,7 @@ class ServerEntry {
     this.macAddress,
     this.wakeOnLanEnabled = false,
     this.identities = const [],
+    this.tags = const [],
   });
 
   final int id;
@@ -34,6 +37,9 @@ class ServerEntry {
   final String? macAddress;
   final bool wakeOnLanEnabled;
   final List<int> identities;
+
+  /// Assigned tags (`tags: [{id, name, color}]` on list items).
+  final List<TagItem> tags;
 
   /// Parse a `type == 'server'` node of `GET /api/entries/list`
   /// (`server/controllers/entry.js` `buildEntryObject`).
@@ -55,6 +61,7 @@ class ServerEntry {
         ? rawPort.toInt()
         : int.tryParse('$rawPort');
     final identities = json['identities'];
+    final tags = json['tags'];
     return ServerEntry(
       id: id,
       name: json['name'] as String? ?? 'Server',
@@ -69,6 +76,20 @@ class ServerEntry {
           ? identities
               .whereType<num>()
               .map((e) => e.toInt())
+              .toList()
+          : const [],
+      tags: tags is List
+          ? tags
+              .whereType<Map>()
+              .map((t) {
+                try {
+                  return TagItem.fromJson(
+                      Map<String, dynamic>.from(t));
+                } catch (_) {
+                  return null;
+                }
+              })
+              .whereType<TagItem>()
               .toList()
           : const [],
     );

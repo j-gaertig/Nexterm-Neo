@@ -25,10 +25,14 @@ enum _Step { server, code }
 
 class _LoginScreenState extends State<LoginScreen> {
   final _urlController = TextEditingController();
+  final _userController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _totpController = TextEditingController();
   final _store = SessionStore();
 
   _Step _step = _Step.server;
   bool _isLoading = false;
+  bool _usePassword = false;
   String? _error;
   String? _deviceCode;
   String? _deviceToken;
@@ -51,6 +55,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _urlController.dispose();
+    _userController.dispose();
+    _passwordController.dispose();
+    _totpController.dispose();
     super.dispose();
   }
 
@@ -130,9 +137,16 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
     // Back off after repeated transport failures (status 'error').
+    // Claim the slot before delaying so the next tick skips instead
+    // of polling concurrently.
     if (_pollFailures >= 3) {
       _pollFailures = 0;
-      await Future<void>.delayed(const Duration(seconds: 5));
+      _polling = true;
+      try {
+        await Future<void>.delayed(const Duration(seconds: 5));
+      } finally {
+        _polling = false;
+      }
       if (!mounted || _deviceToken != pollToken) return;
     }
     _polling = true;
@@ -301,6 +315,84 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Username/password login (`POST /api/auth/login`, see `API.md` §2).
+  Future<void> _loginWithPassword() async {
+    final raw = _urlController.text.trim();
+    final username = _userController.text.trim();
+    final password = _passwordController.text;
+    if (raw.isEmpty) {
+      setState(() => _error = 'Please enter a server URL.');
+      return;
+    }
+    if (username.isEmpty || password.isEmpty) {
+      setState(
+          () => _error = 'Please enter username and password.');
+      return;
+    }
+    final totp = int.tryParse(_totpController.text.trim());
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    final api = NextermApi(baseUrl: raw);
+    try {
+      await api.checkServer();
+    } on NextermApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    late final String token;
+    try {
+      token = await api.login(username, password, totpCode: totp);
+    } on NextermApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    final status = await api.checkSession(token);
+    if (!mounted) return;
+    if (status != SessionStatus.valid) {
+      setState(() {
+        _error = status == SessionStatus.invalid
+            ? 'Login was not accepted. Please try again.'
+            : 'Could not verify the session. Please try again.';
+        _isLoading = false;
+      });
+      return;
+    }
+    final label = raw.replaceFirst(
+        RegExp(r'^https?://', caseSensitive: false), '');
+    final session = SessionInfo(
+      token: token,
+      baseUrl: api.baseUrl,
+      label: label.isEmpty ? api.baseUrl : label,
+    );
+    try {
+      await _store.save(session);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'Session could not be saved.';
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+    widget.onLoggedIn(session);
+  }
+
   void _back() {
     _pollTimer?.cancel();
     setState(() {
@@ -426,6 +518,66 @@ class _LoginScreenState extends State<LoginScreen> {
           style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16)),
         ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: _isLoading
+              ? null
+              : () => setState(() {
+                    _usePassword = !_usePassword;
+                    _error = null;
+                  }),
+          child: Text(_usePassword
+              ? 'Use device code instead'
+              : 'Use username & password instead'),
+        ),
+        if (_usePassword) ...[
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _userController,
+            decoration: const InputDecoration(
+              labelText: 'Username',
+              prefixIcon: Icon(Icons.person_outline),
+              border: OutlineInputBorder(),
+            ),
+            enabled: !_isLoading,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _passwordController,
+            decoration: const InputDecoration(
+              labelText: 'Password',
+              prefixIcon: Icon(Icons.lock_outline),
+              border: OutlineInputBorder(),
+            ),
+            obscureText: true,
+            enabled: !_isLoading,
+            onFieldSubmitted: (_) => _loginWithPassword(),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _totpController,
+            decoration: const InputDecoration(
+              labelText: 'Authenticator code (if enabled)',
+              prefixIcon: Icon(Icons.pin_outlined),
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.number,
+            enabled: !_isLoading,
+            onFieldSubmitted: (_) => _loginWithPassword(),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: _isLoading ? null : _loginWithPassword,
+            style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16)),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Sign in'),
+          ),
+        ],
       ],
     );
   }

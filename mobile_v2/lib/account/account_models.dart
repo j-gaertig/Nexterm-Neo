@@ -7,6 +7,7 @@ class UserInfo {
     this.lastName,
     this.isAdmin = false,
     this.avatarHash,
+    this.totpEnabled = false,
   });
 
   final int id;
@@ -15,6 +16,9 @@ class UserInfo {
   final String? lastName;
   final bool isAdmin;
   final String? avatarHash;
+
+  /// Two-factor enabled (`GET /api/accounts/me`).
+  final bool totpEnabled;
 
   String get displayName {
     final parts = [
@@ -40,6 +44,7 @@ class UserInfo {
       lastName: json['lastName'] as String?,
       isAdmin: json['isAdmin'] == true,
       avatarHash: json['avatarHash'] as String?,
+      totpEnabled: json['totpEnabled'] == true,
     );
   }
 }

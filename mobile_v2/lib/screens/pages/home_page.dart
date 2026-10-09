@@ -45,8 +45,12 @@ class _HomePageState extends State<HomePage> {
     final out = <ServerEntry>[];
     for (final m in raw) {
       try {
-        if (m['type'] == null || m['type'] == 'server') {
-          out.add(ServerEntry.fromJson(m));
+        // `GET /api/entries/recent` returns `{entryId, name, ...}`
+        // (no `id`/`ip`) — map onto the list shape before parsing.
+        final mapped = Map<String, dynamic>.from(m);
+        mapped['id'] ??= mapped['entryId'];
+        if (mapped['type'] == null || mapped['type'] == 'server') {
+          out.add(ServerEntry.fromJson(mapped));
         }
       } catch (_) {}
     }
@@ -90,7 +94,8 @@ class _HomePageState extends State<HomePage> {
         api: widget.api,
         token: widget.token,
         entry: entry,
-        kind: entry.quickConnectKind);
+        kind: entry.quickConnectKind,
+        onSessionExpired: widget.onSessionExpired);
   }
 
   @override

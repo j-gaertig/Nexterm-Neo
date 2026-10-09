@@ -7,8 +7,22 @@ import 'package:xterm/xterm.dart';
 import 'package:nexterm_v2/api/nexterm_api.dart';
 import 'package:nexterm_v2/remote/session_opener.dart';
 import 'package:nexterm_v2/settings/settings_scope.dart';
+import 'package:nexterm_v2/snippets/snippet_models.dart';
 
 import 'terminal_protocol.dart';
+
+/// Map the device cursor preference onto xterm cursor types.
+TerminalCursorType _cursorTypeFor(String cursor) {
+  switch (cursor) {
+    case 'underline':
+      return TerminalCursorType.underline;
+    case 'bar':
+      return TerminalCursorType.verticalBar;
+    case 'block':
+    default:
+      return TerminalCursorType.block;
+  }
+}
 
 /// Full-screen SSH terminal for an opened [RemoteSession].
 ///
@@ -21,18 +35,21 @@ class TerminalScreen extends StatefulWidget {
       {super.key,
       required this.api,
       required this.sessionToken,
-      required this.session});
+      required this.session,
+      this.onSessionExpired});
 
   final NextermApi api;
   final String sessionToken;
   final RemoteSession session;
 
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
+
   @override
   State<TerminalScreen> createState() => _TerminalScreenState();
 }
 
-class _TerminalScreenState extends State<TerminalScreen> {
-  late final Terminal _terminal;
+class _TerminalScreenState extends State<TerminalScreen> {  late final Terminal _terminal;
   late final TerminalController _controller;
   final FocusNode _focusNode = FocusNode();
 
@@ -125,6 +142,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
           _connecting = false;
           _receivedData = true;
         });
+        // Second-factor prompt: surface a secure input instead of
+        // leaving the code visible as plain terminal text.
+        if (frame.isTotpPrompt) _askForTotpCode(generation);
       },
       onError: (Object error) {
         if (!mounted || generation != _generation) return;
@@ -214,6 +234,66 @@ class _TerminalScreenState extends State<TerminalScreen> {
     super.dispose();
   }
 
+  /// Secure prompt for a TOTP second-factor frame: the code is typed
+  /// obscured and submitted with Enter. Guarded per connection
+  /// generation so reconnects can't stack dialogs.
+  bool _totpDialogOpen = false;
+
+  Future<void> _askForTotpCode(int generation) async {
+    if (_totpDialogOpen || !mounted || generation != _generation) return;
+    _totpDialogOpen = true;
+    final controller = TextEditingController();
+    try {
+      final code = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Two-factor code'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Authenticator code',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      );
+      if (code != null &&
+          code.isNotEmpty &&
+          mounted &&
+          generation == _generation) {
+        try {
+          _channel?.sink.add('$code\n');
+        } catch (_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                  content: Text('Session is not connected.')),
+            );
+          }
+        }
+      }
+    } finally {
+      controller.dispose();
+      _totpDialogOpen = false;
+    }
+  }
+
   /// Password fill (`POST /api/connections/:id/paste-password` with the
   /// session's default identity). Plain paste keeps the prompt open,
   /// paste + Enter submits (e.g. `sudo` prompts).
@@ -255,14 +335,117 @@ class _TerminalScreenState extends State<TerminalScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message)));
-    } on SessionExpiredException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
+      return;
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password fill failed.')),
+      );
+    }
+  }
+
+  /// Snippet picker (web SnippetsMenu equivalent): insert a library
+  /// command into the live session, optionally submitting it.
+  Future<void> _insertSnippetMenu() async {
+    List<Snippet> snippets = [];
+    try {
+      final raw = await widget.api.fetchSnippets(widget.sessionToken);
+      for (final m in raw) {
+        try {
+          snippets.add(Snippet.fromJson(m));
+        } catch (_) {}
+      }
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
+      return;
+    } on NextermApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load snippets.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    if (snippets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No snippets in the library.')),
+      );
+      return;
+    }
+    final picked = await showModalBottomSheet<Snippet>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Text('Insert snippet',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: snippets.length,
+                itemBuilder: (_, i) {
+                  final snippet = snippets[i];
+                  return ListTile(
+                    leading: const Icon(Icons.code),
+                    title: Text(snippet.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                    subtitle: Text(snippet.command,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12)),
+                    onTap: () => Navigator.pop(ctx, snippet),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final submit = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(picked.name),
+        content: Text(picked.command),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Paste'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Paste + Run'),
+          ),
+        ],
+      ),
+    );
+    if (submit == null || !mounted) return;
+    try {
+      _channel?.sink.add(picked.command + (submit ? '\n' : ''));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session is not connected.')),
       );
     }
   }
@@ -286,6 +469,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
               tooltip: 'Paste identity password',
               onPressed: _connected ? _pastePasswordMenu : null,
             ),
+          IconButton(
+            icon: const Icon(Icons.code),
+            tooltip: 'Insert snippet',
+            onPressed: _connected ? _insertSnippetMenu : null,
+          ),
           IconButton(
             icon: const Icon(Icons.close),
             tooltip: 'Disconnect',
@@ -344,6 +532,10 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       focusNode: _focusNode,
                       autofocus: true,
                       deleteDetection: true,
+                      cursorType: _cursorTypeFor(
+                          SettingsScope.of(context)
+                                  ?.terminalCursor ??
+                              'block'),
                       textStyle: TerminalStyle(
                         fontSize:
                             SettingsScope.of(context)

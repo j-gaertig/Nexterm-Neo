@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../remote/session_opener.dart';
 import '../../servers/identity.dart';
 import '../../servers/server_models.dart';
+import '../../servers/tag_models.dart';
 import 'servers_page.dart' show protocolIcon;
 
 /// Bottom sheet for a server: active sessions + new session,
@@ -45,8 +46,8 @@ class ServerDetailSheet extends StatelessWidget {
   /// Close all sessions of this server.
   final VoidCallback? onCloseAll;
 
-  /// Quick action id (quick-connect, wake-on-lan, duplicate, edit,
-  /// delete) — null = placeholder snackbar.
+  /// Quick action id (quick-connect, run-script, browser, wake-on-lan,
+  /// move, tags, notes, duplicate, edit, delete) — null = placeholder snackbar.
   final ValueChanged<String>? onAction;
   final _SheetMode _mode;
 
@@ -80,6 +81,7 @@ class ServerDetailSheet extends StatelessWidget {
                 ),
               ] else
                 _ActionsSection(
+                  entry: entry,
                   onAction: onAction ?? (_) {},
                 ),
             ],
@@ -145,6 +147,17 @@ class _Header extends StatelessWidget {
                 formatServerSubtitle(entry),
                 style: TextStyle(fontSize: 12, color: cs.outline),
               ),
+              if (entry.tags.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final tag in entry.tags)
+                      TagChip(tag: tag, dense: true),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -342,16 +355,30 @@ class _NewSessionSection extends StatelessWidget {
 }
 
 class _ActionsSection extends StatelessWidget {
-  const _ActionsSection({required this.onAction});
+  const _ActionsSection({required this.entry, required this.onAction});
 
+  final ServerEntry entry;
   final ValueChanged<String> onAction;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final isSsh =
+        (entry.protocol ?? '').toLowerCase() == 'ssh';
     return Column(
       children: [
         _actionTile(context, Icons.bolt, 'Quick connect', 'quick-connect',
+            destructive: false),
+        _actionTile(context, Icons.play_arrow, 'Run script', 'run-script',
+            destructive: false),
+        if (isSsh)
+          _actionTile(context, Icons.language, 'Browser', 'browser',
+              destructive: false),
+        _actionTile(context, Icons.drive_file_move_outlined, 'Move',
+            'move',
+            destructive: false),
+        _actionTile(context, Icons.label_outlined, 'Tags', 'tags',
+            destructive: false),
+        _actionTile(context, Icons.note_outlined, 'Notes', 'notes',
             destructive: false),
         _actionTile(context, Icons.power_settings_new, 'Wake on LAN',
             'wake-on-lan',
@@ -362,9 +389,6 @@ class _ActionsSection extends StatelessWidget {
             destructive: false),
         _actionTile(context, Icons.delete, 'Delete', 'delete',
             destructive: true),
-        const SizedBox(height: 4),
-        Text('More actions follow in later steps.',
-            style: TextStyle(fontSize: 12, color: cs.outline)),
       ],
     );
   }

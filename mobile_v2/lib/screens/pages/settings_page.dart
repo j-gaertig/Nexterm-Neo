@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../account/account_models.dart';
@@ -5,8 +6,12 @@ import '../../api/nexterm_api.dart';
 import '../../auth/session_store.dart';
 import '../../settings/app_settings.dart';
 import '../../settings/settings_widgets.dart';
+import 'settings_apikeys_page.dart';
+import 'settings_audit_page.dart';
 import 'settings_identities_page.dart';
+import 'settings_link_device_page.dart';
 import 'settings_monitoring_page.dart';
+import 'settings_totp_page.dart';
 
 /// Settings hub: account + server settings (web parity) + app prefs.
 ///
@@ -157,11 +162,150 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  void _openLinkDevice() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsLinkDevicePage(
+          api: widget.api,
+          token: widget.token,
+          onSessionExpired: widget.onSessionExpired,
+        ),
+      ),
+    );
+  }
+
+  void _openApiKeys() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsApiKeysPage(
+          api: widget.api,
+          token: widget.token,
+          onSessionExpired: widget.onSessionExpired,
+        ),
+      ),
+    );
+  }
+
+  void _openTotp() {
+    final profile = _profile;
+    if (profile == null) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsTotpPage(
+          api: widget.api,
+          token: widget.token,
+          enabled: profile.totpEnabled,
+          onSessionExpired: widget.onSessionExpired,
+          onChanged: _load,
+        ),
+      ),
+    );
+  }
+
+  /// Profile picture (web Account avatar equivalent). The server
+  /// requires a WebP image — other formats fail with its message.
+  Future<void> _changeAvatar() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Profile picture'),
+        content: const Text(
+            'Pick a WebP image from your device, or remove the current picture.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, 'remove'),
+            child: const Text('Remove'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, 'pick'),
+            child: const Text('Pick image'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice == 'remove') {
+      try {
+        await widget.api.deleteAvatar(widget.token);
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Picture removed.')),
+        );
+        await _load();
+      } on SessionExpiredException {
+        widget.onSessionExpired?.call();
+      } on NextermApiException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Remove failed.')),
+        );
+      }
+      return;
+    }
+    List<PlatformFile> picked;
+    try {
+      picked = await FilePicker.pickFiles(type: FileType.image);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Could not open the file picker.')),
+      );
+      return;
+    }
+    if (picked.isEmpty || !mounted) return;
+    try {
+      final file = picked.first;
+      final bytes = await file.readAsBytes();
+      await widget.api.uploadAvatar(widget.token, bytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Picture updated.')),
+      );
+      await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
+    } on NextermApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Upload failed.')),
+      );
+    }
+  }
+
   void _openMonitoringSettings() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => SettingsMonitoringPage(
+          api: widget.api,
+          token: widget.token,
+          onSessionExpired: widget.onSessionExpired,
+        ),
+      ),
+    );
+  }
+
+  void _openAudit() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsAuditPage(
           api: widget.api,
           token: widget.token,
           onSessionExpired: widget.onSessionExpired,
@@ -390,6 +534,34 @@ class _SettingsPageState extends State<SettingsPage> {
                         subtitle: 'Server account',
                         onTap: _changePassword,
                       ),
+                      SettingsNavTile(
+                        icon: Icons.photo_outlined,
+                        title: 'Profile picture',
+                        subtitle: 'WebP image',
+                        onTap: _changeAvatar,
+                      ),
+                      SettingsNavTile(
+                        icon: Icons.verified_user_outlined,
+                        title: 'Two-factor',
+                        subtitle: _profile == null
+                            ? null
+                            : (_profile!.totpEnabled
+                                ? 'Enabled'
+                                : 'Disabled'),
+                        onTap: _openTotp,
+                      ),
+                      SettingsNavTile(
+                        icon: Icons.key_outlined,
+                        title: 'API keys',
+                        subtitle: 'Scripts and integrations',
+                        onTap: _openApiKeys,
+                      ),
+                      SettingsNavTile(
+                        icon: Icons.link_outlined,
+                        title: 'Link device',
+                        subtitle: 'Authorize another device',
+                        onTap: _openLinkDevice,
+                      ),
                     ],
                   ),
                   SettingsGroup(
@@ -408,6 +580,12 @@ class _SettingsPageState extends State<SettingsPage> {
                         subtitle: 'Collectors and intervals (admin)',
                         onTap: _openMonitoringSettings,
                       ),
+                      SettingsNavTile(
+                        icon: Icons.history_outlined,
+                        title: 'Audit log',
+                        subtitle: 'Who connected where (admin)',
+                        onTap: _openAudit,
+                      ),
                     ],
                   ),
                   AnimatedBuilder(
@@ -423,7 +601,7 @@ class _SettingsPageState extends State<SettingsPage> {
                             children: [
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
-                                    16, 12, 16, 12),
+                                    16, 12, 16, 4),
                                 child: LayoutBuilder(
                                   builder:
                                       (context, constraints) {
@@ -469,6 +647,72 @@ class _SettingsPageState extends State<SettingsPage> {
                                   },
                                 ),
                               ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 4, 16, 12),
+                                child: Row(
+                                  children: [
+                                    const Text('Accent',
+                                        style: TextStyle(
+                                            fontWeight:
+                                                FontWeight.w600)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        alignment:
+                                            WrapAlignment.end,
+                                        children: [
+                                          for (final seed
+                                              in AppSettings
+                                                  .accentChoices)
+                                            GestureDetector(
+                                              onTap: () => s
+                                                  .setAccentSeed(
+                                                      seed),
+                                              child: Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration:
+                                                    BoxDecoration(
+                                                  color:
+                                                      Color(
+                                                          seed),
+                                                  shape:
+                                                      BoxShape
+                                                          .circle,
+                                                  border: Border.all(
+                                                    color: s.accentSeed ==
+                                                            seed
+                                                        ? Theme.of(
+                                                                context)
+                                                            .colorScheme
+                                                            .onSurface
+                                                        : Colors
+                                                            .transparent,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                                child: s.accentSeed ==
+                                                        seed
+                                                    ? const Icon(
+                                                        Icons
+                                                            .check,
+                                                        size:
+                                                            18,
+                                                        color: Colors
+                                                            .white,
+                                                      )
+                                                    : null,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                           SettingsGroup(
@@ -487,6 +731,46 @@ class _SettingsPageState extends State<SettingsPage> {
                                 divisions: 14,
                                 onChanged: (v) => s
                                     .setTerminalFontSize(v),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(
+                                    16, 4, 16, 12),
+                                child: Row(
+                                  children: [
+                                    const Text('Cursor',
+                                        style: TextStyle(
+                                            fontWeight:
+                                                FontWeight.w600)),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: SegmentedButton<
+                                          String>(
+                                        segments: const [
+                                          ButtonSegment(
+                                              value: 'block',
+                                              label: Text(
+                                                  'Block')),
+                                          ButtonSegment(
+                                              value:
+                                                  'underline',
+                                              label: Text(
+                                                  'Line')),
+                                          ButtonSegment(
+                                              value: 'bar',
+                                              label: Text(
+                                                  'Bar')),
+                                        ],
+                                        selected: {
+                                          s.terminalCursor
+                                        },
+                                        onSelectionChanged:
+                                            (sel) => s
+                                                .setTerminalCursor(
+                                                    sel.first),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                               SettingsSwitchTile(
                                 icon: Icons.key_outlined,

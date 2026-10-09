@@ -91,9 +91,16 @@ class SftpConnection {
 
 /// Thrown when a REST up/download fails.
 class SftpTransferException implements Exception {
-  const SftpTransferException(this.message);
+  const SftpTransferException(this.message, {this.statusCode});
 
   final String message;
+
+  /// HTTP status when the failure came from a REST response (null for
+  /// transport errors/timeouts).
+  final int? statusCode;
+
+  /// True when the session token was rejected — callers should log out.
+  bool get unauthorized => statusCode == 401;
 
   @override
   String toString() => 'SftpTransferException: $message';
@@ -142,9 +149,12 @@ Future<void> uploadSftpFile({
     throw const SftpTransferException('Upload failed.');
   }
   if (response.statusCode != 200 && response.statusCode != 201) {
-    throw SftpTransferException(_transferError(response, 'Upload failed'));
+    throw SftpTransferException(_transferError(response, 'Upload failed'),
+        statusCode: response.statusCode);
   }
 }
+
+/// Upload from a file stream (preferred for large files).
 
 /// Upload from a file stream (preferred for large files).
 Future<void> uploadSftpFileStreamed({
@@ -161,13 +171,18 @@ Future<void> uploadSftpFileStreamed({
     ..contentLength = contentLength;
   try {
     final send = request.send().timeout(const Duration(minutes: 30));
-    unawaited(request.sink.addStream(stream).then((_) {
+    // Await the stream inside try/finally so the sink always closes —
+    // otherwise a stream error hangs the request until timeout.
+    try {
+      await request.sink.addStream(stream);
+    } finally {
       request.sink.close();
-    }));
+    }
     final response = await http.Response.fromStream(await send);
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw SftpTransferException(
-          _transferError(response, 'Upload failed'));
+          _transferError(response, 'Upload failed'),
+          statusCode: response.statusCode);
     }
   } on TimeoutException {
     throw const SftpTransferException('Upload timed out.');
@@ -196,7 +211,8 @@ Future<Uint8List> downloadSftpFile({
     throw const SftpTransferException('Download failed.');
   }
   if (response.statusCode != 200) {
-    throw SftpTransferException(_transferError(response, 'Download failed'));
+    throw SftpTransferException(_transferError(response, 'Download failed'),
+        statusCode: response.statusCode);
   }
   return response.bodyBytes;
 }
@@ -225,7 +241,8 @@ Future<File> downloadSftpFileTo({
   if (streamed.statusCode != 200) {
     final body = await streamed.stream.bytesToString();
     throw SftpTransferException(
-        _transferErrorText(streamed.statusCode, body, 'Download failed'));
+        _transferErrorText(streamed.statusCode, body, 'Download failed'),
+        statusCode: streamed.statusCode);
   }
   final sink = targetFile.openWrite();
   try {

@@ -6,8 +6,13 @@ import '../../remote/viewer.dart';
 import '../../servers/identity.dart';
 import '../../servers/server_models.dart';
 import '../../servers/server_repository.dart';
+import '../../servers/folder_picker.dart';
+import '../../servers/tag_models.dart';
+import '../../snippets/snippet_models.dart';
 import 'server_detail_sheet.dart';
 import 'server_editor_screen.dart';
+import 'server_notes_screen.dart';
+import 'ssh_import_screen.dart';
 
 /// Servers page after the sketch: header with reload, search,
 /// grid/list toggle, collapsible folders, server rows/cards with
@@ -44,6 +49,7 @@ class _ServersPageState extends State<ServersPage> {
   String? _error;
   bool _loading = true;
   late bool _gridView;
+  bool _gridTouched = false;
   String _query = '';
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
@@ -58,6 +64,17 @@ class _ServersPageState extends State<ServersPage> {
     super.initState();
     _gridView = widget.initialGridView;
     _load();
+  }
+
+  @override
+  void didUpdateWidget(ServersPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // "Grid by default" pref arrives as a constructor param —
+    // adopt it unless the user toggled manually this session.
+    if (oldWidget.initialGridView != widget.initialGridView &&
+        !_gridTouched) {
+      setState(() => _gridView = widget.initialGridView);
+    }
   }
 
   @override
@@ -183,9 +200,16 @@ class _ServersPageState extends State<ServersPage> {
 
   // -- Session handling -------------------------------------------------
 
-  Future<void> _startSession(ServerEntry entry, SessionKind kind) {
+  Future<void> _startSession(ServerEntry entry, SessionKind kind,
+      {int? scriptId, String? connectionType}) {
     return startNewSession(context,
-        api: widget.api, token: widget.token, entry: entry, kind: kind);
+        api: widget.api,
+        token: widget.token,
+        entry: entry,
+        kind: kind,
+        scriptId: scriptId,
+        connectionType: connectionType,
+        onSessionExpired: widget.onSessionExpired);
   }
 
   Future<void> _openExisting(
@@ -194,7 +218,8 @@ class _ServersPageState extends State<ServersPage> {
         api: widget.api,
         token: widget.token,
         entry: entry,
-        info: info);
+        info: info,
+        onSessionExpired: widget.onSessionExpired);
   }
 
   Future<void> _closeConnection(ConnectionInfo info) async {
@@ -228,6 +253,17 @@ class _ServersPageState extends State<ServersPage> {
     switch (action) {
       case 'quick-connect':
         await _startSession(entry, entry.quickConnectKind);
+      case 'run-script':
+        await _pickAndRunScript(entry);
+      case 'browser':
+        await _startSession(entry, SessionKind.desktop,
+            connectionType: 'web');
+      case 'move':
+        await _moveServer(entry);
+      case 'tags':
+        await _manageTags(entry);
+      case 'notes':
+        await _openNotes(entry);
       case 'wake-on-lan':
         try {
           await _mutations.wake(entry.id);
@@ -256,6 +292,76 @@ class _ServersPageState extends State<ServersPage> {
       case 'edit':
         await _openEditor(entryId: entry.id);
     }
+  }
+
+  /// Script picker (web ScriptsMenu equivalent): run a library script
+  /// on this server by opening a terminal session with `scriptId`
+  /// (`POST /api/connections/` runs it, output streams to the viewer).
+  Future<void> _pickAndRunScript(ServerEntry entry) async {
+    List<ScriptEntry> scripts = [];
+    try {
+      final raw = await widget.api.fetchScripts(widget.token);
+      for (final m in raw) {
+        try {
+          scripts.add(ScriptEntry.fromJson(m));
+        } catch (_) {}
+      }
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+      return;
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+      return;
+    } catch (_) {
+      if (mounted) _snack('Could not load scripts.');
+      return;
+    }
+    if (!mounted) return;
+    if (scripts.isEmpty) {
+      _snack('No scripts in the library.');
+      return;
+    }
+    final picked = await showModalBottomSheet<ScriptEntry>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Text('Run script',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: scripts.length,
+                itemBuilder: (_, i) {
+                  final script = scripts[i];
+                  return ListTile(
+                    leading: const Icon(Icons.play_arrow),
+                    title: Text(script.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600)),
+                    onTap: () => Navigator.pop(ctx, script),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    await _startSession(entry, SessionKind.terminal,
+        scriptId: picked.id);
   }
 
   Future<void> _confirmDelete(ServerEntry entry) async {
@@ -289,6 +395,62 @@ class _ServersPageState extends State<ServersPage> {
     }
   }
 
+  /// Tag manager (web TagsSubmenu equivalent): toggle assignments,
+  /// create and delete tags.
+  Future<void> _manageTags(ServerEntry entry) async {
+    List<TagItem> all = [];
+    try {
+      final raw = await widget.api.fetchTags(widget.token);
+      for (final m in raw) {
+        try {
+          all.add(TagItem.fromJson(m));
+        } catch (_) {}
+      }
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+      return;
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+      return;
+    } catch (_) {
+      if (mounted) _snack('Could not load tags.');
+      return;
+    }
+    if (!mounted) return;
+    final assigned = entry.tags.map((t) => t.id).toSet();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _TagManagerSheet(
+        api: widget.api,
+        token: widget.token,
+        entry: entry,
+        initial: all,
+        assigned: assigned,
+        onSessionExpired: widget.onSessionExpired,
+      ),
+    );
+    if (mounted) await _load();
+  }
+
+  Future<void> _openNotes(ServerEntry entry) async {
+    final saved = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ServerNotesScreen(
+            api: widget.api,
+            token: widget.token,
+            entry: entry,
+            onSessionExpired: widget.onSessionExpired),
+      ),
+    );
+    if (saved == true) await _load();
+  }
+
   Future<void> _openEditor({int? entryId}) async {
     final saved = await Navigator.push<bool>(
       context,
@@ -298,6 +460,255 @@ class _ServersPageState extends State<ServersPage> {
       ),
     );
     if (saved == true) await _load();
+  }
+
+  /// FAB menu: new server, folder, or SSH-config import.
+  Future<void> _fabMenu() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.dns_outlined),
+              title: const Text('New server',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(ctx, 'server'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: const Text('New folder',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(ctx, 'folder'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.upload_file_outlined),
+              title: const Text('Import SSH config',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () => Navigator.pop(ctx, 'import'),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'server') {
+      await _openEditor();
+    } else if (choice == 'folder') {
+      await _createFolder();
+    } else if (choice == 'import') {
+      final done = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => SshImportScreen(
+              api: widget.api,
+              token: widget.token,
+              onSessionExpired: widget.onSessionExpired),
+        ),
+      );
+      if (done == true) await _load();
+    }
+  }
+
+  Future<String?> _askFolderName(
+      {required String title, String? initial}) async {
+    final controller = TextEditingController(text: initial ?? '');
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 50,
+            decoration: const InputDecoration(
+              labelText: 'Folder name',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ).then((v) => v == null || v.isEmpty ? null : v);
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _createFolder({int? parentId}) async {
+    final name =
+        await _askFolderName(title: 'New folder');
+    if (name == null || !mounted) return;
+    try {
+      final payload = <String, dynamic>{'name': name};
+      final pid = parentId;
+      if (pid != null) payload['parentId'] = pid;
+      await widget.api.createFolder(widget.token, payload);
+      if (mounted) _snack('Folder created.');
+      await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Could not create folder.');
+    }
+  }
+
+  Future<void> _renameFolder(FolderNode folder) async {
+    final folderId = int.tryParse(folder.id);
+    if (folderId == null) return;
+    final name = await _askFolderName(
+        title: 'Rename folder', initial: folder.name);
+    if (name == null || name == folder.name || !mounted) return;
+    try {
+      await widget.api
+          .renameFolder(widget.token, folderId, {'name': name});
+      if (mounted) _snack('Folder renamed.');
+      await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Could not rename folder.');
+    }
+  }
+
+  Future<void> _deleteFolder(FolderNode folder) async {
+    final folderId = int.tryParse(folder.id);
+    if (folderId == null) return;
+    final childCount = flattenNodes(folder.children).length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete folder?'),
+        content: Text(childCount == 0
+            ? 'Delete "${folder.name}"?'
+            : 'Delete "${folder.name}" and move $childCount server${childCount == 1 ? '' : 's'} to the top level?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await widget.api.deleteFolder(widget.token, folderId);
+      if (mounted) _snack('Folder deleted.');
+      await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Could not delete folder.');
+    }
+  }
+
+  void _openFolderActions(FolderNode folder) {
+    if (folder.isOrganization) return;
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Text(folder.name,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.drive_file_move_outlined),
+              title: const Text('New subfolder',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(ctx);
+                final parentId = int.tryParse(folder.id);
+                if (parentId != null) {
+                  _createFolder(parentId: parentId);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _renameFolder(folder);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.error),
+              title: Text('Delete',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _deleteFolder(folder);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Move a server to another folder (or top level) via `folderId`.
+  Future<void> _moveServer(ServerEntry entry) async {
+    final nodes = _nodes;
+    if (nodes == null || !mounted) return;
+    final pick = await showFolderPicker(context, nodes);
+    if (pick == null || !mounted) return;
+    try {
+      await _mutations.update(entry.id, {'folderId': pick.folderId});
+      if (mounted) {
+        _snack(pick.folderId == null
+            ? 'Moved to top level.'
+            : 'Server moved.');
+      }
+      await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+    } on NextermApiException catch (e) {
+      if (mounted) _snack(e.message);
+    } catch (_) {
+      if (mounted) _snack('Could not move server.');
+    }
   }
 
   // -- Filtering --------------------------------------------------------
@@ -349,8 +760,10 @@ class _ServersPageState extends State<ServersPage> {
                           ? Icons.view_list_outlined
                           : Icons.grid_view_outlined),
                       tooltip: _gridView ? 'List view' : 'Grid view',
-                      onPressed: () =>
-                          setState(() => _gridView = !_gridView),
+                      onPressed: () => setState(() {
+                        _gridView = !_gridView;
+                        _gridTouched = true;
+                      }),
                     ),
                   ],
                 ),
@@ -363,8 +776,8 @@ class _ServersPageState extends State<ServersPage> {
             bottom: 16,
             child: FloatingActionButton(
               heroTag: 'add-server',
-              tooltip: 'New server',
-              onPressed: () => _openEditor(),
+              tooltip: 'New server or folder',
+              onPressed: _fabMenu,
               child: const Icon(Icons.add),
             ),
           ),
@@ -409,6 +822,7 @@ class _ServersPageState extends State<ServersPage> {
                 openCount: _openCount,
                 onTap: (s) => _openSessionsSheet(context, s),
                 onMore: (s) => _openActionsSheet(context, s),
+                controller: _scrollController,
               )
             : ListView.builder(
                 controller: _scrollController,
@@ -468,6 +882,7 @@ class _ServersPageState extends State<ServersPage> {
                 }),
                 onTap: (s) => _openSessionsSheet(context, s),
                 onMore: (s) => _openActionsSheet(context, s),
+                onFolderMore: () => _openFolderActions(node),
               );
           }
         },
@@ -537,7 +952,8 @@ class _FolderSection extends StatelessWidget {
       required this.openCount,
       required this.onToggle,
       required this.onTap,
-      required this.onMore});
+      required this.onMore,
+      required this.onFolderMore});
 
   final FolderNode folder;
   final bool expanded;
@@ -546,6 +962,7 @@ class _FolderSection extends StatelessWidget {
   final VoidCallback onToggle;
   final ValueChanged<ServerEntry> onTap;
   final ValueChanged<ServerEntry> onMore;
+  final VoidCallback onFolderMore;
 
   @override
   Widget build(BuildContext context) {
@@ -557,6 +974,8 @@ class _FolderSection extends StatelessWidget {
         InkWell(
           borderRadius: BorderRadius.circular(12),
           onTap: onToggle,
+          onLongPress:
+              folder.isOrganization ? null : onFolderMore,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
@@ -717,20 +1136,31 @@ class _ServerGrid extends StatelessWidget {
       {required this.servers,
       required this.openCount,
       required this.onTap,
-      required this.onMore});
+      required this.onMore,
+      this.controller});
 
   final List<ServerEntry> servers;
   final int Function(ServerEntry) openCount;
   final ValueChanged<ServerEntry> onTap;
   final ValueChanged<ServerEntry> onMore;
 
+  /// When set, the grid scrolls itself (search results); otherwise it
+  /// sizes to content for embedding in the folder list.
+  final ScrollController? controller;
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final controller = this.controller;
     return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 8),
+      controller: controller,
+      shrinkWrap: controller == null,
+      physics: controller == null
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
+      padding: controller == null
+          ? const EdgeInsets.only(bottom: 8)
+          : const EdgeInsets.fromLTRB(16, 0, 16, 96),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         mainAxisSpacing: 8,
@@ -837,4 +1267,364 @@ IconData protocolIcon(String? protocol) {
     default:
       return Icons.terminal;
   }
+}
+
+/// Tag manager bottom sheet: toggle assignments for one server,
+/// create new tags, delete tags.
+class _TagManagerSheet extends StatefulWidget {
+  const _TagManagerSheet(
+      {required this.api,
+      required this.token,
+      required this.entry,
+      required this.initial,
+      required this.assigned,
+      required this.onSessionExpired});
+
+  final NextermApi api;
+  final String token;
+  final ServerEntry entry;
+  final List<TagItem> initial;
+  final Set<int> assigned;
+  final VoidCallback onSessionExpired;
+
+  @override
+  State<_TagManagerSheet> createState() => _TagManagerSheetState();
+}
+
+class _TagManagerSheetState extends State<_TagManagerSheet> {
+  late List<TagItem> _tags;
+  late Set<int> _assigned;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tags = List.of(widget.initial);
+    _assigned = Set.of(widget.assigned);
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _toggle(TagItem tag, bool on) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      if (on) {
+        await widget.api
+            .assignTag(widget.token, tag.id, widget.entry.id);
+        _assigned.add(tag.id);
+      } else {
+        await widget.api
+            .unassignTag(widget.token, tag.id, widget.entry.id);
+        _assigned.remove(tag.id);
+      }
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+      return;
+    } on NextermApiException catch (e) {
+      _snack(e.message);
+    } catch (_) {
+      _snack('Could not update tag.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _create() async {
+    final name = TextEditingController();
+    String color = tagColorPresets.first;
+    try {
+      final created = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialog) => AlertDialog(
+            title: const Text('New tag'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: name,
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final c in tagColorPresets)
+                      GestureDetector(
+                        onTap: () =>
+                            setDialog(() => color = c),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _parseTagColor(c),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: color == c
+                                  ? Theme.of(ctx)
+                                      .colorScheme
+                                      .onSurface
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () =>
+                    Navigator.pop(ctx, true),
+                child: const Text('Create'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (created != true ||
+          name.text.trim().isEmpty ||
+          !mounted) {
+        return;
+      }
+      setState(() => _busy = true);
+      try {
+        final id = await widget.api.createTag(widget.token,
+            {'name': name.text.trim(), 'color': color});
+        if (!mounted) return;
+        setState(() {
+          _tags.add(
+              TagItem(id: id, name: name.text.trim(), color: color));
+          _busy = false;
+        });
+      } on SessionExpiredException {
+        widget.onSessionExpired();
+      } on NextermApiException catch (e) {
+        if (mounted) setState(() => _busy = false);
+        _snack(e.message);
+      } catch (_) {
+        if (mounted) setState(() => _busy = false);
+        _snack('Could not create tag.');
+      }
+    } finally {
+      name.dispose();
+    }
+  }
+
+  Future<void> _rename(TagItem tag) async {
+    final name = TextEditingController(text: tag.name);
+    try {
+      final renamed = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Rename tag'),
+          content: TextField(
+            controller: name,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Name',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (v) => Navigator.pop(ctx, v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, name.text.trim()),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      );
+      if (renamed == null ||
+          renamed.isEmpty ||
+          renamed == tag.name ||
+          !mounted) {
+        return;
+      }
+      setState(() => _busy = true);
+      try {
+        await widget.api
+            .updateTag(widget.token, tag.id, {'name': renamed});
+        if (!mounted) return;
+        setState(() {
+          final i = _tags.indexWhere((t) => t.id == tag.id);
+          if (i >= 0) {
+            _tags[i] =
+                TagItem(id: tag.id, name: renamed, color: tag.color);
+          }
+          _busy = false;
+        });
+      } on SessionExpiredException {
+        widget.onSessionExpired();
+      } on NextermApiException catch (e) {
+        if (mounted) setState(() => _busy = false);
+        _snack(e.message);
+      } catch (_) {
+        if (mounted) setState(() => _busy = false);
+        _snack('Could not rename tag.');
+      }
+    } finally {
+      name.dispose();
+    }
+  }
+
+  Future<void> _delete(TagItem tag) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete tag?'),
+        content: Text(
+            '"${tag.name}" is removed everywhere. Continue?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.api.deleteTag(widget.token, tag.id);
+      if (!mounted) return;
+      setState(() {
+        _tags.removeWhere((t) => t.id == tag.id);
+        _assigned.remove(tag.id);
+        _busy = false;
+      });
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+    } on NextermApiException catch (e) {
+      if (!mounted) setState(() => _busy = false);
+      _snack(e.message);
+    } catch (_) {
+      if (!mounted) setState(() => _busy = false);
+      _snack('Could not delete tag.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text('Tags · ${widget.entry.name}',
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700)),
+                ),
+                TextButton.icon(
+                  onPressed: _busy ? null : _create,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New'),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: _tags.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text('No tags yet.',
+                        textAlign: TextAlign.center),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _tags.length,
+                    itemBuilder: (_, i) {
+                      final tag = _tags[i];
+                      final on = _assigned.contains(tag.id);
+                      return ListTile(
+                        leading: Container(
+                          width: 16,
+                          height: 16,
+                          decoration: BoxDecoration(
+                            color: tag.resolveColor(
+                                Theme.of(context)
+                                    .colorScheme),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        title: Text(tag.name,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600)),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Checkbox(
+                              value: on,
+                              onChanged: _busy
+                                  ? null
+                                  : (v) => _toggle(
+                                      tag, v ?? false),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined,
+                                  size: 20),
+                              tooltip: 'Rename tag',
+                              onPressed: _busy
+                                  ? null
+                                  : () => _rename(tag),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                  Icons.delete_outline,
+                                  size: 20),
+                              tooltip: 'Delete tag',
+                              onPressed: _busy
+                                  ? null
+                                  : () => _delete(tag),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+Color _parseTagColor(String hex) {
+  var h = hex.trim();
+  if (h.startsWith('#')) h = h.substring(1);
+  if (h.length == 6) h = 'FF$h';
+  return Color(int.tryParse(h, radix: 16) ?? 0xFF3F51B5);
 }

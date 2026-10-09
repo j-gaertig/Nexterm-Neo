@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// App-local preferences (device-only, no server involved).
 class AppSettings extends ChangeNotifier {
   static const _kThemeMode = 'nexterm_v2.theme_mode';
+  static const _kAccent = 'nexterm_v2.accent_seed';
+  static const _kTermCursor = 'nexterm_v2.term_cursor';
   static const _kTermFont = 'nexterm_v2.term_font_size';
   static const _kPwHint = 'nexterm_v2.term_password_hint';
   static const _kShowHidden = 'nexterm_v2.sftp_show_hidden';
@@ -13,6 +15,10 @@ class AppSettings extends ChangeNotifier {
   static const _kMonInterval = 'nexterm_v2.monitoring_interval';
 
   ThemeMode themeMode = ThemeMode.system;
+  int accentSeed = 0xFF3F51B5; // Indigo.
+
+  /// Terminal cursor: block, underline or bar.
+  String terminalCursor = 'block';
   double terminalFontSize = 14;
   bool terminalPasswordHint = true;
   bool sftpShowHidden = false;
@@ -20,6 +26,16 @@ class AppSettings extends ChangeNotifier {
   bool serversGridDefault = false;
   bool monitoringAutoRefresh = true;
   int monitoringIntervalSec = 30;
+
+  static const List<int> accentChoices = [
+    0xFF3F51B5, // Indigo
+    0xFF1565C0, // Blue
+    0xFF00897B, // Teal
+    0xFF2E7D32, // Green
+    0xFFEF6C00, // Orange
+    0xFFC62828, // Red
+    0xFF6A1B9A, // Purple
+  ];
 
   static Future<AppSettings> load() async {
     final s = AppSettings();
@@ -30,6 +46,13 @@ class AppSettings extends ChangeNotifier {
         (m) => m.name == mode,
         orElse: () => ThemeMode.system,
       );
+      s.accentSeed =
+          prefs.getInt(_kAccent) ?? 0xFF3F51B5;
+      final cursor = prefs.getString(_kTermCursor);
+      s.terminalCursor = const ['block', 'underline', 'bar']
+              .contains(cursor)
+          ? cursor!
+          : 'block';
       s.terminalFontSize =
           (prefs.getDouble(_kTermFont) ?? 14).clamp(10.0, 24.0);
       s.terminalPasswordHint = prefs.getBool(_kPwHint) ?? true;
@@ -54,6 +77,23 @@ class AppSettings extends ChangeNotifier {
   Future<void> setThemeMode(ThemeMode mode) async {
     themeMode = mode;
     await _save((p) => p.setString(_kThemeMode, mode.name));
+  }
+
+  Future<void> setAccentSeed(int seed) async {
+    accentSeed = seed;
+    await _save((p) => p.setInt(_kAccent, seed));
+  }
+
+  static const List<String> terminalCursors = [
+    'block',
+    'underline',
+    'bar',
+  ];
+
+  Future<void> setTerminalCursor(String cursor) async {
+    if (!terminalCursors.contains(cursor)) return;
+    terminalCursor = cursor;
+    await _save((p) => p.setString(_kTermCursor, cursor));
   }
 
   Future<void> setTerminalFontSize(double size) async {

@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:guacamole_common_dart/guacamole_common_dart.dart';
 
 import '../../api/nexterm_api.dart';
@@ -190,6 +193,9 @@ class _DesktopScreenState extends State<DesktopScreen> {
       _showStatus('Remote error: ${status.message}',
           showReconnect: true);
     };
+    // Clipboard sync (web GuacamoleRenderer equivalent): remote copies
+    // land on the device clipboard; the tools sheet pastes back.
+    client.onclipboard = _onRemoteClipboard;
 
     try {
       client.connect('');
@@ -199,6 +205,91 @@ class _DesktopScreenState extends State<DesktopScreen> {
         _error = 'Could not connect: $e';
         _connecting = false;
       });
+    }
+  }
+
+  /// Remote → device clipboard (text only, 256 KB cap).
+  void _onRemoteClipboard(GuacInputStream stream, String mimetype) {
+    final client = _client;
+    if (client == null || !mimetype.startsWith('text/')) {
+      client?.sendAck(
+          stream.index, 'Unsupported', GuacStatus.unsupported);
+      return;
+    }
+    final buffer = StringBuffer();
+    stream.onblob = (data) {
+      if (buffer.length < _maxClipboardChars) buffer.write(data);
+      client.sendAck(stream.index, 'OK', GuacStatus.success);
+    };
+    stream.onend = () {
+      client.sendAck(stream.index, 'OK', GuacStatus.success);
+      if (buffer.isEmpty || !mounted) return;
+      try {
+        final text = utf8.decode(base64.decode(buffer.toString()));
+        if (text.isEmpty) return;
+        Clipboard.setData(ClipboardData(text: text));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Remote clipboard copied.'),
+                duration: Duration(seconds: 2)),
+          );
+        }
+      } catch (_) {}
+    };
+  }
+
+  static const _maxClipboardChars = 350000; // ~256 KB base64
+
+  /// Device → remote clipboard (tools sheet action).
+  Future<void> _pasteClipboardToRemote() async {
+    final client = _client;
+    if (client == null || !_connected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not connected.')),
+        );
+      }
+      return;
+    }
+    String? text;
+    try {
+      final data =
+          await Clipboard.getData(Clipboard.kTextPlain);
+      text = data?.text;
+    } catch (_) {
+      text = null;
+    }
+    if ((text ?? '').isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Clipboard is empty.')),
+        );
+      }
+      return;
+    }
+    try {
+      final stream = client.createClipboardStream('text/plain');
+      final encoded = base64.encode(utf8.encode(text!));
+      const chunk = 2048;
+      for (var i = 0; i < encoded.length; i += chunk) {
+        client.sendBlob(stream.index,
+            encoded.substring(i, min(i + chunk, encoded.length)));
+      }
+      client.endStream(stream.index);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Pasted to remote.'),
+              duration: Duration(seconds: 2)),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Paste failed.')),
+        );
+      }
     }
   }
 
@@ -566,6 +657,16 @@ class _DesktopScreenState extends State<DesktopScreen> {
                       ),
                       const SizedBox(width: 8),
                       _sheetAction(
+                        icon: Icons.content_paste_outlined,
+                        label: 'Paste',
+                        cs: cs,
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _pasteClipboardToRemote();
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _sheetAction(
                         icon: Icons.keyboard,
                         label: 'Ctrl+Alt+Del',
                         cs: cs,
@@ -843,6 +944,10 @@ class _DesktopScreenState extends State<DesktopScreen> {
               onChanged: (_) => _onKeyboardText(),
               onSubmitted: (_) {
                 _tapKey(_ksEnter);
+                // Reset the baseline first: clearing the controller fires
+                // onChanged(''), which would otherwise emit spurious
+                // backspaces for the already-sent text.
+                _prevKeyboardText = '';
                 _keyboardController.value = TextEditingValue.empty;
                 _keyboardFocus.requestFocus();
               },

@@ -28,14 +28,21 @@ void _pushViewer(
   required ServerEntry entry,
   required String sessionId,
   required SessionKind kind,
+  VoidCallback? onSessionExpired,
 }) {
   final session = RemoteSession(
       sessionId: sessionId, entry: entry, kind: kind);
   final page = switch (kind) {
     SessionKind.terminal => TerminalScreen(
-        api: api, sessionToken: token, session: session),
+        api: api,
+        sessionToken: token,
+        session: session,
+        onSessionExpired: onSessionExpired),
     SessionKind.files => FilesScreen(
-        api: api, sessionToken: token, session: session),
+        api: api,
+        sessionToken: token,
+        session: session,
+        onSessionExpired: onSessionExpired),
     SessionKind.desktop => DesktopScreen(
         api: api, sessionToken: token, session: session),
   };
@@ -52,6 +59,53 @@ void _fail(BuildContext context, Object e) {
   );
 }
 
+/// Audit-reason prompt for organizations with `requireConnectionReason`.
+/// Returns the reason, or null when dismissed.
+Future<String?> _askConnectionReason(BuildContext context) {
+  final controller = TextEditingController();
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Connection reason'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+              'This organization requires a reason for audit logging.'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Reason',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (v) =>
+                Navigator.pop(ctx, v.trim().isEmpty ? null : v.trim()),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final reason = controller.text.trim();
+            Navigator.pop(ctx, reason.isEmpty ? null : reason);
+          },
+          child: const Text('Connect'),
+        ),
+      ],
+    ),
+  ).then((reason) {
+    controller.dispose();
+    return reason;
+  });
+}
+
 /// Open an existing connection in its viewer (resumes hibernated ones).
 Future<void> openConnectionViewer(
   BuildContext context, {
@@ -59,6 +113,7 @@ Future<void> openConnectionViewer(
   required String token,
   required ServerEntry entry,
   required ConnectionInfo info,
+  VoidCallback? onSessionExpired,
 }) async {
   if (info.hibernated) {
     try {
@@ -75,7 +130,8 @@ Future<void> openConnectionViewer(
       token: token,
       entry: entry,
       sessionId: info.sessionId,
-      kind: kindForConnection(info));
+      kind: kindForConnection(info),
+      onSessionExpired: onSessionExpired);
 }
 
 /// Create a new session with progress UI, then open its viewer.
@@ -85,6 +141,10 @@ Future<void> startNewSession(
   required String token,
   required ServerEntry entry,
   required SessionKind kind,
+  int? scriptId,
+  String? connectionType,
+  VoidCallback? onSessionExpired,
+  String? connectionReason,
 }) async {
   // The dialog can be dismissed via Android back despite
   // barrierDismissible:false — track it so we never pop the page below.
@@ -104,8 +164,33 @@ Future<void> startNewSession(
 
   late final RemoteSession session;
   try {
-    session = await SessionOpener(api: api, token: token)
-        .open(entry, kind);
+    session = await SessionOpener(api: api, token: token).open(
+        entry, kind,
+        scriptId: scriptId,
+        connectionType: connectionType,
+        connectionReason: connectionReason);
+  } on NextermApiException catch (e) {
+    // Organizations can require an audit reason
+    // (`requireConnectionReason`): ask and retry once.
+    if (e.message != 'Connection reason required' ||
+        !context.mounted) {
+      closeDialog();
+      if (context.mounted) _fail(context, e);
+      return;
+    }
+    closeDialog();
+    final reason = await _askConnectionReason(context);
+    if (reason == null || !context.mounted) return;
+    await startNewSession(context,
+        api: api,
+        token: token,
+        entry: entry,
+        kind: kind,
+        scriptId: scriptId,
+        connectionType: connectionType,
+        onSessionExpired: onSessionExpired,
+        connectionReason: reason);
+    return;
   } catch (e) {
     if (!context.mounted) return;
     closeDialog();
@@ -119,5 +204,6 @@ Future<void> startNewSession(
       token: token,
       entry: entry,
       sessionId: session.sessionId,
-      kind: session.kind);
+      kind: session.kind,
+      onSessionExpired: onSessionExpired);
 }

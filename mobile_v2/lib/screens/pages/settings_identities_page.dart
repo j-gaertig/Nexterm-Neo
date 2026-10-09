@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/nexterm_api.dart';
 import '../../servers/identity.dart';
+import '../../servers/org_models.dart';
 import '../../settings/settings_widgets.dart';
 
 /// Server identities (`GET /api/identities/list` + PUT/PATCH/DELETE).
@@ -287,6 +288,8 @@ class _IdentityDialogState extends State<_IdentityDialog> {
   String _type = 'password';
   bool _saving = false;
   String? _error;
+  List<OrgRef> _orgs = [];
+  int? _organizationId;
 
   /// Set when editing an identity whose server-side type is unknown to
   /// this app version — saving is blocked so we never overwrite the
@@ -311,6 +314,11 @@ class _IdentityDialogState extends State<_IdentityDialog> {
         _unsupportedType = true;
       }
     }
+    loadOrgRefs(
+      () => widget.api.fetchOrganizations(widget.token),
+    ).then((orgs) {
+      if (mounted) setState(() => _orgs = orgs);
+    });
   }
 
   @override
@@ -355,7 +363,13 @@ class _IdentityDialogState extends State<_IdentityDialog> {
         if (_passphrase.text.isNotEmpty)
           'passphrase': _passphrase.text,
       };
+      // Organization scope is set at creation (moving uses the
+      // dedicated move endpoint, not the edit dialog).
       final existing = widget.existing;
+      final orgId = _organizationId;
+      if (existing == null && orgId != null) {
+        payload['organizationId'] = orgId;
+      }
       if (existing == null) {
         await widget.api.createIdentity(widget.token, payload);
       } else {
@@ -424,6 +438,27 @@ class _IdentityDialogState extends State<_IdentityDialog> {
                 if (v != null) setState(() => _type = v);
               },
             ),
+            if (widget.existing == null && _orgs.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
+                initialValue: _organizationId,
+                decoration: const InputDecoration(
+                    labelText: 'Organization',
+                    border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Personal')),
+                  for (final org in _orgs)
+                    DropdownMenuItem<int?>(
+                      value: org.id,
+                      child: Text(org.name),
+                    ),
+                ],
+                onChanged: (v) =>
+                    setState(() => _organizationId = v),
+              ),
+            ],
             if (_needsPassword) ...[
               const SizedBox(height: 12),
               TextField(

@@ -56,7 +56,11 @@ class SessionOpener implements ConnectionListProvider {
   }
 
   Future<RemoteSession> open(ServerEntry entry, SessionKind kind,
-      {int? identityId, String? startPath}) async {
+      {int? identityId,
+      String? startPath,
+      int? scriptId,
+      String? connectionType,
+      String? connectionReason}) async {
     final resolved =
         identityId ?? await resolveIdentityId(entry);
     final body = <String, dynamic>{
@@ -65,9 +69,18 @@ class SessionOpener implements ConnectionListProvider {
     };
     body['browserId'] = await ClientIds.deviceId();
     if (resolved != null) body['identityId'] = resolved;
-    if (kind == SessionKind.files) body['type'] = 'sftp';
+    // Session type: explicit override wins, files default to sftp
+    // ('web' opens the server-side proxied browser via guac).
+    final ct = connectionType ?? (kind == SessionKind.files ? 'sftp' : null);
+    if (ct != null) body['type'] = ct;
     final sp = startPath;
     if (sp != null && sp.isNotEmpty) body['startPath'] = sp;
+    final sid = scriptId;
+    if (sid != null) body['scriptId'] = sid;
+    final reason = connectionReason;
+    if (reason != null && reason.isNotEmpty) {
+      body['connectionReason'] = reason;
+    }
     final result = await api.createConnection(token, body);
     final sessionId = result['sessionId'] as String?;
     if (sessionId == null || sessionId.isEmpty) {
@@ -82,9 +95,9 @@ class SessionOpener implements ConnectionListProvider {
 
   @override
   Future<List<ConnectionInfo>> activeSessions() async {
-    final raw = await api.listConnections(token,
-        tabId: ClientIds.appInstanceId(),
-        browserId: await ClientIds.deviceId());
+    // Unfiltered: badges + sheets show sessions from all devices/tabs
+    // (web SessionContext parity), not just this app instance.
+    final raw = await api.listConnections(token);
     return raw
         .map((m) {
           try {

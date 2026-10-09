@@ -5,22 +5,27 @@ class Identity {
       {required this.id,
       required this.name,
       required this.type,
-      this.username});
+      this.username,
+      this.organizationId});
 
   final int id;
   final String name;
   final String type;
   final String? username;
+  final int? organizationId;
 
   factory Identity.fromJson(Map<String, dynamic> json) {
     final rawId = json['id'];
     final id = rawId is num ? rawId.toInt() : int.tryParse('$rawId');
     if (id == null) throw FormatException('Identity without id: $json');
+    final rawOrg = json['organizationId'];
     return Identity(
       id: id,
       name: json['name'] as String? ?? 'Identity',
       type: json['type'] as String? ?? 'password',
       username: json['username'] as String?,
+      organizationId:
+          rawOrg == null ? null : int.tryParse('$rawOrg'),
     );
   }
 }

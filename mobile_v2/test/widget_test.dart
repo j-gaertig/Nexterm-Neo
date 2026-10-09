@@ -16,6 +16,8 @@ import 'package:nexterm_v2/screens/pages/settings_identities_page.dart';
 import 'package:nexterm_v2/screens/pages/settings_monitoring_page.dart';
 import 'package:nexterm_v2/settings/app_settings.dart';
 import 'package:nexterm_v2/screens/pages/server_detail_sheet.dart';
+import 'package:nexterm_v2/screens/pages/settings_apikeys_page.dart';
+import 'package:nexterm_v2/servers/ssh_import.dart';
 import 'package:nexterm_v2/screens/pages/server_editor_screen.dart';
 import 'package:nexterm_v2/screens/pages/servers_page.dart';
 import 'package:nexterm_v2/servers/identity.dart';
@@ -856,6 +858,11 @@ void main() {
       'Identities',
       'Edit name',
       'Change password',
+      'Profile picture',
+      'Two-factor',
+      'API keys',
+      'Link device',
+      'Audit log',
       'Grid by default',
     ]) {
       expect(find.text(label), findsWidgets);
@@ -917,6 +924,77 @@ void main() {
     expect(find.text('Collectors'), findsOneWidget);
     expect(find.text('Intervals & limits'), findsOneWidget);
     expect(find.text('Save'), findsOneWidget);
+  });
+
+  test('parseSshConfig extracts hosts', () {
+    const config = '''
+# comment
+Host example
+  HostName 192.168.1.10
+  User root
+  Port 2222
+
+Host *
+  HostName ignored.example.com
+
+Host nas
+  HostName 192.168.1.30
+''';
+    final hosts = parseSshConfig(config);
+    expect(hosts.length, 2);
+    expect(hosts[0]['name'], 'example');
+    expect(hosts[0]['ip'], '192.168.1.10');
+    expect(hosts[0]['port'], 2222);
+    expect(hosts[1]['name'], 'nas');
+    expect(hosts[1]['port'], 22);
+  });
+
+  test('buildEntryPayload carries folder and extras', () {
+    final payload = buildEntryPayload(
+      name: 'DB',
+      protocol: 'ssh',
+      ip: '10.0.0.7',
+      folderId: 3,
+      includeFolder: true,
+      configExtras: {'macAddress': 'AA:BB:CC:DD:EE:FF'},
+    );
+    expect(payload['folderId'], 3);
+    expect((payload['config'] as Map)['macAddress'],
+        'AA:BB:CC:DD:EE:FF');
+    final plain = buildEntryPayload(
+        name: 'X', protocol: 'rdp', ip: 'h');
+    expect((plain as Map).containsKey('folderId'), isFalse);
+  });
+
+  testWidgets('API keys page shows empty state', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsApiKeysPage(
+          api: NextermApi(baseUrl: 'https://host/api'),
+          token: 't',
+          loader: () async => const [],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('API keys'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
+  });
+
+  testWidgets('API keys page lists keys', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SettingsApiKeysPage(
+          api: NextermApi(baseUrl: 'https://host/api'),
+          token: 't',
+          loader: () async => const [
+            {'id': 7, 'name': 'CI token'},
+          ],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('CI token'), findsOneWidget);
   });
 
   test('AppSettings persists theme mode', () async {

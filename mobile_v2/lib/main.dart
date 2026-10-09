@@ -70,30 +70,36 @@ class _NextermAppState extends State<NextermApp> {
 
   @override
   Widget build(BuildContext context) {
-    final light = ColorScheme.fromSeed(seedColor: Colors.indigo);
-    final dark = ColorScheme.fromSeed(
-        seedColor: Colors.indigo, brightness: Brightness.dark);
     final settings = _settings;
     return AnimatedBuilder(
       animation: settings ?? ChangeNotifier(),
-      builder: (context, _) => MaterialApp(
-        title: 'Nexterm V2',
-        theme: ThemeData(colorScheme: light, useMaterial3: true),
-        darkTheme: ThemeData(colorScheme: dark, useMaterial3: true),
-        themeMode: settings?.themeMode ?? ThemeMode.system,
-        home: _loading || settings == null
-            ? const Scaffold(
-                body: Center(child: CircularProgressIndicator()))
-            : _session == null
-                ? LoginScreen(
-                    onLoggedIn: (session) =>
-                        setState(() => _session = session))
-                : HomeShell(
-                    session: _session!,
-                    onLogout: _logout,
-                    settings: settings,
-                  ),
-      ),
+      builder: (context, _) {
+        final seed =
+            Color(settings?.accentSeed ?? 0xFF3F51B5);
+        final light = ColorScheme.fromSeed(seedColor: seed);
+        final dark = ColorScheme.fromSeed(
+            seedColor: seed, brightness: Brightness.dark);
+        return MaterialApp(
+          title: 'Nexterm V2',
+          theme: ThemeData(colorScheme: light, useMaterial3: true),
+          darkTheme:
+              ThemeData(colorScheme: dark, useMaterial3: true),
+          themeMode: settings?.themeMode ?? ThemeMode.system,
+          home: _loading || settings == null
+              ? const Scaffold(
+                  body:
+                      Center(child: CircularProgressIndicator()))
+              : _session == null
+                  ? LoginScreen(
+                      onLoggedIn: (session) => setState(
+                          () => _session = session))
+                  : HomeShell(
+                      session: _session!,
+                      onLogout: _logout,
+                      settings: settings,
+                    ),
+        );
+      },
     );
   }
 }

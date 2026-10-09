@@ -138,34 +138,13 @@ class _MorePageState extends State<MorePage> {
     }
   }
 
-  Future<void> _createSnippet() async {
-    final name = TextEditingController();
-    final content = TextEditingController();
-    try {
-      final created = await showDialog<bool>(
+  Future<void> _deleteScript(ScriptEntry script) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('New snippet'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: name,
-              decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: content,
-              decoration: const InputDecoration(
-                  labelText: 'Command',
-                  border: OutlineInputBorder()),
-              maxLines: 5,
-              keyboardType: TextInputType.multiline,
-            ),
-          ],
-        ),
+        title: const Text('Delete script?'),
+        content:
+            Text('"${script.name}" will be deleted. Continue?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -173,43 +152,318 @@ class _MorePageState extends State<MorePage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Create'),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
-    if (created != true || !mounted) return;
-    if (name.text.trim().isEmpty || content.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Name and command are required.')),
-      );
-      return;
-    }
+    if (confirmed != true || !mounted) return;
     try {
-      await widget.api.createSnippet(widget.token, {
-        'name': name.text.trim(),
-        'command': content.text.trim(),
-      });
+      await widget.api.deleteScript(widget.token, script.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Snippet created.')),
+          const SnackBar(content: Text('Script deleted.')),
         );
       }
       await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(e is NextermApiException
                   ? e.message
-                  : 'Create failed.')),
+                  : 'Delete failed.')),
         );
       }
     }
+  }
+
+  Future<void> _createScript() async {
+    final saved = await _openScriptEditor();
+    if (saved == true) await _load();
+  }
+
+  Future<void> _editScript(ScriptEntry script) async {
+    ScriptEntry full = script;
+    if (script.content == null && mounted) {
+      try {
+        final detail =
+            await widget.api.fetchScript(widget.token, script.id);
+        full = ScriptEntry.fromJson({...detail, 'id': script.id});
+      } on SessionExpiredException {
+        widget.onSessionExpired?.call();
+        return;
+      } catch (_) {
+        // Edit with list-level fields only.
+      }
+    }
+    if (!mounted) return;
+    final saved = await _openScriptEditor(existing: full);
+    if (saved == true) await _load();
+  }
+
+  /// Script editor (web ScriptDialog equivalent).
+  Future<bool?> _openScriptEditor({ScriptEntry? existing}) async {
+    final name = TextEditingController(text: existing?.name ?? '');
+    final content =
+        TextEditingController(text: existing?.content ?? '');
+    final description =
+        TextEditingController(text: existing?.description ?? '');
+    final osFilter = TextEditingController();
+    String? error;
+    try {
+      return await showDialog<bool>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialog) => AlertDialog(
+            title: Text(existing == null
+                ? 'New script'
+                : 'Edit script'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: content,
+                    decoration: const InputDecoration(
+                        labelText: 'Content',
+                        border: OutlineInputBorder()),
+                    maxLines: 8,
+                    keyboardType: TextInputType.multiline,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: description,
+                    decoration: const InputDecoration(
+                        labelText: 'Description (optional)',
+                        border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: osFilter,
+                    decoration: const InputDecoration(
+                        labelText: 'OS filter (optional, comma separated)',
+                        hintText: 'linux, windows',
+                        border: OutlineInputBorder()),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        style: TextStyle(
+                            color: Theme.of(ctx)
+                                .colorScheme
+                                .error,
+                            fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (name.text.trim().isEmpty ||
+                      content.text.trim().isEmpty) {
+                    setDialog(() => error =
+                        'Name and content are required.');
+                    return;
+                  }
+                  final payload = <String, dynamic>{
+                    'name': name.text.trim(),
+                    'content': content.text,
+                    if (description.text.trim().isNotEmpty)
+                      'description':
+                          description.text.trim(),
+                    if (osFilter.text.trim().isNotEmpty)
+                      'osFilter': osFilter.text
+                          .split(',')
+                          .map((s) => s.trim())
+                          .where((s) => s.isNotEmpty)
+                          .toList(),
+                  };
+                  try {
+                    if (existing == null) {
+                      await widget.api.createScript(
+                          widget.token, payload);
+                    } else {
+                      await widget.api.updateScript(
+                          widget.token,
+                          existing.id,
+                          payload);
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } on SessionExpiredException {
+                    widget.onSessionExpired?.call();
+                  } on NextermApiException catch (e) {
+                    setDialog(() => error = e.message);
+                  } catch (_) {
+                    setDialog(
+                        () => error = 'Save failed.');
+                  }
+                },
+                child: Text(
+                    existing == null ? 'Create' : 'Save'),
+              ),
+            ],
+          ),
+        ),
+      );
     } finally {
       name.dispose();
       content.dispose();
+      description.dispose();
+      osFilter.dispose();
+    }
+  }
+
+  Future<void> _createSnippet() async {
+    final saved = await _openSnippetEditor();
+    if (saved == true) await _load();
+  }
+
+  Future<void> _editSnippet(Snippet snippet) async {
+    final saved = await _openSnippetEditor(existing: snippet);
+    if (saved == true) await _load();
+  }
+
+  /// Snippet editor (web SnippetDialog equivalent): name/command plus
+  /// description and OS filter. Organization snippets keep their scope
+  /// (edit/delete pass `organizationId`).
+  Future<bool?> _openSnippetEditor({Snippet? existing}) async {
+    final name = TextEditingController(text: existing?.name ?? '');
+    final command =
+        TextEditingController(text: existing?.command ?? '');
+    final description =
+        TextEditingController(text: existing?.description ?? '');
+    final osFilter = TextEditingController(
+        text: (existing?.osFilter ?? const []).join(', '));
+    String? error;
+    try {
+      return await showDialog<bool>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setDialog) => AlertDialog(
+            title: Text(existing == null
+                ? 'New snippet'
+                : 'Edit snippet'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: name,
+                    decoration: const InputDecoration(
+                        labelText: 'Name',
+                        border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: command,
+                    decoration: const InputDecoration(
+                        labelText: 'Command',
+                        border: OutlineInputBorder()),
+                    maxLines: 5,
+                    keyboardType: TextInputType.multiline,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: description,
+                    decoration: const InputDecoration(
+                        labelText: 'Description (optional)',
+                        border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: osFilter,
+                    decoration: const InputDecoration(
+                        labelText: 'OS filter (optional, comma separated)',
+                        hintText: 'linux, windows',
+                        border: OutlineInputBorder()),
+                  ),
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        style: TextStyle(
+                            color: Theme.of(ctx)
+                                .colorScheme
+                                .error,
+                            fontSize: 12)),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (name.text.trim().isEmpty ||
+                      command.text.trim().isEmpty) {
+                    setDialog(() => error =
+                        'Name and command are required.');
+                    return;
+                  }
+                  final filter = osFilter.text
+                      .split(',')
+                      .map((s) => s.trim())
+                      .where((s) => s.isNotEmpty)
+                      .toList();
+                  final payload = <String, dynamic>{
+                    'name': name.text.trim(),
+                    'command': command.text.trim(),
+                    if (description.text.trim().isNotEmpty)
+                      'description': description.text.trim(),
+                    if (filter.isNotEmpty) 'osFilter': filter,
+                  };
+                  try {
+                    if (existing == null) {
+                      await widget.api.createSnippet(
+                          widget.token, payload);
+                    } else {
+                      await widget.api.updateSnippet(
+                        widget.token,
+                        existing.id,
+                        payload,
+                        organizationId:
+                            existing.organizationId,
+                      );
+                    }
+                    if (ctx.mounted) Navigator.pop(ctx, true);
+                  } on SessionExpiredException {
+                    widget.onSessionExpired?.call();
+                  } on NextermApiException catch (e) {
+                    setDialog(() => error = e.message);
+                  } catch (_) {
+                    setDialog(
+                        () => error = 'Save failed.');
+                  }
+                },
+                child: Text(
+                    existing == null ? 'Create' : 'Save'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } finally {
+      name.dispose();
+      command.dispose();
+      description.dispose();
+      osFilter.dispose();
     }
   }
 
@@ -259,6 +513,8 @@ class _MorePageState extends State<MorePage> {
                         for (final snippet in _data!.snippets)
                           _SnippetTile(
                             snippet: snippet,
+                            onEdit: () =>
+                                _editSnippet(snippet),
                             onDelete: () =>
                                 _deleteSnippet(snippet),
                           ),
@@ -266,8 +522,8 @@ class _MorePageState extends State<MorePage> {
                       _SectionHeader(
                         title:
                             'Scripts (${_data?.scripts.length ?? 0})',
-                        actionLabel: null,
-                        onAction: () {},
+                        actionLabel: 'New',
+                        onAction: _createScript,
                       ),
                       if ((_data?.scripts ?? const []).isEmpty)
                         const _EmptyNote(
@@ -289,6 +545,44 @@ class _MorePageState extends State<MorePage> {
                                   style: const TextStyle(
                                       fontWeight:
                                           FontWeight.w600)),
+                              subtitle: script.description !=
+                                          null &&
+                                      script.description!
+                                          .isNotEmpty
+                                  ? Text(
+                                      script.description!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow
+                                          .ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12))
+                                  : null,
+                              trailing: PopupMenuButton<String>(
+                                icon: const Icon(
+                                    Icons.more_vert),
+                                tooltip: 'Script actions',
+                                onSelected: (v) {
+                                  if (v == 'edit') {
+                                    _editScript(script);
+                                  } else if (v ==
+                                      'delete') {
+                                    _deleteScript(script);
+                                  }
+                                },
+                                itemBuilder: (_) =>
+                                    const [
+                                  PopupMenuItem(
+                                      value: 'edit',
+                                      child:
+                                          Text('Edit')),
+                                  PopupMenuItem(
+                                      value: 'delete',
+                                      child:
+                                          Text('Delete')),
+                                ],
+                              ),
+                              onTap: () =>
+                                  _editScript(script),
                             ),
                           ),
                     ],
@@ -352,9 +646,13 @@ class _EmptyNote extends StatelessWidget {
 }
 
 class _SnippetTile extends StatelessWidget {
-  const _SnippetTile({required this.snippet, required this.onDelete});
+  const _SnippetTile(
+      {required this.snippet,
+      required this.onEdit,
+      required this.onDelete});
 
   final Snippet snippet;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   @override
@@ -404,12 +702,22 @@ class _SnippetTile extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Align(
               alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onDelete,
-                icon: Icon(Icons.delete,
-                    size: 18, color: cs.error),
-                label: Text('Delete',
-                    style: TextStyle(color: cs.error)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit'),
+                  ),
+                  TextButton.icon(
+                    onPressed: onDelete,
+                    icon: Icon(Icons.delete,
+                        size: 18, color: cs.error),
+                    label: Text('Delete',
+                        style: TextStyle(color: cs.error)),
+                  ),
+                ],
               ),
             ),
           ),

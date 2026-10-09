@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -127,6 +128,59 @@ class NextermApi {
       if (e is NextermApiException) rethrow;
       throw NextermApiException('Not a Nexterm server.');
     }
+  }
+
+  /// `POST /api/auth/login` — username/password (+ optional TOTP
+  /// `code`). Returns the session token.
+  Future<String> login(String username, String password,
+      {int? totpCode}) async {
+    final body = <String, dynamic>{
+      'username': username,
+      'password': password,
+    };
+    final code = totpCode;
+    if (code != null) body['code'] = code;
+    late http.Response response;
+    try {
+      response = await http
+          .post(Uri.parse('$baseUrl/auth/login'),
+              headers: _headers(null), body: json.encode(body))
+          .timeout(timeout);
+    } on TimeoutException {
+      throw NextermApiException('Server is not responding (timeout).');
+    } on SocketException {
+      throw NextermApiException('Server unreachable.');
+    } catch (_) {
+      throw NextermApiException('Connection failed.');
+    }
+    final data = _decode(response);
+    if (data is Map) {
+      final token = data['token'];
+      if (token is String && token.isNotEmpty) return token;
+      final message = data['message'];
+      throw NextermApiException(
+          message is String ? message : 'Login failed.');
+    }
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `POST /api/auth/device/info` — inspect a link code (web
+  /// DeviceLinkDialog equivalent). Authed: linking another device
+  /// requires a logged-in account. Returns client/ip/userAgent info.
+  Future<Map<String, dynamic>> fetchDeviceCodeInfo(
+      String token, String code) async {
+    final data = _decode(await _authed(
+        'POST', '/auth/device/info', token,
+        body: {'code': code}));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `POST /api/auth/device/authorize` — approve a link code.
+  Future<void> authorizeDeviceCode(String token, String code) async {
+    _decode(await _authed('POST', '/auth/device/authorize', token,
+        body: {'code': code}));
   }
 
   /// `POST /api/auth/device/create` — create a device code for login.
@@ -271,8 +325,13 @@ class NextermApi {
   /// Build a WebSocket URL: scheme http→ws/https→wss + path + query.
   static String wsUrl(String apiBaseUrl, String path,
       [Map<String, String>? query]) {
-    var url = apiBaseUrl.replaceFirst('http://', 'ws://').replaceFirst(
-        'https://', 'wss://');
+    var url = apiBaseUrl;
+    // Case-insensitive: normalizeBaseUrl preserves the user's casing,
+    // but the WS channel needs a lowercase ws(s) scheme.
+    url = url.replaceFirst(
+        RegExp('^http://', caseSensitive: false), 'ws://');
+    url = url.replaceFirst(
+        RegExp('^https://', caseSensitive: false), 'wss://');
     if (query == null || query.isEmpty) return '$url$path';
     final qs = query.entries
         .map((e) =>
@@ -391,6 +450,128 @@ class NextermApi {
       {int limit = 5}) async {
     final data = _decode(await _authed(
         'GET', '/entries/recent', token, query: {'limit': '$limit'}));
+    if (data is! List) throw NextermApiException('Invalid server response.');
+    return data
+        .whereType<Map>()
+        .map(Map<String, dynamic>.from)
+        .toList();
+  }
+
+  // -- Folders ---------------------------------------------------------
+
+  /// `PUT /api/folders/` — create (`server/validations/folder.js`).
+  /// Returns the new folder id.
+  Future<int> createFolder(String token, Map<String, dynamic> payload) async {
+    final data =
+        _decode(await _authed('PUT', '/folders/', token, body: payload));
+    if (data is Map) {
+      final rawId = data['id'];
+      final id = rawId is num
+          ? rawId.toInt()
+          : int.tryParse('$rawId');
+      if (id != null) return id;
+    }
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `PATCH /api/folders/:id` — rename / reparent.
+  Future<void> renameFolder(
+      String token, int folderId, Map<String, dynamic> payload) async {
+    _decode(await _authed(
+        'PATCH', '/folders/$folderId', token,
+        body: payload));
+  }
+
+  /// `DELETE /api/folders/:id` — delete.
+  Future<void> deleteFolder(String token, int folderId) async {
+    _decode(await _authed('DELETE', '/folders/$folderId', token));
+  }
+
+  /// `POST /api/entries/import/ssh-config` — import parsed hosts.
+  /// Returns server statistics (`{message, ...}`).
+  Future<Map<String, dynamic>> importSshConfig(
+      String token, Map<String, dynamic> payload) async {
+    final data = _decode(await _authed(
+        'POST', '/entries/import/ssh-config', token,
+        body: payload));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `GET /api/audit/logs` — audit trail (needs `AUDIT_VIEW`).
+  /// Returns `{logs, total, filters}`.
+  Future<Map<String, dynamic>> fetchAuditLogs(String token,
+      {int limit = 50, int offset = 0}) async {
+    final data = _decode(await _authed('GET', '/audit/logs', token,
+        query: {'limit': '$limit', 'offset': '$offset'}));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  // -- Tags ------------------------------------------------------------
+
+  /// `GET /api/tags/list` — all tags (`[{id, name, color}]`).
+  Future<List<Map<String, dynamic>>> fetchTags(
+      String token) async {
+    final data = _decode(await _authed('GET', '/tags/list', token));
+    if (data is! List) throw NextermApiException('Invalid server response.');
+    return data
+        .whereType<Map>()
+        .map(Map<String, dynamic>.from)
+        .toList();
+  }
+
+  /// `PUT /api/tags/` — create. Returns `{message, id}`.
+  Future<int> createTag(
+      String token, Map<String, dynamic> payload) async {
+    final data =
+        _decode(await _authed('PUT', '/tags/', token, body: payload));
+    if (data is Map) {
+      final rawId = data['id'];
+      final id = rawId is num
+          ? rawId.toInt()
+          : int.tryParse('$rawId');
+      if (id != null) return id;
+    }
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `PATCH /api/tags/:id` — rename / recolor.
+  Future<void> updateTag(
+      String token, int tagId, Map<String, dynamic> payload) async {
+    _decode(await _authed(
+        'PATCH', '/tags/$tagId', token,
+        body: payload));
+  }
+
+  /// `DELETE /api/tags/:id` — delete with all assignments.
+  Future<void> deleteTag(String token, int tagId) async {
+    _decode(await _authed('DELETE', '/tags/$tagId', token));
+  }
+
+  /// `POST /api/tags/:tagId/assign/:entryId` — assign.
+  Future<void> assignTag(
+      String token, int tagId, int entryId) async {
+    _decode(await _authed(
+        'POST', '/tags/$tagId/assign/$entryId', token));
+  }
+
+  /// `DELETE /api/tags/:tagId/assign/:entryId` — unassign.
+  Future<void> unassignTag(
+      String token, int tagId, int entryId) async {
+    _decode(await _authed(
+        'DELETE', '/tags/$tagId/assign/$entryId', token));
+  }
+
+  // -- Organizations ---------------------------------------------------
+
+  /// `GET /api/organizations/` — memberships (`[{id, name, ...}]`).
+  Future<List<Map<String, dynamic>>> fetchOrganizations(
+      String token) async {
+    final data =
+        _decode(await _authed('GET', '/organizations/', token));
     if (data is! List) throw NextermApiException('Invalid server response.');
     return data
         .whereType<Map>()
@@ -524,25 +705,6 @@ class NextermApi {
     _decode(await _authed('DELETE', '/connections/$id', token));
   }
 
-  Future<void> duplicateConnection(
-      String token, String id, Map<String, dynamic> body) async {
-    _decode(await _authed('POST', '/connections/$id/duplicate', token,
-        body: body));
-  }
-
-  /// `POST /api/connections/:entryId/exec` — one-shot SSH command.
-  Future<Map<String, dynamic>> execCommand(
-      String token, int entryId, String command,
-      {int? identityId}) async {
-    final data = _decode(await _authed(
-        'POST', '/connections/$entryId/exec', token,
-        query: identityId != null ? {'identityId': '$identityId'} : null,
-        body: {'command': command}));
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
-    throw NextermApiException('Invalid server response.');
-  }
-
   /// `POST /api/connections/:id/paste-password` — type an identity
   /// password into the session stream (`submit` appends Enter).
   Future<void> pasteIdentityPassword(String token, String sessionId,
@@ -609,6 +771,17 @@ class NextermApi {
         await _authed('PUT', '/snippets/', token, body: payload));
   }
 
+  /// `PATCH /api/snippets/:id` — edit (`server/routes/snippet.js`).
+  Future<void> updateSnippet(
+      String token, int snippetId, Map<String, dynamic> payload,
+      {int? organizationId}) async {
+    _decode(await _authed('PATCH', '/snippets/$snippetId', token,
+        query: organizationId != null
+            ? {'organizationId': '$organizationId'}
+            : null,
+        body: payload));
+  }
+
   /// `DELETE /api/snippets/:id`.
   Future<void> deleteSnippet(
       String token, int snippetId, int? organizationId) async {
@@ -630,6 +803,37 @@ class NextermApi {
         .whereType<Map>()
         .map(Map<String, dynamic>.from)
         .toList();
+  }
+
+  /// `POST /api/scripts/` — create (`server/validations/script.js`:
+  /// name/content required).
+  Future<void> createScript(
+      String token, Map<String, dynamic> payload) async {
+    _decode(
+        await _authed('POST', '/scripts/', token, body: payload));
+  }
+
+  /// `PUT /api/scripts/:id` — edit.
+  Future<void> updateScript(
+      String token, int scriptId, Map<String, dynamic> payload) async {
+    _decode(await _authed(
+        'PUT', '/scripts/$scriptId', token,
+        body: payload));
+  }
+
+  /// `DELETE /api/scripts/:id` — delete.
+  Future<void> deleteScript(String token, int scriptId) async {
+    _decode(await _authed('DELETE', '/scripts/$scriptId', token));
+  }
+
+  /// `GET /api/scripts/:id` — full detail incl. content.
+  Future<Map<String, dynamic>> fetchScript(
+      String token, int scriptId) async {
+    final data =
+        _decode(await _authed('GET', '/scripts/$scriptId', token));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
   }
 
   // -- Account & login sessions ----------------------------------------
@@ -656,6 +860,97 @@ class NextermApi {
   /// `DELETE /api/sessions/:id` — revoke a login session.
   Future<void> revokeLoginSession(String token, String id) async {
     _decode(await _authed('DELETE', '/sessions/$id', token));
+  }
+
+  // -- API keys --------------------------------------------------------
+
+  /// `GET /api/accounts/api-keys/` — list (never includes secrets).
+  Future<List<Map<String, dynamic>>> fetchApiKeys(
+      String token) async {
+    final data =
+        _decode(await _authed('GET', '/accounts/api-keys/', token));
+    if (data is! List) throw NextermApiException('Invalid server response.');
+    return data
+        .whereType<Map>()
+        .map(Map<String, dynamic>.from)
+        .toList();
+  }
+
+  /// `POST /api/accounts/api-keys/` — create. Returns the record
+  /// including the one-time plaintext token.
+  Future<Map<String, dynamic>> createApiKey(
+      String token, Map<String, dynamic> payload) async {
+    final data = _decode(await _authed(
+        'POST', '/accounts/api-keys/', token,
+        body: payload));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `DELETE /api/accounts/api-keys/:id` — revoke.
+  Future<void> deleteApiKey(String token, int id) async {
+    _decode(await _authed('DELETE', '/accounts/api-keys/$id', token));
+  }
+
+  // -- TOTP two-factor -------------------------------------------------
+
+  /// `GET /api/accounts/totp/secret` — `{secret, url}` for setup.
+  Future<Map<String, dynamic>> fetchTotpSecret(String token) async {
+    final data =
+        _decode(await _authed('GET', '/accounts/totp/secret', token));
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw NextermApiException('Invalid server response.');
+  }
+
+  /// `POST /api/accounts/totp/enable` — verify `code` and enable.
+  Future<void> enableTotp(String token, int code) async {
+    _decode(await _authed('POST', '/accounts/totp/enable', token,
+        body: {'code': code}));
+  }
+
+  /// `POST /api/accounts/totp/disable` — disable.
+  Future<void> disableTotp(String token) async {
+    _decode(
+        await _authed('POST', '/accounts/totp/disable', token));
+  }
+
+  // -- Avatar ----------------------------------------------------------
+
+  /// `POST /api/accounts/me/avatar` — raw image bytes. The server
+  /// requires a WebP image (cropped/resized client-side on web).
+  Future<String?> uploadAvatar(String token, Uint8List bytes) async {
+    final uri = _uri('/accounts/me/avatar');
+    late http.Response response;
+    try {
+      response = await http
+          .post(uri,
+              headers: {
+                ..._headers(token),
+                'Content-Type': 'application/octet-stream',
+              },
+              body: bytes)
+          .timeout(timeout);
+    } on TimeoutException {
+      throw NextermApiException('Server is not responding (timeout).');
+    } on SocketException {
+      throw NextermApiException('Server unreachable.');
+    } catch (_) {
+      throw NextermApiException('Connection failed.');
+    }
+    if (response.statusCode == 401) throw SessionExpiredException();
+    final data = _decode(response);
+    if (data is Map) {
+      final hash = data['avatarHash'];
+      return hash is String ? hash : null;
+    }
+    return null;
+  }
+
+  /// `DELETE /api/accounts/me/avatar` — remove.
+  Future<void> deleteAvatar(String token) async {
+    _decode(await _authed('DELETE', '/accounts/me/avatar', token));
   }
 
   /// `PATCH /api/accounts/name` — update first/last name

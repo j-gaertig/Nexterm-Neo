@@ -4,6 +4,7 @@
 // and `server/routes/sftpWS.js`); up/download use the REST endpoints
 // (see `server/routes/sftp.js`) with query-token auth.
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -13,19 +14,25 @@ import 'package:nexterm_v2/api/nexterm_api.dart';
 import 'package:nexterm_v2/remote/session_opener.dart';
 import 'package:nexterm_v2/settings/settings_scope.dart';
 
+import 'file_editor_screen.dart';
 import 'sftp_protocol.dart';
 import 'sftp_service.dart';
+import 'terminal_screen.dart';
 
 class FilesScreen extends StatefulWidget {
   const FilesScreen(
       {super.key,
       required this.api,
       required this.sessionToken,
-      required this.session});
+      required this.session,
+      this.onSessionExpired});
 
   final NextermApi api;
   final String sessionToken;
   final RemoteSession session;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
 
   @override
   State<FilesScreen> createState() => _FilesScreenState();
@@ -44,6 +51,8 @@ class _FilesScreenState extends State<FilesScreen> {
   String _lastRequested = '/';
   Completer<void>? _listCompleter;
   bool _tornDown = false;
+  String _query = '';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -68,6 +77,7 @@ class _FilesScreenState extends State<FilesScreen> {
   @override
   void dispose() {
     _tearDown();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -402,6 +412,7 @@ class _FilesScreenState extends State<FilesScreen> {
     setState(() => _transferring = true);
     var uploaded = 0;
     var failed = 0;
+    var sessionExpired = false;
     try {
       for (final file in picked) {
         final remotePath = sftpJoin(_currentPath, file.name);
@@ -428,6 +439,9 @@ class _FilesScreenState extends State<FilesScreen> {
             );
           }
           uploaded++;
+        } on SftpTransferException catch (e) {
+          failed++;
+          if (e.unauthorized) sessionExpired = true;
         } catch (_) {
           failed++;
         }
@@ -436,6 +450,10 @@ class _FilesScreenState extends State<FilesScreen> {
       if (mounted) setState(() => _transferring = false);
     }
     if (!mounted) return;
+    if (sessionExpired) {
+      widget.onSessionExpired?.call();
+      return;
+    }
     _showSnack(failed == 0
         ? 'Uploaded $uploaded file${uploaded == 1 ? '' : 's'}.'
         : 'Uploaded $uploaded, failed $failed.');
@@ -466,6 +484,10 @@ class _FilesScreenState extends State<FilesScreen> {
       _showSnack('Saved to ${target.path}.');
     } on SftpTransferException catch (e) {
       if (!mounted) return;
+      if (e.unauthorized) {
+        widget.onSessionExpired?.call();
+        return;
+      }
       _showSnack(e.message);
     } catch (_) {
       if (!mounted) return;
@@ -477,6 +499,10 @@ class _FilesScreenState extends State<FilesScreen> {
 
   void _onEntryAction(String action, SftpEntry entry) {
     switch (action) {
+      case 'preview':
+        _preview(entry);
+      case 'edit':
+        _editFile(entry);
       case 'download':
         _download(entry);
       case 'rename':
@@ -484,6 +510,191 @@ class _FilesScreenState extends State<FilesScreen> {
       case 'delete':
         _delete(entry);
     }
+  }
+
+  /// Open a terminal on the same server (web "open in terminal").
+  Future<void> _openTerminal() async {
+    var dialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator()),
+    ).then((_) => dialogOpen = false);
+    void closeDialog() {
+      if (dialogOpen) {
+        dialogOpen = false;
+        Navigator.pop(context);
+      }
+    }
+
+    late final RemoteSession session;
+    try {
+      session = await SessionOpener(
+              api: widget.api, token: widget.sessionToken)
+          .open(widget.session.entry, SessionKind.terminal);
+    } on SessionExpiredException {
+      closeDialog();
+      widget.onSessionExpired?.call();
+      return;
+    } on NextermApiException catch (e) {
+      closeDialog();
+      if (mounted) _showSnack(e.message);
+      return;
+    } catch (_) {
+      closeDialog();
+      if (mounted) _showSnack('Could not open terminal.');
+      return;
+    }
+    if (!mounted) return;
+    closeDialog();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TerminalScreen(
+          api: widget.api,
+          sessionToken: widget.sessionToken,
+          session: session,
+          onSessionExpired: widget.onSessionExpired,
+        ),
+      ),
+    );
+  }
+
+  static const _imageExtensions = {
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'bmp',
+  };
+
+  static const _maxPreviewBytes = 8 * 1024 * 1024;
+
+  String _extensionOf(String name) {
+    final idx = name.lastIndexOf('.');
+    if (idx < 0 || idx == name.length - 1) return '';
+    return name.substring(idx + 1).toLowerCase();
+  }
+
+  /// Preview images and text files (web FilePreviewWindow equivalent).
+  Future<void> _preview(SftpEntry entry) async {
+    if (entry.isDir || !mounted) return;
+    final ext = _extensionOf(entry.name);
+    final isImage = _imageExtensions.contains(ext);
+    if (!isImage && entry.size > _maxPreviewBytes) {
+      _showSnack('File is too large to preview.');
+      return;
+    }
+    if (entry.size > _maxPreviewBytes) {
+      _showSnack('File is too large to preview.');
+      return;
+    }
+    setState(() => _transferring = true);
+    try {
+      final bytes = await downloadSftpFile(
+        baseUrl: widget.api.baseUrl,
+        sessionToken: widget.sessionToken,
+        sessionId: widget.session.sessionId,
+        remotePath: sftpJoin(_currentPath, entry.name),
+      );
+      if (!mounted) return;
+      if (isImage) {
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => Dialog(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(entry.name,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600)),
+                ),
+                Flexible(
+                  child: InteractiveViewer(
+                    child: Image.memory(
+                      bytes,
+                      fit: BoxFit.contain,
+                      errorBuilder: (_, _, _) => const Padding(
+                        padding: EdgeInsets.all(32),
+                        child: Text(
+                            'Could not render image.'),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+        return;
+      }
+      String text;
+      try {
+        text = utf8.decode(bytes, allowMalformed: false);
+      } on FormatException {
+        _showSnack('Not a text file — download it instead.');
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(entry.name,
+              style:
+                  const TextStyle(fontWeight: FontWeight.w600)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: SelectableText(text,
+                  style: const TextStyle(
+                      fontFamily: 'monospace', fontSize: 12)),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } on SftpTransferException catch (e) {
+      if (!mounted) return;
+      if (e.unauthorized) {
+        widget.onSessionExpired?.call();
+        return;
+      }
+      _showSnack(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnack('Preview failed.');
+    } finally {
+      if (mounted) setState(() => _transferring = false);
+    }
+  }
+
+  /// Edit a text file (opens the remote file editor).
+  void _editFile(SftpEntry entry) {
+    if (entry.isDir || !mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RemoteFileEditorScreen(
+          api: widget.api,
+          sessionToken: widget.sessionToken,
+          session: widget.session,
+          remoteDir: _currentPath,
+          entry: entry,
+          onSessionExpired: widget.onSessionExpired,
+        ),
+      ),
+    );
   }
 
   void _showSnack(String message) {
@@ -596,6 +807,11 @@ class _FilesScreenState extends State<FilesScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.terminal),
+            tooltip: 'Open terminal',
+            onPressed: _connected ? _openTerminal : null,
+          ),
+          IconButton(
             icon: const Icon(Icons.upload),
             tooltip: 'Upload files',
             onPressed:
@@ -625,6 +841,32 @@ class _FilesScreenState extends State<FilesScreen> {
       body: Column(
         children: [
           _buildBreadcrumb(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search in folder',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
+                border: const OutlineInputBorder(),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
+                isDense: true,
+              ),
+              onChanged: (v) =>
+                  setState(() => _query = v.trim().toLowerCase()),
+            ),
+          ),
           if (_transferring) const LinearProgressIndicator(minHeight: 2),
           Expanded(
             child: RefreshIndicator(
@@ -682,21 +924,32 @@ class _FilesScreenState extends State<FilesScreen> {
     // Device preference: hide dotfiles unless enabled in Settings.
     final showHidden =
         SettingsScope.of(context)?.sftpShowHidden ?? false;
-    final visible = showHidden
-        ? _entries
-        : _entries
-            .where((e) => !e.name.startsWith('.'))
-            .toList();
+    final query = _query;
+    final visible = _entries.where((e) {
+      if (!showHidden && e.name.startsWith('.')) return false;
+      if (query.isNotEmpty &&
+          !e.name.toLowerCase().contains(query)) {
+        return false;
+      }
+      return true;
+    }).toList();
     if (visible.isEmpty) {
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(32),
         children: [
           const SizedBox(height: 64),
-          Icon(Icons.visibility_off_outlined,
-              size: 56, color: cs.onSurfaceVariant),
+          Icon(
+              _query.isNotEmpty
+                  ? Icons.search_off_outlined
+                  : Icons.visibility_off_outlined,
+              size: 56,
+              color: cs.onSurfaceVariant),
           const SizedBox(height: 16),
-          const Text('Only hidden files here.',
+          Text(
+              _query.isNotEmpty
+                  ? 'No files match "$_query".'
+                  : 'Only hidden files here.',
               textAlign: TextAlign.center),
         ],
       );
@@ -736,11 +989,19 @@ class _FilesScreenState extends State<FilesScreen> {
             icon: const Icon(Icons.more_vert),
             tooltip: 'File actions',
             onSelected: (value) => _onEntryAction(value, entry),
-            itemBuilder: (ctx) => const [
-              PopupMenuItem(
+            itemBuilder: (ctx) => [
+              if (!entry.isDir) ...[
+                const PopupMenuItem(
+                    value: 'preview', child: Text('Preview')),
+                const PopupMenuItem(
+                    value: 'edit', child: Text('Edit')),
+              ],
+              const PopupMenuItem(
                   value: 'download', child: Text('Download')),
-              PopupMenuItem(value: 'rename', child: Text('Rename')),
-              PopupMenuItem(value: 'delete', child: Text('Delete')),
+              const PopupMenuItem(
+                  value: 'rename', child: Text('Rename')),
+              const PopupMenuItem(
+                  value: 'delete', child: Text('Delete')),
             ],
           ),
           onTap: () => entry.isDir

@@ -33,6 +33,7 @@ class MonitoringPage extends StatefulWidget {
 class _MonitoringPageState extends State<MonitoringPage> {
   final _searchController = TextEditingController();
   Timer? _refreshTimer;
+  int _loadCalls = 0;
   String _query = '';
   List<MonitoredServer>? _servers;
   String? _error;
@@ -66,6 +67,7 @@ class _MonitoringPageState extends State<MonitoringPage> {
   }
 
   Future<void> _load({bool silent = false}) async {
+    final call = ++_loadCalls;
     if (!silent) {
       setState(() {
         _loading = true;
@@ -74,7 +76,7 @@ class _MonitoringPageState extends State<MonitoringPage> {
     }
     try {
       final servers = await widget.repository.fetchServers();
-      if (!mounted) return;
+      if (!mounted || call != _loadCalls) return;
       setState(() {
         _servers = servers;
         _loading = false;
@@ -84,13 +86,13 @@ class _MonitoringPageState extends State<MonitoringPage> {
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || call != _loadCalls) return;
       setState(() {
         _error = e.message;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || call != _loadCalls) return;
       setState(() {
         _error = 'Could not load monitoring data.';
         _loading = false;
