@@ -1,0 +1,484 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../api/nexterm_api.dart';
+import '../auth/session_store.dart';
+import '../widgets/qr_scanner_page.dart';
+
+/// Login per Geräte-Code (`POST /api/auth/device/*`, siehe `API.md` §2).
+///
+/// Ablauf: Server-URL eingeben → Code anzeigen lassen (oder QR scannen) →
+/// Code im Web-Interface / Browser freigeben → Polling erkennt die Freigabe.
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key, required this.onLoggedIn});
+
+  final ValueChanged<SessionInfo> onLoggedIn;
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+enum _Step { server, code }
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _urlController = TextEditingController();
+  final _store = SessionStore();
+
+  _Step _step = _Step.server;
+  bool _isLoading = false;
+  String? _error;
+  String? _deviceCode;
+  String? _deviceToken;
+  String _baseUrl = '';
+  Timer? _pollTimer;
+  bool _polling = false;
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _connect() async {
+    final raw = _urlController.text.trim();
+    if (raw.isEmpty) {
+      setState(() => _error = 'Bitte eine Server-URL eingeben.');
+      return;
+    }
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    final api = NextermApi(baseUrl: raw);
+    try {
+      await api.checkServer();
+    } on NextermApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    final ok = await _createCode(api);
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      if (ok) {
+        _baseUrl = api.baseUrl;
+        _step = _Step.code;
+      }
+    });
+  }
+
+  /// Erzeugt einen Geräte-Code und startet das Polling.
+  /// Gibt an, ob ein Code erstellt wurde.
+  Future<bool> _createCode(NextermApi api) async {
+    try {
+      final code = await api.createDeviceCode();
+      if (mounted) {
+        setState(() {
+          _deviceCode = code.code;
+          _deviceToken = code.token;
+        });
+      }
+      _startPolling(api);
+      return true;
+    } on NextermApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+      return false;
+    }
+  }
+
+  void _startPolling(NextermApi api) {
+    _pollTimer?.cancel();
+    _pollTimer =
+        Timer.periodic(const Duration(seconds: 3), (_) => _poll(api));
+  }
+
+  Future<void> _poll(NextermApi api) async {
+    if (_polling) return;
+    final pollToken = _deviceToken;
+    if (pollToken == null) return;
+    _polling = true;
+    try {
+      final result = await api.pollDeviceCode(pollToken);
+      if (!mounted) return;
+      if (result.isAuthorized && result.token != null) {
+        final status = await api.checkSession(result.token!);
+        if (!mounted) return;
+        if (status == SessionStatus.unknown) {
+          // Netzblip nach Freigabe — weiter warten statt Sackgasse.
+          return;
+        }
+        _pollTimer?.cancel();
+        if (status == SessionStatus.invalid) {
+          setState(() {
+            _error = 'Session wurde nicht bestätigt. Bitte erneut verbinden.';
+            _step = _Step.server;
+            _deviceCode = null;
+            _deviceToken = null;
+          });
+          return;
+        }
+        final label = _urlController.text
+            .trim()
+            .replaceFirst(RegExp(r'^https?://', caseSensitive: false), '');
+        final session = SessionInfo(
+          token: result.token!,
+          baseUrl: api.baseUrl,
+          label: label.isEmpty ? api.baseUrl : label,
+        );
+        try {
+          await _store.save(session);
+        } catch (_) {
+          if (!mounted) return;
+          setState(() {
+            _error = 'Session konnte nicht gespeichert werden.';
+            _step = _Step.server;
+            _deviceCode = null;
+            _deviceToken = null;
+          });
+          return;
+        }
+        if (!mounted) return;
+        widget.onLoggedIn(session);
+      } else if (result.isInvalid) {
+        _pollTimer?.cancel();
+        setState(() {
+          _error = 'Code ist abgelaufen. Bitte erneut verbinden.';
+          _step = _Step.server;
+          _deviceCode = null;
+          _deviceToken = null;
+        });
+      }
+      // pending/error → weiter warten.
+    } finally {
+      _polling = false;
+    }
+  }
+
+  /// QR vom Web-Interface ("Gerät verknüpfen", `nexterm://devicelink`).
+  Future<void> _scanQr() async {
+    final result = await Navigator.push<Map<String, String>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => QrScannerPage(
+          title: 'QR-Code scannen',
+          hint:
+              'Im Browser „Gerät verknüpfen“ öffnen und den QR-Code scannen.',
+          onDetect: (raw) {
+            try {
+              final uri = Uri.parse(raw);
+              if (uri.scheme == 'nexterm' && uri.host == 'devicelink') {
+                final token = uri.queryParameters['token'];
+                final server = uri.queryParameters['server'];
+                if (token != null && server != null) {
+                  // Guard: Scanner könnte gerade per Zurück geschlossen worden
+                  // sein — dann keine Route poppen.
+                  if (Navigator.canPop(context)) {
+                    Navigator.pop(
+                        context, {'token': token, 'server': server});
+                    return true;
+                  }
+                }
+              }
+            } catch (_) {}
+            return false;
+          },
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    final token = result['token'];
+    final server = result['server'];
+    if (token == null || server == null) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    // Uri.queryParameters ist bereits prozentdekodiert — kein decode nötig.
+    final api = NextermApi(baseUrl: server);
+    try {
+      await api.checkServer();
+    } on NextermApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _baseUrl = api.baseUrl;
+        _urlController.text = server;
+        _deviceCode = null;
+        _deviceToken = token;
+        _step = _Step.code;
+        _isLoading = false;
+      });
+    }
+    _startPolling(api);
+  }
+
+  /// `$server/link?code=...` im Browser öffnen zur Freigabe.
+  Future<void> _openInBrowser() async {
+    final code = _deviceCode;
+    if (code == null) return;
+    // Basispfad erhalten (Server kann unter Subpfad laufen).
+    final base = Uri.parse(NextermApi.webBaseUrl(_baseUrl));
+    final path = '${base.path.replaceAll(RegExp(r'/+$'), '')}/link';
+    final url = base.replace(path: path, queryParameters: {'code': code});
+    try {
+      final opened =
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!opened && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Browser konnte nicht geöffnet werden.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Browser konnte nicht geöffnet werden.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _copyCode() async {
+    final code = _deviceCode;
+    if (code == null) return;
+    await Clipboard.setData(ClipboardData(text: code));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Code kopiert')),
+      );
+    }
+  }
+
+  void _back() {
+    _pollTimer?.cancel();
+    setState(() {
+      _step = _Step.server;
+      _deviceCode = null;
+      _deviceToken = null;
+      _error = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Icons.terminal, size: 72, color: cs.primary),
+                const SizedBox(height: 16),
+                Text(
+                  'Nexterm',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Server-Verwaltung für unterwegs',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                if (_step == _Step.server) _buildServerStep(cs),
+                if (_step == _Step.code) _buildCodeStep(cs),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildServerStep(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'URL deines Nexterm-Servers eingeben, um dich zu verbinden.',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        TextFormField(
+          controller: _urlController,
+          decoration: InputDecoration(
+            labelText: 'Server-URL',
+            hintText: 'nexterm.example.com',
+            prefixIcon: const Icon(Icons.dns),
+            border: const OutlineInputBorder(),
+            errorText: _error,
+          ),
+          keyboardType: TextInputType.url,
+          enabled: !_isLoading,
+          onFieldSubmitted: (_) => _connect(),
+        ),
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: _isLoading ? null : _connect,
+          style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16)),
+          child: _isLoading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Verbinden'),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(child: Divider(color: cs.outlineVariant)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text('oder',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: cs.onSurfaceVariant)),
+            ),
+            Expanded(child: Divider(color: cs.outlineVariant)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: _isLoading ? null : _scanQr,
+          icon: const Icon(Icons.qr_code_scanner),
+          label: const Text('QR-Code scannen'),
+          style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCodeStep(ColorScheme cs) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_deviceCode != null) ...[
+          Text(
+            'Diesen Code im Nexterm-Webinterface eingeben.',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _deviceCode!,
+                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
+                        letterSpacing: 4,
+                        color: cs.primary,
+                      ),
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  onPressed: _copyCode,
+                  icon: const Icon(Icons.content_copy),
+                  tooltip: 'Code kopieren',
+                ),
+              ],
+            ),
+          ),
+        ] else ...[
+          Text(
+            'QR-Code erkannt — warte auf Freigabe …',
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+        const SizedBox(height: 24),
+        Text(
+          'Warte auf Freigabe …',
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: cs.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        const ClipRRect(
+          borderRadius: BorderRadius.all(Radius.circular(4)),
+          child: LinearProgressIndicator(),
+        ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(_error!,
+                style: TextStyle(fontSize: 13, color: cs.error),
+                textAlign: TextAlign.center),
+          ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _back,
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
+                child: const Text('Zurück'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _deviceCode == null ? null : _openInBrowser,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Im Browser öffnen'),
+                style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16)),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
