@@ -72,6 +72,7 @@ class _HomePageState extends State<HomePage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {

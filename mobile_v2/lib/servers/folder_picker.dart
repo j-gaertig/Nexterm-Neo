@@ -61,8 +61,10 @@ Future<FolderPick?> showFolderPicker(
                       : Icons.folder_outlined),
                   title: Padding(
                     padding: EdgeInsets.only(
-                        left: 16.0 * folder.depth),
+                        left: 16.0 * folder.depth.clamp(0, 3)),
                     child: Text(folder.node.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                             fontWeight: FontWeight.w600)),
                   ),

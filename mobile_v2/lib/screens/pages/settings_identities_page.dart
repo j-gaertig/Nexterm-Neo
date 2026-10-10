@@ -66,6 +66,7 @@ class _SettingsIdentitiesPageState extends State<SettingsIdentitiesPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -379,6 +380,9 @@ class _IdentityDialogState extends State<_IdentityDialog> {
       if (!mounted) return;
       Navigator.pop(context, true);
     } on SessionExpiredException {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;

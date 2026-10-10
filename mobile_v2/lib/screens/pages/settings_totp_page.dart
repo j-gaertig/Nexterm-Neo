@@ -65,6 +65,7 @@ class _SettingsTotpPageState extends State<SettingsTotpPage> {
         _working = false;
       });
     } on SessionExpiredException {
+      if (mounted) setState(() => _working = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -103,6 +104,7 @@ class _SettingsTotpPageState extends State<SettingsTotpPage> {
         const SnackBar(content: Text('Two-factor enabled.')),
       );
     } on SessionExpiredException {
+      if (mounted) setState(() => _working = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -155,6 +157,7 @@ class _SettingsTotpPageState extends State<SettingsTotpPage> {
       widget.onChanged?.call();
       await _fetchSecret();
     } on SessionExpiredException {
+      if (mounted) setState(() => _working = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -288,6 +291,13 @@ class _SettingsTotpPageState extends State<SettingsTotpPage> {
               Text(_error!,
                   style:
                       TextStyle(color: cs.error, fontSize: 12)),
+              if (!_enabled && _secret == null) ...[
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: _working ? null : _fetchSecret,
+                  child: const Text('Retry'),
+                ),
+              ],
             ],
           ],
         ),

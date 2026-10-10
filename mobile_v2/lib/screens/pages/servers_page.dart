@@ -226,6 +226,9 @@ class _ServersPageState extends State<ServersPage> {
     try {
       await SessionOpener(api: widget.api, token: widget.token)
           .close(info.sessionId);
+    } on SessionExpiredException {
+      widget.onSessionExpired();
+      return;
     } catch (e) {
       if (mounted) {
         _snack(e is NextermApiException
@@ -242,6 +245,9 @@ class _ServersPageState extends State<ServersPage> {
     for (final info in _conns[entry.id] ?? const <ConnectionInfo>[]) {
       try {
         await opener.close(info.sessionId);
+      } on SessionExpiredException {
+        widget.onSessionExpired();
+        return;
       } catch (_) {}
     }
     await _load();
@@ -299,6 +305,20 @@ class _ServersPageState extends State<ServersPage> {
   /// (`POST /api/connections/` runs it, output streams to the viewer).
   Future<void> _pickAndRunScript(ServerEntry entry) async {
     List<ScriptEntry> scripts = [];
+    var dialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator()),
+    ).then((_) => dialogOpen = false);
+    void closeProgress() {
+      if (dialogOpen && context.mounted) {
+        dialogOpen = false;
+        Navigator.pop(context);
+      }
+    }
+
     try {
       final raw = await widget.api.fetchScripts(widget.token);
       for (final m in raw) {
@@ -307,15 +327,19 @@ class _ServersPageState extends State<ServersPage> {
         } catch (_) {}
       }
     } on SessionExpiredException {
+      closeProgress();
       widget.onSessionExpired();
       return;
     } on NextermApiException catch (e) {
+      closeProgress();
       if (mounted) _snack(e.message);
       return;
     } catch (_) {
+      closeProgress();
       if (mounted) _snack('Could not load scripts.');
       return;
     }
+    closeProgress();
     if (!mounted) return;
     if (scripts.isEmpty) {
       _snack('No scripts in the library.');
@@ -456,7 +480,10 @@ class _ServersPageState extends State<ServersPage> {
       context,
       MaterialPageRoute(
         builder: (_) => ServerEditorScreen(
-            api: widget.api, token: widget.token, entryId: entryId),
+            api: widget.api,
+            token: widget.token,
+            entryId: entryId,
+            onSessionExpired: widget.onSessionExpired),
       ),
     );
     if (saved == true) await _load();
@@ -601,8 +628,8 @@ class _ServersPageState extends State<ServersPage> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete folder?'),
         content: Text(childCount == 0
-            ? 'Delete "${folder.name}"?'
-            : 'Delete "${folder.name}" and move $childCount server${childCount == 1 ? '' : 's'} to the top level?'),
+            ? 'Delete "${folder.name}" permanently?'
+            : 'Delete "${folder.name}" and all $childCount server${childCount == 1 ? '' : 's'} inside it permanently? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -1361,22 +1388,30 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                   runSpacing: 8,
                   children: [
                     for (final c in tagColorPresets)
-                      GestureDetector(
-                        onTap: () =>
-                            setDialog(() => color = c),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: _parseTagColor(c),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: color == c
-                                  ? Theme.of(ctx)
-                                      .colorScheme
-                                      .onSurface
-                                  : Colors.transparent,
-                              width: 2,
+                      Semantics(
+                        label: 'Tag color',
+                        selected: color == c,
+                        button: true,
+                        child: Tooltip(
+                          message: 'Tag color',
+                          child: GestureDetector(
+                            onTap: () =>
+                                setDialog(() => color = c),
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: _parseTagColor(c),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: color == c
+                                      ? Theme.of(ctx)
+                                          .colorScheme
+                                          .onSurface
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1415,6 +1450,7 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
           _busy = false;
         });
       } on SessionExpiredException {
+        if (mounted) setState(() => _busy = false);
         widget.onSessionExpired();
       } on NextermApiException catch (e) {
         if (mounted) setState(() => _busy = false);
@@ -1477,6 +1513,7 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
           _busy = false;
         });
       } on SessionExpiredException {
+        if (mounted) setState(() => _busy = false);
         widget.onSessionExpired();
       } on NextermApiException catch (e) {
         if (mounted) setState(() => _busy = false);
@@ -1520,9 +1557,10 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
         _busy = false;
       });
     } on SessionExpiredException {
+      if (mounted) setState(() => _busy = false);
       widget.onSessionExpired();
     } on NextermApiException catch (e) {
-      if (!mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busy = false);
       _snack(e.message);
     } catch (_) {
       if (!mounted) setState(() => _busy = false);
@@ -1537,12 +1575,16 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (_busy)
+            const LinearProgressIndicator(minHeight: 2),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
             child: Row(
               children: [
                 Expanded(
                   child: Text('Tags · ${widget.entry.name}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700)),
@@ -1580,6 +1622,8 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
                           ),
                         ),
                         title: Text(tag.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w600)),
                         trailing: Row(
@@ -1625,6 +1669,10 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
 Color _parseTagColor(String hex) {
   var h = hex.trim();
   if (h.startsWith('#')) h = h.substring(1);
-  if (h.length == 6) h = 'FF$h';
+  if (h.length == 6) {
+    h = 'FF$h';
+  } else if (h.length != 8) {
+    return const Color(0xFF3F51B5);
+  }
   return Color(int.tryParse(h, radix: 16) ?? 0xFF3F51B5);
 }

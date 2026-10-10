@@ -87,6 +87,7 @@ class _RemoteFileEditorScreenState
     } on SftpTransferException catch (e) {
       if (!mounted) return;
       if (e.unauthorized) {
+        setState(() => _loading = false);
         widget.onSessionExpired?.call();
         return;
       }
@@ -134,6 +135,7 @@ class _RemoteFileEditorScreenState
     } on SftpTransferException catch (e) {
       if (!mounted) return;
       if (e.unauthorized) {
+        setState(() => _saving = false);
         widget.onSessionExpired?.call();
         return;
       }
@@ -196,17 +198,51 @@ class _RemoteFileEditorScreenState
               : Padding(
                   padding:
                       const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                  child: TextField(
-                    controller: _controller,
-                    maxLines: null,
-                    expands: true,
-                    textAlignVertical: TextAlignVertical.top,
-                    keyboardType: TextInputType.multiline,
-                    style: const TextStyle(fontFamily: 'monospace'),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.all(12),
-                    ),
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.stretch,
+                    children: [
+                      if (_error != null) ...[
+                        Container(
+                          padding:
+                              const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .errorContainer,
+                            borderRadius:
+                                BorderRadius.circular(12),
+                          ),
+                          child: Text(_error!,
+                              style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                  fontSize: 12)),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          maxLines: null,
+                          expands: true,
+                          textAlignVertical:
+                              TextAlignVertical.top,
+                          keyboardType:
+                              TextInputType.multiline,
+                          style: const TextStyle(
+                              fontFamily: 'monospace'),
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            contentPadding:
+                                EdgeInsets.all(12),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
     );

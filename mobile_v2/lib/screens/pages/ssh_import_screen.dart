@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -64,7 +66,7 @@ class _SshImportScreenState extends State<SshImportScreen> {
     if (picked.isEmpty || !mounted) return;
     try {
       final bytes = await picked.first.readAsBytes();
-      final text = String.fromCharCodes(bytes);
+      final text = utf8.decode(bytes, allowMalformed: true);
       if (!mounted) return;
       setState(() => _controller.text = text);
       _reparse();
@@ -118,6 +120,7 @@ class _SshImportScreenState extends State<SshImportScreen> {
       );
       Navigator.pop(context, true);
     } on SessionExpiredException {
+      if (mounted) setState(() => _importing = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -206,17 +209,21 @@ class _SshImportScreenState extends State<SshImportScreen> {
               itemCount: _hosts.length,
               itemBuilder: (_, i) {
                 final host = _hosts[i];
+                final user = host['username'];
                 return Card(
                   elevation: 0,
                   color: cs.surfaceContainerHigh,
                   shape: RoundedRectangleBorder(
                       borderRadius:
-                          BorderRadius.circular(12)),
+                          BorderRadius.circular(16)),
                   child: ListTile(
                     dense: true,
                     leading:
                         const Icon(Icons.dns_outlined),
-                    title: Text('${host['name']}',
+                    title: Text(
+                        user == null
+                            ? '${host['name']}'
+                            : '${host['name']} ($user)',
                         style: const TextStyle(
                             fontWeight: FontWeight.w600)),
                     subtitle: Text(

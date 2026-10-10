@@ -657,6 +657,18 @@ class _DesktopScreenState extends State<DesktopScreen> {
                       ),
                       const SizedBox(width: 8),
                       _sheetAction(
+                        icon: _keyboardVisible
+                            ? Icons.keyboard
+                            : Icons.keyboard_outlined,
+                        label: 'Keyboard',
+                        cs: cs,
+                        onTap: () {
+                          _toggleKeyboard();
+                          setSheetState(() {});
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _sheetAction(
                         icon: Icons.content_paste_outlined,
                         label: 'Paste',
                         cs: cs,
@@ -746,11 +758,15 @@ class _DesktopScreenState extends State<DesktopScreen> {
             children: [
               Icon(icon, size: 18, color: cs.primary),
               const SizedBox(width: 8),
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurface)),
+              Flexible(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface)),
+              ),
             ],
           ),
         ),
@@ -801,10 +817,11 @@ class _DesktopScreenState extends State<DesktopScreen> {
   }
 
   Color _statusColor() {
-    if (_error != null) return Colors.red;
-    if (_connected) return Colors.green;
-    if (_connecting) return Colors.amber;
-    return Colors.grey;
+    final cs = Theme.of(context).colorScheme;
+    if (_error != null) return cs.error;
+    if (_connected) return cs.tertiary;
+    if (_connecting) return cs.primary;
+    return cs.outline;
   }
 
   String _statusLabel() {
@@ -824,6 +841,8 @@ class _DesktopScreenState extends State<DesktopScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(widget.session.entry.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 16)),
             Row(children: [
               Container(
@@ -852,19 +871,6 @@ class _DesktopScreenState extends State<DesktopScreen> {
                   ? DesktopMouseMode.cursor
                   : DesktopMouseMode.touch;
             }),
-          ),
-          IconButton(
-            tooltip: 'Keyboard',
-            icon: const Icon(Icons.keyboard),
-            color: _keyboardVisible
-                ? Theme.of(context).colorScheme.primary
-                : null,
-            onPressed: _toggleKeyboard,
-          ),
-          IconButton(
-            tooltip: 'Fit screen',
-            icon: const Icon(Icons.fit_screen),
-            onPressed: _fitScreen,
           ),
           IconButton(
             tooltip: 'Special keys',
@@ -984,6 +990,7 @@ class _DesktopScreenState extends State<DesktopScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.close),
+          tooltip: 'Dismiss',
           onPressed: () => setState(() => _error = null),
           color: cs.onErrorContainer,
         ),

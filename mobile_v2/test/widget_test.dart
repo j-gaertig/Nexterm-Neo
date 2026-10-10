@@ -688,10 +688,13 @@ void main() {
       {'id': 'org-9', 'type': 'organization', 'name': 'Team'},
       {'id': 13, 'type': 'server', 'name': 'C', 'ip': '10.0.0.3'},
     ]);
-    // Prod folder + top-level server; empty + org-only folders pruned.
-    expect(nodes.length, 2);
+    // Prod + Empty folders + top-level server; the organization shell
+    // without servers is pruned. Empty real folders are kept so newly
+    // created ones stay visible.
+    expect(nodes.length, 3);
     final folder = nodes.first as FolderNode;
     expect(folder.name, 'Prod');
+    expect((nodes[1] as FolderNode).name, 'Empty');
     expect(flattenNodes(nodes).map((s) => s.name).toList(),
         ['A', 'B', 'C']);
   });

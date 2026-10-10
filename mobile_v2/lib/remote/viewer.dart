@@ -156,7 +156,7 @@ Future<void> startNewSession(
         const Center(child: CircularProgressIndicator()),
   ).then((_) => dialogOpen = false);
   void closeDialog() {
-    if (dialogOpen) {
+    if (dialogOpen && context.mounted) {
       dialogOpen = false;
       Navigator.pop(context);
     }

@@ -522,7 +522,7 @@ class _FilesScreenState extends State<FilesScreen> {
           const Center(child: CircularProgressIndicator()),
     ).then((_) => dialogOpen = false);
     void closeDialog() {
-      if (dialogOpen) {
+      if (dialogOpen && context.mounted) {
         dialogOpen = false;
         Navigator.pop(context);
       }
@@ -583,10 +583,6 @@ class _FilesScreenState extends State<FilesScreen> {
     if (entry.isDir || !mounted) return;
     final ext = _extensionOf(entry.name);
     final isImage = _imageExtensions.contains(ext);
-    if (!isImage && entry.size > _maxPreviewBytes) {
-      _showSnack('File is too large to preview.');
-      return;
-    }
     if (entry.size > _maxPreviewBytes) {
       _showSnack('File is too large to preview.');
       return;
@@ -650,6 +646,7 @@ class _FilesScreenState extends State<FilesScreen> {
                   const TextStyle(fontWeight: FontWeight.w600)),
           content: SizedBox(
             width: double.maxFinite,
+            height: MediaQuery.of(ctx).size.height * 0.6,
             child: SingleChildScrollView(
               child: SelectableText(text,
                   style: const TextStyle(
@@ -811,24 +808,22 @@ class _FilesScreenState extends State<FilesScreen> {
             tooltip: 'Open terminal',
             onPressed: _connected ? _openTerminal : null,
           ),
-          IconButton(
-            icon: const Icon(Icons.upload),
-            tooltip: 'Upload files',
-            onPressed:
-                _transferring || !_connected ? null : _uploadFiles,
-          ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.add),
-            tooltip: 'New',
+            icon: const Icon(Icons.more_vert),
+            tooltip: 'File actions',
             enabled: _transferring == false && _connected,
             onSelected: (value) {
+              if (value == 'upload') _uploadFiles();
               if (value == 'folder') _createFolder();
               if (value == 'file') _createFile();
             },
             itemBuilder: (ctx) => const [
               PopupMenuItem(
+                  value: 'upload', child: Text('Upload files')),
+              PopupMenuItem(
                   value: 'folder', child: Text('New folder')),
-              PopupMenuItem(value: 'file', child: Text('New file')),
+              PopupMenuItem(
+                  value: 'file', child: Text('New file')),
             ],
           ),
           IconButton(

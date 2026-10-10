@@ -52,6 +52,7 @@ class _SettingsPageState extends State<SettingsPage> {
   UserInfo? _profile;
   List<LoginSession>? _sessions;
   String? _error;
+  String? _sessionsError;
   bool _loading = true;
 
   @override
@@ -78,35 +79,49 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _loading = true;
       _error = null;
+      _sessionsError = null;
     });
+    // Profile and sessions load independently: one failing endpoint
+    // must not blank the whole hub.
+    UserInfo? profile;
+    List<LoginSession>? sessions;
+    String? sessionsError;
+    String? error;
     try {
-      final profile =
+      profile =
           await (widget.loadProfile?.call() ?? _defaultProfile());
-      final sessions =
-          await (widget.loadSessions?.call() ?? _defaultSessions());
-      if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _sessions = sessions;
-        _loading = false;
-      });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
-    } on NextermApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Could not load settings.';
-        _loading = false;
-      });
+    } catch (e) {
+      error = e is NextermApiException
+          ? e.message
+          : 'Could not load profile.';
     }
+    try {
+      sessions =
+          await (widget.loadSessions?.call() ?? _defaultSessions());
+    } on SessionExpiredException {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      widget.onSessionExpired?.call();
+      return;
+    } catch (e) {
+      sessionsError = e is NextermApiException
+          ? e.message
+          : 'Could not load sessions.';
+      sessions ??= const [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _profile = profile;
+      _sessions = sessions ?? const [];
+      _sessionsError = sessionsError;
+      _error = profile == null ? error : null;
+      _loading = false;
+    });
   }
 
   Future<void> _revoke(LoginSession login) async {
@@ -137,6 +152,8 @@ class _SettingsPageState extends State<SettingsPage> {
         );
       }
       await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -667,44 +684,56 @@ class _SettingsPageState extends State<SettingsPage> {
                                           for (final seed
                                               in AppSettings
                                                   .accentChoices)
-                                            GestureDetector(
-                                              onTap: () => s
-                                                  .setAccentSeed(
-                                                      seed),
-                                              child: Container(
-                                                width: 32,
-                                                height: 32,
-                                                decoration:
-                                                    BoxDecoration(
-                                                  color:
-                                                      Color(
+                                            Semantics(
+                                              label:
+                                                  'Accent color',
+                                              selected: s.accentSeed ==
+                                                  seed,
+                                              button: true,
+                                              child: Tooltip(
+                                                message:
+                                                    'Accent color',
+                                                child:
+                                                    GestureDetector(
+                                                  onTap: () => s
+                                                      .setAccentSeed(
                                                           seed),
-                                                  shape:
-                                                      BoxShape
+                                                  child: Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration:
+                                                        BoxDecoration(
+                                                      color: Color(
+                                                          seed),
+                                                      shape: BoxShape
                                                           .circle,
-                                                  border: Border.all(
-                                                    color: s.accentSeed ==
+                                                      border:
+                                                          Border
+                                                              .all(
+                                                        color: s.accentSeed ==
+                                                                seed
+                                                            ? Theme.of(context)
+                                                                .colorScheme
+                                                                .onSurface
+                                                            : Colors
+                                                                .transparent,
+                                                        width:
+                                                            2,
+                                                      ),
+                                                    ),
+                                                    child: s.accentSeed ==
                                                             seed
-                                                        ? Theme.of(
-                                                                context)
-                                                            .colorScheme
-                                                            .onSurface
-                                                        : Colors
-                                                            .transparent,
-                                                    width: 2,
+                                                        ? Icon(
+                                                            Icons
+                                                                .check,
+                                                            size:
+                                                                18,
+                                                            color: _onSeedColor(
+                                                                seed),
+                                                          )
+                                                        : null,
                                                   ),
                                                 ),
-                                                child: s.accentSeed ==
-                                                        seed
-                                                    ? const Icon(
-                                                        Icons
-                                                            .check,
-                                                        size:
-                                                            18,
-                                                        color: Colors
-                                                            .white,
-                                                      )
-                                                    : null,
                                               ),
                                             ),
                                         ],
@@ -743,30 +772,64 @@ class _SettingsPageState extends State<SettingsPage> {
                                                 FontWeight.w600)),
                                     const SizedBox(width: 12),
                                     Expanded(
-                                      child: SegmentedButton<
-                                          String>(
-                                        segments: const [
-                                          ButtonSegment(
-                                              value: 'block',
-                                              label: Text(
-                                                  'Block')),
-                                          ButtonSegment(
-                                              value:
-                                                  'underline',
-                                              label: Text(
-                                                  'Line')),
-                                          ButtonSegment(
-                                              value: 'bar',
-                                              label: Text(
-                                                  'Bar')),
-                                        ],
-                                        selected: {
-                                          s.terminalCursor
+                                      child: LayoutBuilder(
+                                        builder: (context,
+                                            constraints) {
+                                          final narrow =
+                                              constraints
+                                                      .maxWidth <
+                                                  300;
+                                          return SegmentedButton<
+                                              String>(
+                                            segments: [
+                                              ButtonSegment(
+                                                  value: 'block',
+                                                  icon: narrow
+                                                      ? null
+                                                      : const Icon(
+                                                          Icons
+                                                              .crop_square,
+                                                          size:
+                                                              16),
+                                                  label:
+                                                      const Text(
+                                                          'Block')),
+                                              ButtonSegment(
+                                                  value:
+                                                      'underline',
+                                                  icon: narrow
+                                                      ? null
+                                                      : const Icon(
+                                                          Icons
+                                                              .format_underline,
+                                                          size:
+                                                              16),
+                                                  label:
+                                                      const Text(
+                                                          'Line')),
+                                              ButtonSegment(
+                                                  value: 'bar',
+                                                  icon: narrow
+                                                      ? null
+                                                      : const Icon(
+                                                          Icons
+                                                              .height,
+                                                          size:
+                                                              16),
+                                                  label:
+                                                      const Text(
+                                                          'Bar')),
+                                            ],
+                                            selected: {
+                                              s.terminalCursor
+                                            },
+                                            onSelectionChanged:
+                                                (sel) => s
+                                                    .setTerminalCursor(
+                                                        sel
+                                                            .first),
+                                          );
                                         },
-                                        onSelectionChanged:
-                                            (sel) => s
-                                                .setTerminalCursor(
-                                                    sel.first),
                                       ),
                                     ),
                                   ],
@@ -854,6 +917,15 @@ class _SettingsPageState extends State<SettingsPage> {
                             .titleSmall
                             ?.copyWith(fontWeight: FontWeight.w700)),
                   ),
+                  if (_sessionsError != null)
+                    Padding(
+                      padding:
+                          const EdgeInsets.only(bottom: 8),
+                      child: Text(_sessionsError!,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: cs.error)),
+                    ),
                   if ((_sessions ?? const []).isEmpty)
                     Text('No other sessions.',
                         style: TextStyle(
@@ -954,8 +1026,15 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 }
 
-String _shortDate(DateTime dt) {
-  const months = [
+/// Check color readable on an accent seed (white on dark seeds).
+Color _onSeedColor(int seed) {
+  final c = Color(seed);
+  final luminance =
+      0.299 * (c.r * 255) + 0.587 * (c.g * 255) + 0.114 * (c.b * 255);
+  return luminance > 150 ? Colors.black : Colors.white;
+}
+
+String _shortDate(DateTime dt) {  const months = [
     'Jan',
     'Feb',
     'Mar',

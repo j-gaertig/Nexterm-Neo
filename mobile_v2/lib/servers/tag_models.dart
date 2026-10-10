@@ -19,8 +19,19 @@ class TagItem {
     return TagItem(
       id: id,
       name: json['name'] as String? ?? 'Tag',
-      color: json['color'] as String?,
+      color: _normalizeColor(json['color']),
     );
+  }
+
+  /// Only 6/8-digit hex survives; anything else falls back to null
+  /// (short/garbage values would render near-transparent).
+  static String? _normalizeColor(Object? raw) {
+    if (raw is! String) return null;
+    var hex = raw.trim();
+    if (hex.startsWith('#')) hex = hex.substring(1);
+    if (hex.length != 6 && hex.length != 8) return null;
+    if (int.tryParse(hex, radix: 16) == null) return null;
+    return '#$hex';
   }
 
   /// Parse the stored color (hex `#rrggbb`/`#aarrggbb` or int).
@@ -37,7 +48,8 @@ class TagItem {
   }
 }
 
-/// Small tag chip for server rows/sheets.
+/// Small tag chip for server rows/sheets: colored dot + onSurface
+/// text (raw tag colors stay readable in both themes).
 class TagChip extends StatelessWidget {
   const TagChip({super.key, required this.tag, this.dense = false});
 
@@ -58,11 +70,25 @@ class TagChip extends StatelessWidget {
         border: Border.all(
             color: color.withValues(alpha: 0.4)),
       ),
-      child: Text(tag.name,
-          style: TextStyle(
-              fontSize: dense ? 11 : 12,
-              fontWeight: FontWeight.w600,
-              color: color)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(tag.name,
+              style: TextStyle(
+                  fontSize: dense ? 11 : 12,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface)),
+        ],
+      ),
     );
   }
 }

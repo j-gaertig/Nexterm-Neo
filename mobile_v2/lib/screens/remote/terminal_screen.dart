@@ -306,6 +306,10 @@ class _TerminalScreenState extends State<TerminalScreen> {  late final Terminal 
             'Type the session identity password into the terminal.'),
         actions: [
           TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Paste'),
           ),
@@ -350,6 +354,20 @@ class _TerminalScreenState extends State<TerminalScreen> {  late final Terminal 
   /// command into the live session, optionally submitting it.
   Future<void> _insertSnippetMenu() async {
     List<Snippet> snippets = [];
+    var dialogOpen = true;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) =>
+          const Center(child: CircularProgressIndicator()),
+    ).then((_) => dialogOpen = false);
+    void closeProgress() {
+      if (dialogOpen && context.mounted) {
+        dialogOpen = false;
+        Navigator.pop(context);
+      }
+    }
+
     try {
       final raw = await widget.api.fetchSnippets(widget.sessionToken);
       for (final m in raw) {
@@ -358,20 +376,24 @@ class _TerminalScreenState extends State<TerminalScreen> {  late final Terminal 
         } catch (_) {}
       }
     } on SessionExpiredException {
+      closeProgress();
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
+      closeProgress();
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message)));
       return;
     } catch (_) {
+      closeProgress();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not load snippets.')),
       );
       return;
     }
+    closeProgress();
     if (!mounted) return;
     if (snippets.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -428,6 +450,10 @@ class _TerminalScreenState extends State<TerminalScreen> {  late final Terminal 
         title: Text(picked.name),
         content: Text(picked.command),
         actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Paste'),

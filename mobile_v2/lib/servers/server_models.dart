@@ -176,11 +176,14 @@ List<EntryNode> parseEntryTree(List<dynamic> nodes) {
         final children = map['entries'];
         final parsed =
             children is List ? parseNodes(children) : null;
-        if (parsed != null && parsed.isNotEmpty) {
+        final kids = parsed ?? const <EntryNode>[];
+        // Keep empty real folders (newly created ones have no servers
+        // yet); prune only empty organization shells.
+        if (kids.isNotEmpty || type == 'folder') {
           out.add(FolderNode(
             id: '${map['id']}',
             name: map['name'] as String? ?? 'Folder',
-            children: parsed,
+            children: kids,
             isOrganization: type == 'organization',
           ));
         }

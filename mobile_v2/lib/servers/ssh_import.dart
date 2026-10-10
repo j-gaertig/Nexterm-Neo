@@ -66,6 +66,8 @@ List<Map<String, dynamic>> parseSshConfig(String text) {
             'port': h['port'],
             'config': h['config'],
             'identities': h['identities'],
+            if (h['username'] != null)
+              'username': h['username'],
           })
       .toList();
 }

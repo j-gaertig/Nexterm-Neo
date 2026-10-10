@@ -29,6 +29,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   final _totpController = TextEditingController();
   final _store = SessionStore();
+  bool _passwordVisible = false;
 
   _Step _step = _Step.server;
   bool _isLoading = false;
@@ -281,7 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _openInBrowser() async {
     final code = _deviceCode;
     if (code == null) return;
-    // Basispfad erhalten (Server kann unter Subpfad laufen).
+    // Keep the base path (server may run under a sub-path).
     final base = Uri.parse(NextermApi.webBaseUrl(_baseUrl));
     final path = '${base.path.replaceAll(RegExp(r'/+$'), '')}/link';
     final url = base.replace(path: path, queryParameters: {'code': code});
@@ -539,17 +540,31 @@ class _LoginScreenState extends State<LoginScreen> {
               prefixIcon: Icon(Icons.person_outline),
               border: OutlineInputBorder(),
             ),
+            autofillHints: const [AutofillHints.username],
+            textInputAction: TextInputAction.next,
             enabled: !_isLoading,
           ),
           const SizedBox(height: 12),
           TextFormField(
             controller: _passwordController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Password',
-              prefixIcon: Icon(Icons.lock_outline),
-              border: OutlineInputBorder(),
+              prefixIcon: const Icon(Icons.lock_outline),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_passwordVisible
+                    ? Icons.visibility_off_outlined
+                    : Icons.visibility_outlined),
+                tooltip: _passwordVisible
+                    ? 'Hide password'
+                    : 'Show password',
+                onPressed: () => setState(
+                    () => _passwordVisible = !_passwordVisible),
+              ),
             ),
-            obscureText: true,
+            obscureText: !_passwordVisible,
+            autofillHints: const [AutofillHints.password],
+            textInputAction: TextInputAction.next,
             enabled: !_isLoading,
             onFieldSubmitted: (_) => _loginWithPassword(),
           ),
@@ -562,6 +577,8 @@ class _LoginScreenState extends State<LoginScreen> {
               border: OutlineInputBorder(),
             ),
             keyboardType: TextInputType.number,
+            autofillHints: const [AutofillHints.oneTimeCode],
+            textInputAction: TextInputAction.done,
             enabled: !_isLoading,
             onFieldSubmitted: (_) => _loginWithPassword(),
           ),

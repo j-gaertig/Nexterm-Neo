@@ -49,7 +49,8 @@ class ScriptEntry {
       {required this.id,
       required this.name,
       this.content,
-      this.description});
+      this.description,
+      this.osFilter = const []});
 
   final int id;
   final String name;
@@ -57,6 +58,9 @@ class ScriptEntry {
   /// Only present on detail (`GET /api/scripts/:id`) / edit flows.
   final String? content;
   final String? description;
+
+  /// OS filter (`server/validations/script.js`).
+  final List<String> osFilter;
 
   factory ScriptEntry.fromJson(Map<String, dynamic> json) {
     final rawId = json['id'];
@@ -66,11 +70,15 @@ class ScriptEntry {
     if (id == null) {
       throw FormatException('Script without numeric id: $json');
     }
+    final rawFilter = json['osFilter'];
     return ScriptEntry(
       id: id,
       name: json['name'] as String? ?? 'Script',
       content: json['content'] as String?,
       description: json['description'] as String?,
+      osFilter: rawFilter is List
+          ? rawFilter.whereType<String>().toList()
+          : const [],
     );
   }
 }

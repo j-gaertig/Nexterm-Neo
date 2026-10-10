@@ -60,6 +60,7 @@ class _SettingsLinkDevicePageState
         _working = false;
       });
     } on SessionExpiredException {
+      if (mounted) setState(() => _working = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -95,6 +96,7 @@ class _SettingsLinkDevicePageState
         const SnackBar(content: Text('Device authorized.')),
       );
     } on SessionExpiredException {
+      if (mounted) setState(() => _working = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -165,7 +167,8 @@ class _SettingsLinkDevicePageState
               SettingsGroup(
                 title: 'Device',
                 children: [
-                  for (final row in _infoRows(_info!))
+                  for (final row
+                      in _infoRows(_info!, _normalized))
                     ListTile(
                       title: Text(row.$1,
                           style: const TextStyle(
@@ -211,9 +214,11 @@ class _SettingsLinkDevicePageState
   }
 }
 
-List<(String, String)> _infoRows(Map<String, dynamic> info) {
+List<(String, String)> _infoRows(
+    Map<String, dynamic> info, String code) {
   String str(Object? v) => v == null ? '—' : '$v';
   return [
+    ('Code', code),
     ('Client', str(info['clientType'] ?? info['client'])),
     ('IP address', str(info['ip'] ?? info['ipAddress'])),
     ('Browser', str(info['userAgent'])),

@@ -64,11 +64,15 @@ class ServerEditorScreen extends StatefulWidget {
       {super.key,
       required this.api,
       required this.token,
-      this.entryId});
+      this.entryId,
+      this.onSessionExpired});
 
   final NextermApi api;
   final String token;
   final int? entryId;
+
+  /// Called on HTTP 401 so expired sessions return to login.
+  final VoidCallback? onSessionExpired;
 
   @override
   State<ServerEditorScreen> createState() => _ServerEditorScreenState();
@@ -171,6 +175,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> {
       try {
         detail = await widget.api
             .fetchEntry(widget.token, widget.entryId!);
+      } on SessionExpiredException {
+        if (mounted) setState(() => _loading = false);
+        widget.onSessionExpired?.call();
+        return;
       } catch (e) {
         if (mounted) {
           setState(() {
@@ -353,6 +361,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> {
         await widget.api.updateEntry(widget.token, widget.entryId!, payload);
       }
       if (mounted) Navigator.pop(context, true);
+    } on SessionExpiredException {
+      if (mounted) setState(() => _saving = false);
+      widget.onSessionExpired?.call();
     } catch (e) {
       if (mounted) {
         setState(() {

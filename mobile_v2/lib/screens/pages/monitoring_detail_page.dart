@@ -59,6 +59,7 @@ class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -89,8 +90,12 @@ class _MonitoringDetailPageState extends State<MonitoringDetailPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.server.name),
+            Text(widget.server.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             Text(widget.server.address,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -328,6 +333,7 @@ class _ChartsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
@@ -335,7 +341,7 @@ class _ChartsTab extends StatelessWidget {
           title: 'CPU usage',
           child: MetricChart(
               points: history.cpu,
-              color: const Color(0xFF314BD3),
+              color: cs.primary,
               unit: '%',
               max: 100),
         ),
@@ -344,7 +350,7 @@ class _ChartsTab extends StatelessWidget {
           title: 'Memory usage',
           child: MetricChart(
               points: history.mem,
-              color: const Color(0xFF29C16A),
+              color: cs.tertiary,
               unit: '%',
               max: 100),
         ),
@@ -353,7 +359,7 @@ class _ChartsTab extends StatelessWidget {
           title: 'Processes',
           child: MetricChart(
               points: history.processes,
-              color: const Color(0xFFDC5600),
+              color: cs.secondary,
               unit: '',
               max: null),
         ),
@@ -508,7 +514,7 @@ class _StorageTab extends StatelessWidget {
     final barColor = p.usagePercent >= 90
         ? cs.error
         : p.usagePercent >= 75
-            ? Colors.orange
+            ? cs.tertiary
             : cs.primary;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -575,7 +581,7 @@ class _NetworkTab extends StatelessWidget {
                   children: [
                     if (iface.state != null)
                       _badge(context, iface.state!,
-                          iface.state == 'up' ? Colors.green : cs.outline),
+                          iface.state == 'up' ? cs.tertiary : cs.outline),
                     for (final ip in iface.ipv4)
                       _badge(context, ip, cs.primary),
                     if (iface.mac != null)

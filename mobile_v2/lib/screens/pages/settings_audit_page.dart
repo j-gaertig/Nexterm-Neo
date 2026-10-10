@@ -48,6 +48,7 @@ class _SettingsAuditPageState extends State<SettingsAuditPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -78,6 +79,7 @@ class _SettingsAuditPageState extends State<SettingsAuditPage> {
         _loadingMore = false;
       });
     } on SessionExpiredException {
+      if (mounted) setState(() => _loadingMore = false);
       widget.onSessionExpired?.call();
     } catch (_) {
       if (mounted) setState(() => _loadingMore = false);
@@ -160,13 +162,22 @@ class _SettingsAuditPageState extends State<SettingsAuditPage> {
                             );
                           }
                           final log = _logs[i];
+                          final date = _shortDate(
+                              '${log['timestamp'] ?? log['createdAt'] ?? ''}');
+                          final parts = <String>[
+                            if (log['resource'] != null)
+                              '${log['resource']}',
+                            if (log['ipAddress'] != null)
+                              '${log['ipAddress']}',
+                            if (date.isNotEmpty) date,
+                          ];
                           return Card(
                             elevation: 0,
                             color: cs.surfaceContainerHigh,
                             shape: RoundedRectangleBorder(
                                 borderRadius:
                                     BorderRadius.circular(
-                                        12)),
+                                        16)),
                             child: ListTile(
                               dense: true,
                               title: Text(
@@ -176,16 +187,7 @@ class _SettingsAuditPageState extends State<SettingsAuditPage> {
                                           FontWeight.w600,
                                       fontSize: 14)),
                               subtitle: Text(
-                                [
-                                  if (log['resource'] !=
-                                      null)
-                                    '${log['resource']}',
-                                  if (log['ipAddress'] !=
-                                      null)
-                                    '${log['ipAddress']}',
-                                  _shortDate(
-                                      '${log['timestamp'] ?? log['createdAt'] ?? ''}'),
-                                ].join(' • '),
+                                parts.join(' • '),
                                 style: const TextStyle(
                                     fontSize: 12),
                               ),

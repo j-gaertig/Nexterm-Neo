@@ -81,6 +81,7 @@ class _MorePageState extends State<MorePage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -126,6 +127,8 @@ class _MorePageState extends State<MorePage> {
         );
       }
       await _load();
+    } on SessionExpiredException {
+      widget.onSessionExpired?.call();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -211,7 +214,8 @@ class _MorePageState extends State<MorePage> {
         TextEditingController(text: existing?.content ?? '');
     final description =
         TextEditingController(text: existing?.description ?? '');
-    final osFilter = TextEditingController();
+    final osFilter = TextEditingController(
+        text: (existing?.osFilter ?? const []).join(', '));
     String? error;
     try {
       return await showDialog<bool>(

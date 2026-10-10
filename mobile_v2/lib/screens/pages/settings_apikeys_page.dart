@@ -53,6 +53,7 @@ class _SettingsApiKeysPageState extends State<SettingsApiKeysPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -142,6 +143,10 @@ class _SettingsApiKeysPageState extends State<SettingsApiKeysPage> {
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Close'),
+            ),
+            FilledButton(
               onPressed: () {
                 Clipboard.setData(
                     ClipboardData(text: '${token ?? ''}'));

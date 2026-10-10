@@ -83,6 +83,7 @@ class _MonitoringPageState extends State<MonitoringPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -226,11 +227,11 @@ class _MonitorCard extends StatelessWidget {
   Color _statusColor(ColorScheme cs) {
     switch (server.status) {
       case 'online':
-        return Colors.green;
+        return cs.tertiary;
       case 'offline':
-        return cs.error;
+        return cs.outline;
       case 'error':
-        return Colors.orange;
+        return cs.error;
       default:
         return cs.outline;
     }

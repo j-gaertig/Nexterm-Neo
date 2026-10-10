@@ -54,6 +54,7 @@ class _SettingsMonitoringPageState extends State<SettingsMonitoringPage> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {

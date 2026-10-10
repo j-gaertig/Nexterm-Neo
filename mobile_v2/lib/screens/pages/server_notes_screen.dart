@@ -63,6 +63,7 @@ class _ServerNotesScreenState extends State<ServerNotesScreen> {
       });
     } on SessionExpiredException {
       if (!mounted) return;
+      setState(() => _loading = false);
       widget.onSessionExpired?.call();
       return;
     } on NextermApiException catch (e) {
@@ -96,6 +97,7 @@ class _ServerNotesScreenState extends State<ServerNotesScreen> {
       if (!mounted) return;
       Navigator.pop(context, true);
     } on SessionExpiredException {
+      if (mounted) setState(() => _saving = false);
       widget.onSessionExpired?.call();
     } on NextermApiException catch (e) {
       if (!mounted) return;
@@ -116,7 +118,8 @@ class _ServerNotesScreenState extends State<ServerNotesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notes · ${widget.entry.name}'),
+        title: Text('Notes · ${widget.entry.name}',
+            maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           if (!_loading && _error == null)
             Padding(
