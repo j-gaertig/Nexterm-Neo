@@ -1563,7 +1563,7 @@ class _TagManagerSheetState extends State<_TagManagerSheet> {
       if (mounted) setState(() => _busy = false);
       _snack(e.message);
     } catch (_) {
-      if (!mounted) setState(() => _busy = false);
+      if (mounted) setState(() => _busy = false);
       _snack('Could not delete tag.');
     }
   }
