@@ -5,7 +5,7 @@ labels: ["translation"]
 body:
   - type: markdown
     attributes:
-      value: "Nexterm Neo translations are managed through [Crowdin](https://crowdin.com/project/nexterm). This form is for requesting a language that is not available yet; translation contributions should be made on Crowdin."
+      value: "Translations live in the locale files under client/public/assets/locales. This form is for requesting a language that is not available yet; translation contributions are made through pull requests."
 
   - type: checkboxes
     id: checks
@@ -35,7 +35,7 @@ body:
   - type: dropdown
     id: help
     attributes:
-      label: Can you help with the translation on Crowdin?
+      label: Can you help with the translation?
       options:
         - "Yes"
         - "No"
