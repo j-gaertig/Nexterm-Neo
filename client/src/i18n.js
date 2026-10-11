@@ -4,6 +4,7 @@ import HttpApi from 'i18next-http-backend';
 
 export const languages = [
     {name: 'English', code: 'en'},
+    {name: 'العربية', code: 'ar_SA'},
     {name: 'Čeština', code: 'cs_CZ'},
     {name: 'Deutsch', code: 'de_DE'},
     {name: 'Español', code: 'es_ES'},

@@ -8,7 +8,7 @@ maintainer: "Mathias Wagner <mathias@gnm.dev>"
 description: |
   Nexterm engine — Connection service for Nexterm
 vendor: "Nexterm"
-homepage: "https://github.com/gnmyt/Nexterm"
+homepage: "https://github.com/j-gaertig/Nexterm-Neo"
 license: "MIT"
 
 overrides:
