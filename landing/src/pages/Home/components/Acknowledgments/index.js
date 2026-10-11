@@ -1,1 +1,0 @@
-export {Acknowledgments as default} from "./Acknowledgments.jsx";

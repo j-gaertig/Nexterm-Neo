@@ -10,17 +10,11 @@ build/
 data/
 *.log
 
-# Documentation site
-docs/.vitepress/
-
 # Mobile & connector builds
 mobile/.dart_tool/
 mobile/build/
 mobile/.flutter-plugins*
 connector/src-tauri/target/
-
-# Landing page
-landing/dist/
 
 # Git & CI
 .git/

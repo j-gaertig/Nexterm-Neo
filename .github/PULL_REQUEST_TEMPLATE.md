@@ -16,8 +16,6 @@ one issue; explain why each touched component is needed. -->
 - [ ] Connector app
 - [ ] Mobile app
 - [ ] CLI
-- [ ] Landing page
-- [ ] Documentation
 - [ ] Other: ___
 
 ## Scope and context
