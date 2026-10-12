@@ -3,6 +3,8 @@ const { resolveIdentity } = require("../utils/identityResolver");
 const { getIdentityCredentials } = require("./identity");
 const { buildSSHParams, resolveJumpHosts } = require("../lib/ConnectionService");
 const { validateEntryAccess } = require("./entry");
+const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
+const Integration = require("../models/Integration");
 const controlPlane = require("../lib/controlPlane/ControlPlaneServer");
 
 const execCommand = async (accountId, entryId, identityId, command) => {
@@ -18,6 +20,17 @@ const execCommand = async (accountId, entryId, identityId, command) => {
 
     if (entry.disabled) {
         return { code: 403, message: "Server is disabled" };
+    }
+
+    const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
+    const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
+    if (!policyCheck.allowed) {
+        return {
+            code: 403,
+            message: policyCheck.reason === "engine"
+                ? "Access denied: this server must be reached through a different engine"
+                : "Access denied: this server IP is not allowed for your account",
+        };
     }
 
     if (entry.config?.protocol !== "ssh") {

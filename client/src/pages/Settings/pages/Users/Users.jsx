@@ -17,6 +17,8 @@ import {
     mdiMagnify,
     mdiAccountCircleOutline,
     mdiAccountGroupOutline,
+    mdiEarth,
+    mdiShieldOffOutline,
 } from "@mdi/js";
 import CreateUserDialog from "./components/CreateUserDialog";
 import UserPermissionsDialog from "@/pages/Settings/pages/Permissions/components/UserPermissionsDialog";
@@ -50,6 +52,7 @@ export const Users = () => {
     const [contextUserId, setContextUserId] = useState(null);
     const [passwordChangeDialogOpen, setPasswordChangeDialogOpen] = useState(false);
     const [permDialogOpen, setPermDialogOpen] = useState(false);
+    const [permInitialTab, setPermInitialTab] = useState("roles");
     const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false);
 
     const contextMenu = useContextMenu();
@@ -136,6 +139,11 @@ export const Users = () => {
                         {getFullName(currentUser) && <span className="name">{getFullName(currentUser)}</span>}
                         <span className="username">@{currentUser.username}</span>
                     </div>
+                    {currentUser.accessPolicy?.restricted && (
+                        <span className="access-restricted-badge" title={t("settings.users.accessRestrictedHint")}>
+                            <Icon path={mdiShieldOffOutline} />
+                        </span>
+                    )}
                 </div>
             ),
         },
@@ -187,6 +195,7 @@ export const Users = () => {
 
             <UserPermissionsDialog open={permDialogOpen} onClose={() => setPermDialogOpen(false)}
                                    accountId={contextUserId} groups={groups} catalog={catalog}
+                                   initialTab={permInitialTab}
                                    onSaved={loadUsers} />
 
             <ActionConfirmDialog open={confirmDeleteDialogOpen} setOpen={setConfirmDeleteDialogOpen}
@@ -239,11 +248,18 @@ export const Users = () => {
                 />
 
                 {canManagePermissions && (
-                    <ContextMenuItem
-                        icon={mdiShieldKeyOutline}
-                        label={t("settings.users.contextMenu.managePermissions")}
-                        onClick={() => setPermDialogOpen(true)}
-                    />
+                    <>
+                        <ContextMenuItem
+                            icon={mdiShieldKeyOutline}
+                            label={t("settings.users.contextMenu.managePermissions")}
+                            onClick={() => { setPermInitialTab("roles"); setPermDialogOpen(true); }}
+                        />
+                        <ContextMenuItem
+                            icon={mdiEarth}
+                            label={t("settings.users.contextMenu.networkRestrictions")}
+                            onClick={() => { setPermInitialTab("access"); setPermDialogOpen(true); }}
+                        />
+                    </>
                 )}
 
                 {user?.id !== contextUserId && (

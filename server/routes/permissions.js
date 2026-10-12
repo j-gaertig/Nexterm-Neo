@@ -8,6 +8,7 @@ const {
     addMemberValidation,
     setGroupsValidation,
     reorderGroupsValidation,
+    setAccessPolicyValidation,
 } = require("../validations/permission");
 
 const app = Router();
@@ -173,6 +174,44 @@ app.put("/users/:accountId/groups", async (req, res) => {
 app.put("/users/:accountId/permissions", async (req, res) => {
     if (validateSchema(res, setPermissionsValidation, req.body)) return;
     handle(res, await controller.setUserPermissions(req.params.accountId, req.body.permissions, req.permissions));
+});
+
+/**
+ * GET /permissions/access-engines
+ * @summary List Engines For Access Policy
+ * @description Returns id/name of all engines for the per-user access policy editor.
+ * @tags Permissions
+ * @security BearerAuth
+ * @return {array} 200 - Engines with id, name and isLocal flag
+ */
+app.get("/access-engines", async (req, res) =>
+    handle(res, await controller.listAccessEngines()));
+
+/**
+ * GET /permissions/users/{accountId}/access
+ * @summary Get User Access Policy
+ * @description Returns the per-user IP/engine blacklist/whitelist policy.
+ * @tags Permissions
+ * @security BearerAuth
+ * @param {string} accountId.path.required - Account id
+ * @return {object} 200 - The user's access policy
+ */
+app.get("/users/:accountId/access", async (req, res) =>
+    handle(res, await controller.getUserAccessPolicy(req.params.accountId)));
+
+/**
+ * PUT /permissions/users/{accountId}/access
+ * @summary Set User Access Policy
+ * @description Sets the per-user IP/engine blacklist/whitelist policy.
+ * @tags Permissions
+ * @security BearerAuth
+ * @param {string} accountId.path.required - Account id
+ * @param {object} request.body.required - { ipMode, ipRules, engineMode, engineIds }
+ * @return {object} 200 - The user's updated access policy
+ */
+app.put("/users/:accountId/access", async (req, res) => {
+    if (validateSchema(res, setAccessPolicyValidation, req.body)) return;
+    handle(res, await controller.setUserAccessPolicy(req.params.accountId, req.body));
 });
 
 module.exports = app;

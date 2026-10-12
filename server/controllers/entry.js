@@ -6,6 +6,7 @@ const Tag = require("../models/Tag");
 const AuditLog = require("../models/AuditLog");
 const { listFolders } = require("./folder");
 const { hasOrganizationAccess, hasOrganizationPermission, hasAccountPermission, validateFolderAccess } = require("../utils/permission");
+const { getAccessPolicy, isPolicyInactive, filterEntriesByPolicy } = require("../utils/accessPolicy");
 const { Permission } = require("../permissions/registry");
 const { Op } = require("sequelize");
 const Identity = require("../models/Identity");
@@ -369,6 +370,21 @@ module.exports.listEntries = async (accountId) => {
         },
         order: [["folderId", "ASC"], ["position", "ASC"]],
     });
+
+    try {
+        const policy = await getAccessPolicy(accountId);
+        if (!isPolicyInactive(policy)) {
+            const integrationIds = [...new Set(entries.filter((e) => e.integrationId).map((e) => e.integrationId))];
+            const Integration = require("../models/Integration");
+            const integrations = integrationIds.length
+                ? await Integration.findAll({ where: { id: { [Op.in]: integrationIds } } })
+                : [];
+            const integrationsById = new Map(integrations.map((i) => [i.id, i]));
+            entries = filterEntriesByPolicy(policy, entries, integrationsById);
+        }
+    } catch (error) {
+        logger.error("Failed to apply access policy to entry list", { accountId, error: error.message });
+    }
 
     const entryIds = entries.map(e => e.id);
     const allEntryIdentities = await EntryIdentity.findAll({
@@ -794,6 +810,25 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
             where: { id: { [Op.in]: entryIds } },
         });
         const entryMap = new Map(entries.map(e => [e.id, e]));
+
+        try {
+            const policy = await getAccessPolicy(accountId);
+            if (!isPolicyInactive(policy)) {
+                const { checkEntryAgainstPolicy } = require("../utils/accessPolicy");
+                const Integration = require("../models/Integration");
+                const integrationIds = [...new Set([...entryMap.values()].filter((e) => e.integrationId).map((e) => e.integrationId))];
+                const integrations = integrationIds.length
+                    ? await Integration.findAll({ where: { id: { [Op.in]: integrationIds } } })
+                    : [];
+                const integrationsById = new Map(integrations.map((i) => [i.id, i]));
+                for (const [id, entry] of entryMap) {
+                    const integration = entry.integrationId ? integrationsById.get(entry.integrationId) || null : null;
+                    if (!checkEntryAgainstPolicy(policy, entry, integration).allowed) entryMap.delete(id);
+                }
+            }
+        } catch (error) {
+            logger.error("Failed to apply access policy to recent connections", { error: error.message, accountId });
+        }
 
         const allEntryIdentities = await EntryIdentity.findAll({
             where: { entryId: { [Op.in]: entryIds } },
