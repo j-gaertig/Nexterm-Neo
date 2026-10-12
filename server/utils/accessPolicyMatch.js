@@ -153,6 +153,16 @@ const filterEntriesByPolicy = (policy, entries, integrationsById = new Map()) =>
     });
 };
 
+// Every applicable policy (personal + roles) must allow the entry.
+// The first denying policy decides the reason.
+const checkPoliciesAgainstEntry = (policies, entry, integration = null) => {
+    for (const policy of policies || []) {
+        const verdict = checkEntryAgainstPolicy(policy, entry, integration);
+        if (!verdict.allowed) return verdict;
+    }
+    return { allowed: true, reason: null };
+};
+
 module.exports = {
     MODES,
     MAX_RULES,
@@ -170,5 +180,6 @@ module.exports = {
     normalizeEngineId,
     getEntryTarget,
     checkEntryAgainstPolicy,
+    checkPoliciesAgainstEntry,
     filterEntriesByPolicy,
 };

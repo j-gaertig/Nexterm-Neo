@@ -13,8 +13,9 @@ const { getAdminGroupIds, countAdmins, isAccountAdmin } = require("../utils/perm
 const { ACCOUNT_VIEW_ATTRIBUTES, toAccountView } = require("../utils/accountView");
 const { revokeLiveSessionAccess } = require("./liveSession");
 const logger = require("../utils/logger");
-const { getAccessPolicy, setAccessPolicy } = require("../utils/accessPolicy");
+const { getAccessPolicy, setAccessPolicy, getGroupAccessPolicy, setGroupAccessPolicy, getEffectivePolicies, isPolicyInactive, DEFAULT_POLICY } = require("../utils/accessPolicy");
 const Engine = require("../models/Engine");
+const GroupAccessPolicy = require("../models/GroupAccessPolicy");
 
 const TRI = ["allow", "deny", "neutral"];
 
@@ -92,11 +93,14 @@ module.exports.getGroup = async (groupId) => {
         attributes: ACCOUNT_VIEW_ATTRIBUTES,
     });
 
+    const accessPolicy = await getGroupAccessPolicy(groupId);
+
     return {
         ...group,
         isSystem: isBuiltIn(group),
         permissions: permissions.reduce((acc, p) => ({ ...acc, [p.permission]: p.value }), {}),
         members: accounts.map(userView),
+        accessPolicy,
     };
 };
 
@@ -131,6 +135,7 @@ module.exports.deleteGroup = async (groupId) => {
 
     await GroupPermission.destroy({ where: { groupId } });
     await GroupMember.destroy({ where: { groupId } });
+    await GroupAccessPolicy.destroy({ where: { groupId } });
     await PermissionGroup.destroy({ where: { id: groupId } });
 
     logger.system(`Permission group deleted`, { groupId, name: group.name });
@@ -175,11 +180,11 @@ module.exports.getUserPermissions = async (accountId) => {
     const account = await Account.findByPk(accountId);
     if (!account) return { code: 404, message: "Account not found" };
 
-    const [memberships, overrides, effective, accessPolicy] = await Promise.all([
+    const [memberships, overrides, effective, effectivePolicies] = await Promise.all([
         GroupMember.findAll({ where: { accountId } }),
         AccountPermission.findAll({ where: { accountId } }),
         getSystemPermissions(accountId),
-        getAccessPolicy(accountId),
+        getEffectivePolicies(accountId),
     ]);
 
     return {
@@ -187,7 +192,8 @@ module.exports.getUserPermissions = async (accountId) => {
         groupIds: memberships.map((m) => m.groupId),
         overrides: overrides.reduce((acc, o) => ({ ...acc, [o.permission]: o.value }), {}),
         effective,
-        accessPolicy,
+        accessPolicy: effectivePolicies[0] || { ...DEFAULT_POLICY },
+        inheritedRestricted: effectivePolicies.slice(1).some((p) => !isPolicyInactive(p)),
     };
 };
 
@@ -269,6 +275,18 @@ module.exports.setUserAccessPolicy = async (accountId, input) => {
     const account = await Account.findByPk(accountId);
     if (!account) return { code: 404, message: "Account not found" };
     return await setAccessPolicy(accountId, input || {});
+};
+
+module.exports.getGroupAccessPolicy = async (groupId) => {
+    const group = await PermissionGroup.findByPk(groupId);
+    if (!group) return { code: 404, message: "Group not found" };
+    return await getGroupAccessPolicy(groupId);
+};
+
+module.exports.setGroupAccessPolicy = async (groupId, input) => {
+    const group = await PermissionGroup.findByPk(groupId);
+    if (!group) return { code: 404, message: "Group not found" };
+    return await setGroupAccessPolicy(groupId, input || {});
 };
 
 module.exports.listAccessEngines = async () => {

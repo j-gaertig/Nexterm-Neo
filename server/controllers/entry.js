@@ -6,7 +6,7 @@ const Tag = require("../models/Tag");
 const AuditLog = require("../models/AuditLog");
 const { listFolders } = require("./folder");
 const { hasOrganizationAccess, hasOrganizationPermission, hasAccountPermission, validateFolderAccess } = require("../utils/permission");
-const { getAccessPolicy, isPolicyInactive, filterEntriesByPolicy } = require("../utils/accessPolicy");
+const { isPolicyInactive } = require("../utils/accessPolicy");
 const { Permission } = require("../permissions/registry");
 const { Op } = require("sequelize");
 const Identity = require("../models/Identity");
@@ -360,7 +360,7 @@ module.exports.listEntries = async (accountId) => {
     };
     flattenFolders(folders);
 
-    let entries = await Entry.findAll({
+    const entries = await Entry.findAll({
         where: {
             [Op.or]: [
                 { folderId: { [Op.in]: folderIds } },
@@ -371,16 +371,23 @@ module.exports.listEntries = async (accountId) => {
         order: [["folderId", "ASC"], ["position", "ASC"]],
     });
 
+    // Blocked servers stay visible (greyed out with a warning in the UI);
+    // only connecting and monitoring data are restricted.
+    let blockedEntryIds = new Set();
     try {
-        const policy = await getAccessPolicy(accountId);
-        if (!isPolicyInactive(policy)) {
+        const { getEffectivePolicies, checkPoliciesAgainstEntry } = require("../utils/accessPolicy");
+        const policies = await getEffectivePolicies(accountId);
+        if (policies.some((p) => !isPolicyInactive(p))) {
             const integrationIds = [...new Set(entries.filter((e) => e.integrationId).map((e) => e.integrationId))];
             const Integration = require("../models/Integration");
             const integrations = integrationIds.length
                 ? await Integration.findAll({ where: { id: { [Op.in]: integrationIds } } })
                 : [];
             const integrationsById = new Map(integrations.map((i) => [i.id, i]));
-            entries = filterEntriesByPolicy(policy, entries, integrationsById);
+            for (const entry of entries) {
+                const integration = entry.integrationId ? integrationsById.get(entry.integrationId) || null : null;
+                if (!checkPoliciesAgainstEntry(policies, entry, integration).allowed) blockedEntryIds.add(entry.id);
+            }
         }
     } catch (error) {
         logger.error("Failed to apply access policy to entry list", { accountId, error: error.message });
@@ -448,6 +455,7 @@ module.exports.listEntries = async (accountId) => {
             name: entry.name,
             status: entry.status,
             disabled: Boolean(entry.disabled),
+            accessBlocked: blockedEntryIds.has(entry.id),
             position: entry.position,
             renderer: entry.renderer,
             tags: tags || [],
@@ -811,10 +819,11 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
         });
         const entryMap = new Map(entries.map(e => [e.id, e]));
 
+        const blockedRecentIds = new Set();
         try {
-            const policy = await getAccessPolicy(accountId);
-            if (!isPolicyInactive(policy)) {
-                const { checkEntryAgainstPolicy } = require("../utils/accessPolicy");
+            const { getEffectivePolicies, checkPoliciesAgainstEntry, isPolicyInactive } = require("../utils/accessPolicy");
+            const policies = await getEffectivePolicies(accountId);
+            if (policies.some((p) => !isPolicyInactive(p))) {
                 const Integration = require("../models/Integration");
                 const integrationIds = [...new Set([...entryMap.values()].filter((e) => e.integrationId).map((e) => e.integrationId))];
                 const integrations = integrationIds.length
@@ -823,7 +832,7 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
                 const integrationsById = new Map(integrations.map((i) => [i.id, i]));
                 for (const [id, entry] of entryMap) {
                     const integration = entry.integrationId ? integrationsById.get(entry.integrationId) || null : null;
-                    if (!checkEntryAgainstPolicy(policy, entry, integration).allowed) entryMap.delete(id);
+                    if (!checkPoliciesAgainstEntry(policies, entry, integration).allowed) blockedRecentIds.add(id);
                 }
             }
         } catch (error) {
@@ -853,6 +862,7 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
                     icon: entry.icon,
                     type: entry.type,
                     disabled: Boolean(entry.disabled),
+                    accessBlocked: blockedRecentIds.has(entry.id),
                     protocol: entry.config?.protocol || null,
                     connectionType: log.action,
                     timestamp: log.timestamp,

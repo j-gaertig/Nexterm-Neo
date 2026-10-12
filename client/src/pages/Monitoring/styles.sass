@@ -61,6 +61,17 @@
   &:hover
     border-color: colors.$gray
 
+  &.access-blocked
+    opacity: 0.6
+    filter: grayscale(0.8)
+    cursor: default
+
+    &:hover
+      border-color: colors.$dark-gray
+
+    &.pve:hover
+      border-color: rgba(227, 125, 2, 0.3)
+
   .server-header
     display: flex
     align-items: center

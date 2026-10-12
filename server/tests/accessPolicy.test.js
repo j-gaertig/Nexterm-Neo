@@ -77,3 +77,23 @@ test("policy input validation reports bad modes and rules", () => {
     assert.equal(match.validatePolicyInput({ engineIds: ["abc"] }) !== null, true);
     assert.equal(match.validatePolicyInput({ ipMode: "whitelist", ipRules: ["10.0.0.0/24"] }), null);
 });
+
+test("multiple policies combine: every policy must allow", () => {
+    const entry = { config: { ip: "10.0.0.5", engineId: 1 } };
+    const open = { ipMode: "disabled", ipRules: [], engineMode: "disabled", engineIds: [] };
+    const ipBlacklist = { ipMode: "blacklist", ipRules: ["10.0.0.5"], engineMode: "disabled", engineIds: [] };
+    const engineWhitelist = { ipMode: "disabled", ipRules: [], engineMode: "whitelist", engineIds: [1] };
+
+    assert.equal(match.checkPoliciesAgainstEntry([], entry).allowed, true);
+    assert.equal(match.checkPoliciesAgainstEntry([open, open], entry).allowed, true);
+    assert.equal(match.checkPoliciesAgainstEntry([open, engineWhitelist], entry).allowed, true);
+
+    const deniedByIp = match.checkPoliciesAgainstEntry([open, engineWhitelist, ipBlacklist], entry);
+    assert.equal(deniedByIp.allowed, false);
+    assert.equal(deniedByIp.reason, "ip");
+
+    const deniedByEngine = match.checkPoliciesAgainstEntry(
+        [open, { ipMode: "disabled", ipRules: [], engineMode: "whitelist", engineIds: [2] }], entry);
+    assert.equal(deniedByEngine.allowed, false);
+    assert.equal(deniedByEngine.reason, "engine");
+});

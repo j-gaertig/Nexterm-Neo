@@ -445,6 +445,10 @@
     },
     "grid": {
       "loading": "Laden von Monitor-Daten...",
+      "restricted": {
+        "title": "Zugriff gesperrt",
+        "subtitle": "Monitoring-Daten sind durch deine Netzwerk-Einschränkungen ausgeblendet."
+      },
       "noServers": {
         "title": "Keine Server gefunden",
         "subtitle": "Es sind keine SSH-Server für Monitoring verfügbar.\nFüge einige Server hinzu, um sie zu überwachen."
@@ -1538,25 +1542,20 @@
       "accessTab": "Netzwerk",
       "access": {
         "ipTitle": "IP-Adressen",
-        "ipDescription": "Steuert, zu welchen Server-IPs oder Hostnamen dieser Benutzer verbinden und Monitoring sehen darf.",
         "engineTitle": "Engines",
-        "engineDescription": "Steuert, über welche Engines dieser Benutzer verbinden darf.",
         "mode": {
           "disabled": "Keine Beschränkung",
           "blacklist": "Blacklist",
           "whitelist": "Whitelist"
         },
-        "ipPlaceholder": "z. B. 10.0.0.5, 10.0.0.0/24, *.example.com",
-        "ipBlacklistHint": "Verbindungen und Monitoring für diese IPs/Hostnamen sind blockiert. Exakte Werte, *-Wildcards und IPv4-CIDR-Bereiche werden unterstützt.",
-        "ipWhitelistHint": "Nur diese IPs/Hostnamen können verbunden und im Monitoring gesehen werden. Exakte Werte, *-Wildcards und IPv4-CIDR-Bereiche werden unterstützt.",
-        "engineBlacklistHint": "Verbindungen über diese Engines sind blockiert.",
-        "engineWhitelistHint": "Nur Verbindungen über diese Engines sind erlaubt.",
-        "noRules": "Noch keine Einträge — füge oben IPs, Hostnamen oder CIDR-Bereiche hinzu.",
-        "whitelistEmpty": "Whitelist ist leer: Nichts ist erlaubt, bis mindestens ein Eintrag hinzugefügt wird.",
+        "ipPlaceholder": "IP, Hostname, Wildcard, CIDR-Bereich",
+        "emptyAllowed": "Leere Liste — alles ist erlaubt.",
+        "emptyRestricted": "Leere Liste — alles ist gesperrt.",
         "defaultEngine": "Standard (automatisch)",
         "localEngine": "lokal",
         "unknownEngine": "Engine #{{id}}",
-        "engineIdPlaceholder": "Engine-ID, z. B. 2"
+        "engineIdPlaceholder": "Engine-ID, z. B. 2",
+        "inheritedNote": "Zusätzliche Einschränkungen durch Rollen aktiv."
       }
     }
   },
@@ -1592,6 +1591,7 @@
   "servers": {
     "addServerNote": "Rechtsklick zum Hinzufügen eines neuen Servers",
     "searchPlaceholder": "Suche",
+    "accessRestricted": "Zugriff gesperrt",
     "time": {
       "justNow": "Gerade eben",
       "minuteAgo": "vor {{count}} Minute",
@@ -1701,7 +1701,8 @@
       "updateFailed": "Server kann nicht aktualisiert werden",
       "createIdentityFailed": "Identität kann nicht erstellt werden",
       "updateIdentityFailed": "Identität kann nicht aktualisiert werden",
-      "serverDisabled": "Server „{{name}}“ ist deaktiviert"
+      "serverDisabled": "Server „{{name}}“ ist deaktiviert",
+      "accessBlocked": "Zugriff auf „{{name}}“ ist gesperrt"
     },
     "dialog": {
       "addServer": "Server hinzufügen",

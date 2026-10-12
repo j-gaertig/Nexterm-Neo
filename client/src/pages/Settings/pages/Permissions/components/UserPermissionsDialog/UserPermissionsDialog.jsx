@@ -117,7 +117,8 @@ export const UserPermissionsDialog = ({ open, onClose, accountId, groups = [], c
                     )}
 
                     {tab === "access" && (
-                        <AccessPolicyEditor value={accessPolicy} onChange={setAccessPolicy} engines={engines} />
+                        <AccessPolicyEditor value={accessPolicy} onChange={setAccessPolicy} engines={engines}
+                                            inheritedRestricted={Boolean(data?.inheritedRestricted)} />
                     )}
                 </div>
 

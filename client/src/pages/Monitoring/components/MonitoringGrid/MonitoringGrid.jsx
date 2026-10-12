@@ -61,7 +61,7 @@ export const MonitoringGrid = ({ servers, onServerSelect }) => {
     return (
         <div className="monitoring-grid">
             {servers.map(server => (
-                <div key={server.id} className={`server-card ${server.type === "proxmox" ? "pve" : ""}`} onClick={() => onServerSelect(server)}>
+                <div key={server.id} className={`server-card ${server.type === "proxmox" ? "pve" : ""}${server.accessBlocked ? " access-blocked" : ""}`} onClick={server.accessBlocked ? undefined : () => onServerSelect(server)}>
                     <div className={`status-indicator ${server.monitoring?.status || "unknown"}`}></div>
                     <div className="server-header">
                         <div className="server-icon">
@@ -72,7 +72,17 @@ export const MonitoringGrid = ({ servers, onServerSelect }) => {
                             <p>{server.ip}:{server.port}</p>
                         </div>
                     </div>
-                    {server.status === "online" ? (
+                    {server.accessBlocked ? (
+                        <div className="offline-state">
+                            <div className="offline-icon">
+                                <Icon path={mdiClockOutline} />
+                            </div>
+                            <div className="offline-info">
+                                <h4>{t("monitoring.grid.restricted.title")}</h4>
+                                <p>{t("monitoring.grid.restricted.subtitle")}</p>
+                            </div>
+                        </div>
+                    ) : server.status === "online" ? (
                         <>
                             <div className="metrics">
                                 {getMetrics(server).map(m => (
