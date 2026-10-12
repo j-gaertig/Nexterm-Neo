@@ -49,6 +49,7 @@ const ServerEntries = ({ entries, nestedLevel, setRenameStateId, connectToServer
                             nestedLevel={nestedLevel}
                             icon={entry.icon}
                             status={entry.status}
+                            disabled={entry.disabled}
                             tags={entry.tags}
                             connectToServer={connectToServer}
                             hibernatedSessionCount={hibernatedCount}

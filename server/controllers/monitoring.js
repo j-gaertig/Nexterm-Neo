@@ -55,7 +55,7 @@ module.exports.getServerMonitoring = async (accountId, entryId, timeRange = "1h"
         const access = await validateEntryAccess(accountId, entry);
         if (!access.valid) return access;
         const { data, latest } = await fetchMonitoringData({ entryId }, timeRange);
-        if (!latest.osInfo?.name && entry.config?.protocol === "ssh") {
+        if (!entry.disabled && !latest.osInfo?.name && entry.config?.protocol === "ssh") {
             const { detectServerOS } = require("../utils/monitoringService");
             const detectedOsInfo = await detectServerOS(entry);
             if (detectedOsInfo) latest.osInfo = detectedOsInfo;
@@ -81,7 +81,7 @@ module.exports.getAllServersMonitoring = async (accountId) => {
     try {
         const entries = await Entry.findAll({ where: { type: "server" } });
         const accessChecks = await Promise.all(entries.map(e => validateEntryAccess(accountId, e).then(r => ({ item: e, valid: r.valid }))));
-        const accessibleEntries = accessChecks.filter(({ item, valid }) => valid && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
+        const accessibleEntries = accessChecks.filter(({ item, valid }) => valid && !item.disabled && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
 
         const integrations = await Integration.findAll({ where: { type: "proxmox" } });
         const intAccessChecks = await Promise.all(integrations.map(i => validateIntegrationAccess(accountId, i).then(r => ({ item: i, valid: r.valid }))));

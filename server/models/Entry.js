@@ -64,6 +64,11 @@ module.exports = db.define("entries", {
         type: Sequelize.STRING,
         allowNull: true,
     },
+    disabled: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+    },
     config: {
         type: Sequelize.JSON,
         allowNull: true,

@@ -65,6 +65,9 @@ export const mapConnectionError = (rawMessage, t, statusCode = null, protocol = 
         return t("common.errors.connection.rdpSessionClosed");
     }
     if (!cleaned) return t("common.errors.connection.failed");
+    if (msg.includes("server is disabled")) {
+        return t("common.errors.connection.disabled");
+    }
     if (msg.includes("connection not available") || msg.includes("not available")) {
         return t("common.errors.connection.hostUnreachable");
     }

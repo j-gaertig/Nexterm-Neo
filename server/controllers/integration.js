@@ -399,6 +399,7 @@ module.exports.syncIntegration = async (accountId, integrationId) => {
 module.exports.performEntryAction = async (accountId, entryId, action) => {
     const entry = await Entry.findByPk(entryId);
     if (!entry) return { code: 404, message: "Entry not found" };
+    if (entry.disabled) return { code: 403, message: "Server is disabled" };
     if (!entry.integrationId) return { code: 400, message: "Entry is not linked to an integration" };
 
     const integration = await Integration.findByPk(entry.integrationId);

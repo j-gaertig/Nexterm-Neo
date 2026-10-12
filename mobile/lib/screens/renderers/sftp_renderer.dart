@@ -2406,8 +2406,11 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       );
     } catch (e) {
       if (mounted) {
+        final msg = e.toString().toLowerCase().contains('disabled')
+            ? '${widget.session.server.name} is disabled'
+            : 'Failed to open terminal: $e';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open terminal: $e')),
+          SnackBar(content: Text(msg)),
         );
       }
     } finally {

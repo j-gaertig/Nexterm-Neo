@@ -197,6 +197,7 @@
         "authenticationFailed": "Authentication failed",
         "permissionDenied": "Permission denied",
         "failed": "Connection failed",
+        "disabled": "Server is disabled",
         "closedUnexpectedly": "Connection closed unexpectedly",
         "error": "Connection error occurred",
         "scriptClosedUnexpectedly": "Script connection closed unexpectedly",
@@ -1638,6 +1639,10 @@
       "editServer": "Edit Server",
       "editIntegration": "Edit Integration",
       "duplicateServer": "Duplicate Server",
+      "disableServer": "Disable Server",
+      "enableServer": "Enable Server",
+      "disableFailed": "Failed to disable \"{{name}}\".",
+      "enableFailed": "Failed to enable \"{{name}}\".",
       "pasteIdentityPassword": "Paste Password",
       "deleteServer": "Delete Server",
       "deleteConfirm": "Are you sure you want to delete \"{{name}}\"? This action cannot be undone.",
@@ -1690,7 +1695,8 @@
       "createFailed": "Failed to create server",
       "updateFailed": "Failed to update server",
       "createIdentityFailed": "Failed to create identity",
-      "updateIdentityFailed": "Failed to update identity"
+      "updateIdentityFailed": "Failed to update identity",
+      "serverDisabled": "Server \"{{name}}\" is disabled"
     },
     "dialog": {
       "addServer": "Add server",
