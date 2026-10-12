@@ -90,6 +90,10 @@ const createSession = async ({
         return { code: 403, message: "Access denied" };
     }
 
+    if (entry.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
     const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
     if (!policyCheck.allowed) {
@@ -330,6 +334,7 @@ const getSession = async (accountId, sessionId) => {
         type: entry.type,
         icon: entry.icon,
         renderer: entry.renderer,
+        disabled: Boolean(entry.disabled),
         protocol: entry.config?.protocol,
     };
 

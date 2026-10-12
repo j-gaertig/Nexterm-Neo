@@ -15,6 +15,8 @@ import { useSessionLayout } from "@/pages/Servers/components/ViewContainer/hooks
 import { useActiveSessions } from "@/common/contexts/SessionContext.jsx";
 import { useLiveSessions } from "@/common/contexts/LiveSessionContext.jsx";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
+import { useToast } from "@/common/contexts/ToastContext.jsx";
+import { useTranslation } from "react-i18next";
 import { useAutoReconnect } from "@/common/hooks/useAutoReconnect.js";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ServerContext } from "@/common/contexts/ServerContext.jsx";
@@ -63,6 +65,8 @@ export const Servers = () => {
     const { getServerById, servers } = useContext(ServerContext);
     const { registerHandler, isConnected } = useContext(StateStreamContext);
     const { autoReconnect } = usePreferences();
+    const { sendToast } = useToast();
+    const { t } = useTranslation();
     const sessionLayout = useSessionLayout();
     const location = useLocation();
     const navigate = useNavigate();
@@ -213,8 +217,17 @@ export const Servers = () => {
         return findOrganizationForServer(parseInt(serverId), servers)?.requireConnectionReason || false;
     };
 
+    const notifyServerDisabled = (server) => {
+        sendToast("Error", t("servers.messages.serverDisabled", { name: server?.name ?? "" }));
+    };
+
     const connectToServer = async (serverId, identity, overrideRenderer, placement = null) => {
         const server = getServerById(serverId);
+
+        if (server?.disabled) {
+            notifyServerDisabled(server);
+            return;
+        }
 
         const hibernated = hibernatedSessions.find(s => s.server.id === serverId && s.identity === identity?.id);
         if (hibernated) {
@@ -285,6 +298,10 @@ export const Servers = () => {
 
     const performConnection = async (options, connectionReason = null) => {
         const { server, identity = null, type = null, directIdentity = null, scriptId = null, scriptName = null, placement = null, reconnectSessionId = null, reconnectKey: existingReconnectKey = null } = options;
+        if (server?.disabled) {
+            if (!reconnectSessionId) notifyServerDisabled(server);
+            return false;
+        }
         const identityKey = identity?.id ?? (directIdentity
             ? `${directIdentity.username || ""}:${directIdentity.type || ""}`
             : null);
@@ -383,6 +400,9 @@ export const Servers = () => {
                     return remaining;
                 });
             }
+            if (String(error?.message || "").toLowerCase().includes("disabled")) {
+                notifyServerDisabled(server);
+            }
             console.error(reconnectSessionId ? "Failed to reconnect session" : "Failed to create session", error);
             return false;
         } finally {
@@ -394,6 +414,11 @@ export const Servers = () => {
 
     const initiateConnection = async (options) => {
         if (!options.server) return { connected: false, deferred: true };
+
+        if (options.server.disabled) {
+            if (!options.reconnectSessionId) notifyServerDisabled(options.server);
+            return { connected: false, deferred: true };
+        }
 
         const requiresReason = checkConnectionReasonRequired(options.server.id, servers);
         if (requiresReason) {
@@ -417,6 +442,13 @@ export const Servers = () => {
     };
 
     const resumeConnection = async (sessionId) => {
+        const hibernated = hibernatedSessions.find(s => s.id === sessionId);
+        const hibernatedServerId = hibernated?.server?.id;
+        const hibernatedServer = hibernatedServerId ? getServerById(hibernatedServerId) : null;
+        if ((hibernatedServer?.disabled ?? hibernated?.server?.disabled) === true) {
+            notifyServerDisabled(hibernatedServer ?? hibernated?.server);
+            return;
+        }
         try {
             await postRequest(`/connections/${sessionId}/resume`, {
                 tabId: getTabId(),
@@ -574,6 +606,12 @@ export const Servers = () => {
     };
 
     const duplicateSession = async (sessionId) => {
+        const originalSession = activeSessions.find(s => s.id === sessionId);
+        const duplicateServer = originalSession?.server?.id ? getServerById(originalSession.server.id) : null;
+        if ((duplicateServer?.disabled ?? originalSession?.server?.disabled) === true) {
+            notifyServerDisabled(duplicateServer ?? originalSession?.server);
+            return;
+        }
         try {
             const result = await postRequest(`/connections/${sessionId}/duplicate`, {
                 tabId: getTabId(),
@@ -581,7 +619,6 @@ export const Servers = () => {
             });
 
             if (result?.sessionId) {
-                const originalSession = activeSessions.find(s => s.id === sessionId);
                 if (originalSession) {
                     const sessionData = {
                         ...originalSession,
@@ -603,6 +640,12 @@ export const Servers = () => {
             const originalSession = activeSessions.find(s => s.id === sessionId);
             if (!originalSession) {
                 console.error("Original session not found");
+                return;
+            }
+
+            const fmServer = originalSession.server?.id ? getServerById(originalSession.server.id) : null;
+            if ((fmServer?.disabled ?? originalSession.server?.disabled) === true) {
+                notifyServerDisabled(fmServer ?? originalSession.server);
                 return;
             }
 
@@ -652,6 +695,10 @@ export const Servers = () => {
     };
 
     const openDirectConnect = (server, placement = null) => {
+        if (server?.disabled) {
+            notifyServerDisabled(server);
+            return;
+        }
         if (!requiresIdentity(server)) {
             initiateConnection({ server, placement });
             return;

@@ -73,7 +73,7 @@ module.exports.getServerMonitoring = async (accountId, entryId, timeRange = "1h"
                 };
         }
         const { data, latest } = await fetchMonitoringData({ entryId }, timeRange);
-        if (!latest.osInfo?.name && entry.config?.protocol === "ssh") {
+        if (!entry.disabled && !latest.osInfo?.name && entry.config?.protocol === "ssh") {
             const { detectServerOS } = require("../utils/monitoringService");
             const detectedOsInfo = await detectServerOS(entry);
             if (detectedOsInfo) latest.osInfo = detectedOsInfo;
@@ -101,7 +101,7 @@ module.exports.getAllServersMonitoring = async (accountId) => {
         const policyActive = !isPolicyInactive(policy);
         const entries = await Entry.findAll({ where: { type: "server" } });
         const accessChecks = await Promise.all(entries.map(e => validateEntryAccess(accountId, e).then(r => ({ item: e, valid: r.valid }))));
-        let accessibleEntries = accessChecks.filter(({ item, valid }) => valid && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
+        let accessibleEntries = accessChecks.filter(({ item, valid }) => valid && !item.disabled && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
         if (policyActive) {
             accessibleEntries = accessibleEntries.filter((e) => checkEntryAgainstPolicy(policy, e).allowed);
         }

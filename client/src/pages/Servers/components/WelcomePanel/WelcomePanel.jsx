@@ -126,9 +126,10 @@ export const WelcomePanel = ({
                         <div className="recent-list">
                             {recentConnections.map((item, i) => {
                                 const hibernated = getHibernated(item.entryId);
+                                const disabled = getServerById(item.entryId)?.disabled ?? item.disabled;
                                 return (
                                     <div key={`${item.entryId}-${i}`}
-                                         className={`recent-item${hibernated ? " hibernated" : ""}`}
+                                         className={`recent-item${hibernated ? " hibernated" : ""}${disabled ? " disabled" : ""}`}
                                          onClick={() => handleClick(item)}
                                          onContextMenu={(e) => handleContextMenu(e, item)}>
                                         <div className="item-icon"><Icon path={getIconPath(item.icon)} /></div>

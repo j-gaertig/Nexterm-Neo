@@ -128,6 +128,15 @@ class ServerEditorService {
     _throwIfError(response.statusCode, response.body);
   }
 
+  static Future<void> setEntryDisabled({required String token, required dynamic entryId, required bool disabled}) async {
+    final response = await ApiClient.patch(
+      '/entries/$entryId',
+      body: {'disabled': disabled},
+      token: token,
+    );
+    _throwIfError(response.statusCode, response.body);
+  }
+
   static Future<List<EngineInfo>> getEngines(String token) async {
     try {
       final response = await ApiClient.get('/engines', token: token);

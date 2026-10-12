@@ -18,6 +18,10 @@ const execCommand = async (accountId, entryId, identityId, command) => {
         return { code: 403, message: "Access denied" };
     }
 
+    if (entry.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
     const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
     if (!policyCheck.allowed) {

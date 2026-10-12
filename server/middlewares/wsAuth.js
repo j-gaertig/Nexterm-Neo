@@ -8,7 +8,7 @@ const { getOrganizationAuditSettingsInternal } = require("../controllers/audit")
 const { resolveIdentity } = require("../utils/identityResolver");
 const { safeCloseWs } = require("../utils/wsClose");
 
-const SHARED_ENTRY_ATTRIBUTES = ["id", "type", "config", "integrationId"];
+const SHARED_ENTRY_ATTRIBUTES = ["id", "type", "config", "integrationId", "disabled"];
 
 const authenticateToken = async (ws, sessionToken) => {
     if (!sessionToken) return ws.close(4001, "You need to provide the token in the 'sessionToken' parameter"), null;
@@ -48,6 +48,7 @@ const authenticateSharedSession = async (ws, query) => {
 
     const entry = await Entry.findByPk(session.entryId, { attributes: SHARED_ENTRY_ATTRIBUTES });
     if (!entry) return ws.close(4005, "Entry not found"), null;
+    if (entry.disabled) return ws.close(4005, "Server is disabled"), null;
 
     return buildSharedContext(query, session, entry, { shareWritable: session.shareWritable });
 };
@@ -67,6 +68,7 @@ const authenticateOrganizationJoin = async (ws, query) => {
 
     const entry = await Entry.findByPk(access.session.entryId, { attributes: SHARED_ENTRY_ATTRIBUTES });
     if (!entry) return ws.close(4005, "Entry not found"), null;
+    if (entry.disabled) return ws.close(4005, "Server is disabled"), null;
 
     if (!(await checkOrgJoinAccessPolicy(ws, auth.user.id, entry))) return null;
 
@@ -121,6 +123,11 @@ const authenticateWebSocket = async (ws, query) => {
     const accessResult = await validateEntryAccess(user.id, entry);
     if (!accessResult.valid) {
         ws.close(4005, "You don't have access to this entry");
+        return null;
+    }
+
+    if (entry.disabled) {
+        ws.close(4005, "Server is disabled");
         return null;
     }
 

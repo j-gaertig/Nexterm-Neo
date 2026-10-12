@@ -91,6 +91,12 @@ const resolveJoinAccess = async (accountId, sessionId) => {
     }
 
     const writable = await hasOrganizationPermission(accountId, session.organizationId, Permission.ORG_SESSIONS_CONTROL);
+
+    const entry = await Entry.findByPk(session.entryId);
+    if (entry?.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     return { session, writable };
 };
 

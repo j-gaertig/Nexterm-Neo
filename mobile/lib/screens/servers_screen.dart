@@ -625,7 +625,7 @@ class _ServersScreenState extends State<ServersScreen> {
 
   Widget _buildServerGridCard(Server server, {Key? key, bool compact = false}) {
     final cs = Theme.of(context).colorScheme;
-    final offline = !server.isRunning;
+    final offline = !server.isRunning || server.disabled;
     final pve = server.isPve;
     final icon = _serverIcon(server);
     final (bg, fg) = offline
@@ -633,13 +633,15 @@ class _ServersScreenState extends State<ServersScreen> {
         : pve ? (cs.tertiaryContainer, cs.onTertiaryContainer) : (cs.primaryContainer, cs.onPrimaryContainer);
     String? sub;
     final ip = server.ip.trim();
-    if (pve && server.status != null) {
+    if (server.disabled) {
+      sub = ip.isNotEmpty && ip != 'N/A' ? 'Disabled · $ip' : 'Disabled';
+    } else if (pve && server.status != null) {
       sub = ip.isNotEmpty && ip != 'N/A' ? '${server.status} · $ip' : server.status;
     } else if (ip.isNotEmpty && ip != 'N/A') {
       sub = ip;
     }
     final tags = server.tags ?? const <Tag>[];
-    final statusLabel = offline ? 'Offline' : 'Online';
+    final statusLabel = server.disabled ? 'Disabled' : (offline ? 'Offline' : 'Online');
     return Semantics(
       key: key,
       button: true,
@@ -727,7 +729,7 @@ class _ServersScreenState extends State<ServersScreen> {
 
   Widget _buildServer(Server server, int depth, {Key? key}) {
     final cs = Theme.of(context).colorScheme;
-    final offline = !server.isRunning;
+    final offline = !server.isRunning || server.disabled;
     final pve = server.isPve;
     final icon = _serverIcon(server);
 
@@ -737,7 +739,9 @@ class _ServersScreenState extends State<ServersScreen> {
 
     String? sub;
     final ip = server.ip.trim();
-    if (pve && server.status != null) {
+    if (server.disabled) {
+      sub = ip.isNotEmpty && ip != 'N/A' ? 'Disabled · $ip' : 'Disabled';
+    } else if (pve && server.status != null) {
       sub = ip.isNotEmpty && ip != 'N/A' ? '${server.status} · $ip' : server.status;
     } else if (ip.isNotEmpty && ip != 'N/A') {
       sub = ip;
@@ -746,7 +750,7 @@ class _ServersScreenState extends State<ServersScreen> {
     final shownTags = tags.take(3).toList();
     final extraTags = tags.length - shownTags.length;
     final cappedDepth = depth.clamp(0, 2);
-    final statusLabel = offline ? 'Offline' : 'Online';
+    final statusLabel = server.disabled ? 'Disabled' : (offline ? 'Offline' : 'Online');
 
     return Semantics(
       button: true,
@@ -799,6 +803,13 @@ class _ServersScreenState extends State<ServersScreen> {
 
   Future<void> _initiateConnection(Server server,
       {ConnectionType type = ConnectionType.terminal, Map<String, dynamic>? directIdentity}) async {
+    if (server.disabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      }
+      return;
+    }
     final token = widget.authManager.sessionToken;
     if (token == null) return;
 
@@ -822,7 +833,11 @@ class _ServersScreenState extends State<ServersScreen> {
       }
       if (mounted) widget.onSwitchToSessions?.call();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to connect: $e'), behavior: SnackBarBehavior.floating));
+      if (!mounted) return;
+      final msg = e.toString().toLowerCase().contains('disabled')
+          ? '${server.name} is disabled'
+          : 'Failed to connect: $e';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
     }
   }
 
@@ -883,7 +898,7 @@ class _ServersScreenState extends State<ServersScreen> {
           _menuItem(ctx, AppIcons.cursorDefaultClick, 'Quick Connect', cs, () {
             Navigator.pop(ctx); _quickConnect(server);
           }),
-        if (server.canWakeOnLan)
+        if (server.canWakeOnLan && !server.disabled)
           _menuItem(ctx, AppIcons.powerPlug, 'Wake-On-LAN', cs, () {
             Navigator.pop(ctx); _wakeServer(server);
           }),
@@ -893,6 +908,10 @@ class _ServersScreenState extends State<ServersScreen> {
           }),
         _menuItem(ctx, AppIcons.contentCopy, 'Duplicate', cs, () {
           Navigator.pop(ctx); _duplicateServer(server);
+        }),
+        _menuItem(ctx, server.disabled ? AppIcons.checkCircle : AppIcons.serverOff,
+            server.disabled ? 'Enable' : 'Disable', cs, () {
+          Navigator.pop(ctx); _toggleServerDisabled(server);
         }),
         _menuItem(ctx, AppIcons.trashCanOutline, 'Delete', cs, () {
           Navigator.pop(ctx); _deleteServer(server);
@@ -918,6 +937,11 @@ class _ServersScreenState extends State<ServersScreen> {
       );
 
   Future<void> _quickConnect(Server server) async {
+    if (server.disabled) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      return;
+    }
     if (server.isPve) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Quick Connect is not supported for Proxmox entries'), behavior: SnackBarBehavior.floating));
@@ -945,6 +969,13 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _wakeServer(Server server) async {
+    if (server.disabled) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      }
+      return;
+    }
     final token = widget.authManager.sessionToken;
     if (token == null) {
       if (mounted) {
@@ -1101,6 +1132,23 @@ class _ServersScreenState extends State<ServersScreen> {
     }
   }
 
+  Future<void> _toggleServerDisabled(Server server) async {
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    final disabled = !server.disabled;
+    try {
+      await ServerEditorService.setEntryDisabled(token: token, entryId: server.id, disabled: disabled);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(disabled ? '${server.name} disabled' : '${server.name} enabled'), behavior: SnackBarBehavior.floating));
+      _refreshData();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(disabled ? 'Disable failed: $e' : 'Enable failed: $e'), behavior: SnackBarBehavior.floating));
+    }
+  }
+
   Future<void> _deleteServer(Server server) async {
     final token = widget.authManager.sessionToken;
     if (token == null) return;
@@ -1130,6 +1178,11 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   void _connectToServer(Server server) {
+    if (server.disabled) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      return;
+    }
     final cs = Theme.of(context).colorScheme;
     if (server.isStopped) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

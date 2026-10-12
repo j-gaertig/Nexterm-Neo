@@ -152,7 +152,7 @@ const ServerNote = ({ text, mode, isHovered }) => {
     );
 };
 
-export const ServerObject = ({ id, name, position, folderId, organizationId, nestedLevel, icon, type, connectToServer, status, tags = [], hibernatedSessionCount = 0 }) => {
+export const ServerObject = ({ id, name, position, folderId, organizationId, nestedLevel, icon, type, connectToServer, status, disabled = false, tags = [], hibernatedSessionCount = 0 }) => {
     const { loadServers, getServerById } = useContext(ServerContext);
     const { getLiveSessionsForEntry } = useLiveSessions();
     const { t } = useTranslation();
@@ -232,7 +232,7 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
 
     return (
         <div 
-            className={"server-object"}
+            className={"server-object" + (disabled ? " server-disabled" : "")}
             style={{ paddingLeft: `${15 + (nestedLevel * 15)}px`, opacity, position: 'relative' }} 
             data-id={id}
             ref={(node) => {

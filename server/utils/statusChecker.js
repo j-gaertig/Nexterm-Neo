@@ -57,6 +57,7 @@ const listAllServers = async () => {
         const entries = await Entry.findAll({
             where: {
                 type: ["server", "pve-qemu", "pve-lxc", "pve-shell"],
+                disabled: false,
             },
             attributes: ["id", "type", "name", "config", "integrationId", "status"],
         });
