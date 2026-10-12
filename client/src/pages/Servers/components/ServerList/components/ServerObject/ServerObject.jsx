@@ -152,7 +152,7 @@ const ServerNote = ({ text, mode, isHovered }) => {
     );
 };
 
-export const ServerObject = ({ id, name, position, folderId, organizationId, nestedLevel, icon, type, connectToServer, status, disabled = false, tags = [], hibernatedSessionCount = 0 }) => {
+export const ServerObject = ({ id, name, position, folderId, organizationId, nestedLevel, icon, type, connectToServer, status, disabled = false, accessBlocked = false, tags = [], hibernatedSessionCount = 0 }) => {
     const { loadServers, getServerById } = useContext(ServerContext);
     const { getLiveSessionsForEntry } = useLiveSessions();
     const { t } = useTranslation();
@@ -223,6 +223,7 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
         : undefined;
 
     const connect = () => {
+        if (accessBlocked) return;
         connectToServer(server.id, server.identities?.[0]);
     };
 
@@ -232,7 +233,7 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
 
     return (
         <div 
-            className={"server-object" + (disabled ? " server-disabled" : "")}
+            className={"server-object" + (disabled ? " server-disabled" : "") + (accessBlocked ? " server-access-blocked" : "")}
             style={{ paddingLeft: `${15 + (nestedLevel * 15)}px`, opacity, position: 'relative' }} 
             data-id={id}
             ref={(node) => {
@@ -255,7 +256,9 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
             </div>
             <div className="server-text">
                 <p className="server-name truncate-text">{name}</p>
-                {noteLine && <ServerNote text={noteLine} mode={serverNoteScrollMode || "none"} isHovered={isServerHovered} />}
+                {accessBlocked
+                    ? <span className="server-access-blocked-note">{t("servers.accessRestricted")}</span>
+                    : noteLine && <ServerNote text={noteLine} mode={serverNoteScrollMode || "none"} isHovered={isServerHovered} />}
             </div>
             {hibernatedSessionCount > 0 && (
                 <Tooltip text={`${hibernatedSessionCount} hibernated session${hibernatedSessionCount > 1 ? 's' : ''}`} delay={500} asChild>

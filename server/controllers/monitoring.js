@@ -7,7 +7,7 @@ const Integration = require("../models/Integration");
 const { Op } = require("sequelize");
 const { validateEntryAccess } = require("./entry");
 const { validateIntegrationAccess } = require("./integration");
-const { checkEntryAgainstPolicy, getAccessPolicy, isPolicyInactive } = require("../utils/accessPolicy");
+const { isPolicyInactive, checkEntryAccessPolicy } = require("../utils/accessPolicy");
 
 const TIME_RANGES = { "1h": { ms: 3600000, points: 60 }, "6h": { ms: 21600000, points: 360 }, "24h": { ms: 86400000, points: 720 } };
 
@@ -39,11 +39,8 @@ module.exports.getIntegrationMonitoring = async (accountId, integrationId, timeR
         const integration = await Integration.findByPk(integrationId);
         const access = await validateIntegrationAccess(accountId, integration);
         if (!access.valid) return access.error;
-        const policy = await getAccessPolicy(accountId);
-        if (!isPolicyInactive(policy)) {
-            const verdict = checkEntryAgainstPolicy(policy, { config: { ip: integration?.config?.ip, engineId: null } }, integration);
-            if (!verdict.allowed) return { code: 403, message: "Access denied: this integration IP is not allowed for your account" };
-        }
+        const verdict = await checkEntryAccessPolicy(accountId, { config: { ip: integration?.config?.ip, engineId: null } }, integration);
+        if (!verdict.allowed) return { code: 403, message: "Access denied: this integration IP is not allowed for your account" };
         const { data, latest } = await fetchMonitoringData({ integrationId }, timeRange);
         return {
             server: { id: `pve-${integration.id}`, integrationId: integration.id, name: integration.name, ip: integration.config?.ip, port: integration.config?.port, status: integration.status, monitoringEnabled: integration.config?.monitoringEnabled, type: "proxmox" },
@@ -60,18 +57,15 @@ module.exports.getServerMonitoring = async (accountId, entryId, timeRange = "1h"
         const entry = await Entry.findByPk(entryId);
         const access = await validateEntryAccess(accountId, entry);
         if (!access.valid) return access;
-        const policy = await getAccessPolicy(accountId);
-        if (!isPolicyInactive(policy)) {
-            const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
-            const verdict = checkEntryAgainstPolicy(policy, entry, integration);
-            if (!verdict.allowed)
-                return {
-                    code: 403,
-                    message: verdict.reason === "engine"
-                        ? "Access denied: this server must be reached through a different engine"
-                        : "Access denied: this server IP is not allowed for your account",
-                };
-        }
+        const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
+        const verdict = await checkEntryAccessPolicy(accountId, entry, integration);
+        if (!verdict.allowed)
+            return {
+                code: 403,
+                message: verdict.reason === "engine"
+                    ? "Access denied: this server must be reached through a different engine"
+                    : "Access denied: this server IP is not allowed for your account",
+            };
         const { data, latest } = await fetchMonitoringData({ entryId }, timeRange);
         if (!entry.disabled && !latest.osInfo?.name && entry.config?.protocol === "ssh") {
             const { detectServerOS } = require("../utils/monitoringService");
@@ -97,24 +91,32 @@ const buildMonitoringResult = (items, idField, tsMap, snapMap, transform) => ite
 
 module.exports.getAllServersMonitoring = async (accountId) => {
     try {
-        const policy = await getAccessPolicy(accountId);
-        const policyActive = !isPolicyInactive(policy);
+        const { getEffectivePolicies, checkPoliciesAgainstEntry } = require("../utils/accessPolicy");
+        const policies = await getEffectivePolicies(accountId);
+        const policyActive = policies.some((p) => !isPolicyInactive(p));
         const entries = await Entry.findAll({ where: { type: "server" } });
         const accessChecks = await Promise.all(entries.map(e => validateEntryAccess(accountId, e).then(r => ({ item: e, valid: r.valid }))));
-        let accessibleEntries = accessChecks.filter(({ item, valid }) => valid && !item.disabled && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
-        if (policyActive) {
-            accessibleEntries = accessibleEntries.filter((e) => checkEntryAgainstPolicy(policy, e).allowed);
-        }
+        const accessibleEntries = accessChecks.filter(({ item, valid }) => valid && !item.disabled && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
 
         const integrations = await Integration.findAll({ where: { type: "proxmox" } });
         const intAccessChecks = await Promise.all(integrations.map(i => validateIntegrationAccess(accountId, i).then(r => ({ item: i, valid: r.valid }))));
-        let accessibleInts = intAccessChecks.filter(({ item, valid }) => valid && item.config?.monitoringEnabled).map(({ item }) => item);
+        const accessibleInts = intAccessChecks.filter(({ item, valid }) => valid && item.config?.monitoringEnabled).map(({ item }) => item);
+
+        // Blocked servers stay visible but must not leak monitoring data.
+        const blockedIds = new Set();
         if (policyActive) {
-            accessibleInts = accessibleInts.filter((i) =>
-                checkEntryAgainstPolicy(policy, { config: { ip: i.config?.ip, engineId: null } }, i).allowed);
+            for (const e of accessibleEntries) {
+                if (!checkPoliciesAgainstEntry(policies, e).allowed) blockedIds.add(e.id);
+            }
+            for (const i of accessibleInts) {
+                if (!checkPoliciesAgainstEntry(policies, { config: { ip: i.config?.ip, engineId: null } }, i).allowed) {
+                    blockedIds.add(`pve-${i.id}`);
+                }
+            }
         }
 
-        const entryIds = accessibleEntries.map(e => e.id), intIds = accessibleInts.map(i => i.id);
+        const entryIds = accessibleEntries.filter((e) => !blockedIds.has(e.id)).map(e => e.id);
+        const intIds = accessibleInts.filter((i) => !blockedIds.has(`pve-${i.id}`)).map(i => i.id);
         const [entryData, entrySnaps, intData, intSnaps] = await Promise.all([
             entryIds.length ? MonitoringData.findAll({ where: { entryId: entryIds }, order: [["timestamp", "DESC"]] }) : [],
             entryIds.length ? MonitoringSnapshot.findAll({ where: { entryId: entryIds } }) : [],
@@ -131,7 +133,7 @@ module.exports.getAllServersMonitoring = async (accountId) => {
         return [
             ...buildMonitoringResult(accessibleEntries, "id", latestByEntry, snapByEntry, e => ({ id: e.id, name: e.name, ip: e.config?.ip, status: e.status, port: e.config?.port, icon: e.icon, monitoringEnabled: e.config?.monitoringEnabled, type: "server" })),
             ...buildMonitoringResult(accessibleInts, "id", latestByInt, snapByInt, i => ({ id: `pve-${i.id}`, integrationId: i.id, name: i.name, ip: i.config?.ip, status: i.status, port: i.config?.port, icon: "proxmox", monitoringEnabled: i.config?.monitoringEnabled, type: "proxmox" })),
-        ];
+        ].map((item) => ({ ...item, accessBlocked: blockedIds.has(item.id) }));
     } catch (error) {
         logger.error("Error getting all servers monitoring", { error: error.message });
         return { code: 500, message: "Internal server error" };

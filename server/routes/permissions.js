@@ -177,6 +177,33 @@ app.put("/users/:accountId/permissions", async (req, res) => {
 });
 
 /**
+ * GET /permissions/groups/{id}/access
+ * @summary Get Group Access Policy
+ * @description Returns the IP/engine blacklist/whitelist policy of a role. Applies to all members in addition to their personal policy.
+ * @tags Permissions
+ * @security BearerAuth
+ * @param {string} id.path.required - Group id
+ * @return {object} 200 - The group's access policy
+ */
+app.get("/groups/:id/access", async (req, res) =>
+    handle(res, await controller.getGroupAccessPolicy(req.params.id)));
+
+/**
+ * PUT /permissions/groups/{id}/access
+ * @summary Set Group Access Policy
+ * @description Sets the IP/engine blacklist/whitelist policy of a role.
+ * @tags Permissions
+ * @security BearerAuth
+ * @param {string} id.path.required - Group id
+ * @param {object} request.body.required - { ipMode, ipRules, engineMode, engineIds }
+ * @return {object} 200 - The group's updated access policy
+ */
+app.put("/groups/:id/access", async (req, res) => {
+    if (validateSchema(res, setAccessPolicyValidation, req.body)) return;
+    handle(res, await controller.setGroupAccessPolicy(req.params.id, req.body));
+});
+
+/**
  * GET /permissions/access-engines
  * @summary List Engines For Access Policy
  * @description Returns id/name of all engines for the per-user access policy editor.

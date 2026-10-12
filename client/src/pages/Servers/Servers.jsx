@@ -221,11 +221,20 @@ export const Servers = () => {
         sendToast("Error", t("servers.messages.serverDisabled", { name: server?.name ?? "" }));
     };
 
+    const notifyAccessBlocked = (server) => {
+        sendToast("Error", t("servers.messages.accessBlocked", { name: server?.name ?? "" }));
+    };
+
     const connectToServer = async (serverId, identity, overrideRenderer, placement = null) => {
         const server = getServerById(serverId);
 
         if (server?.disabled) {
             notifyServerDisabled(server);
+            return;
+        }
+
+        if (server?.accessBlocked) {
+            notifyAccessBlocked(server);
             return;
         }
 
@@ -300,6 +309,10 @@ export const Servers = () => {
         const { server, identity = null, type = null, directIdentity = null, scriptId = null, scriptName = null, placement = null, reconnectSessionId = null, reconnectKey: existingReconnectKey = null } = options;
         if (server?.disabled) {
             if (!reconnectSessionId) notifyServerDisabled(server);
+            return false;
+        }
+        if (server?.accessBlocked) {
+            if (!reconnectSessionId) notifyAccessBlocked(server);
             return false;
         }
         const identityKey = identity?.id ?? (directIdentity
@@ -420,6 +433,11 @@ export const Servers = () => {
             return { connected: false, deferred: true };
         }
 
+        if (options.server.accessBlocked) {
+            if (!options.reconnectSessionId) notifyAccessBlocked(options.server);
+            return { connected: false, deferred: true };
+        }
+
         const requiresReason = checkConnectionReasonRequired(options.server.id, servers);
         if (requiresReason) {
             setPendingConnection(options);
@@ -447,6 +465,10 @@ export const Servers = () => {
         const hibernatedServer = hibernatedServerId ? getServerById(hibernatedServerId) : null;
         if ((hibernatedServer?.disabled ?? hibernated?.server?.disabled) === true) {
             notifyServerDisabled(hibernatedServer ?? hibernated?.server);
+            return;
+        }
+        if ((hibernatedServer?.accessBlocked ?? hibernated?.server?.accessBlocked) === true) {
+            notifyAccessBlocked(hibernatedServer ?? hibernated?.server);
             return;
         }
         try {
@@ -612,6 +634,10 @@ export const Servers = () => {
             notifyServerDisabled(duplicateServer ?? originalSession?.server);
             return;
         }
+        if ((duplicateServer?.accessBlocked ?? originalSession?.server?.accessBlocked) === true) {
+            notifyAccessBlocked(duplicateServer ?? originalSession?.server);
+            return;
+        }
         try {
             const result = await postRequest(`/connections/${sessionId}/duplicate`, {
                 tabId: getTabId(),
@@ -646,6 +672,10 @@ export const Servers = () => {
             const fmServer = originalSession.server?.id ? getServerById(originalSession.server.id) : null;
             if ((fmServer?.disabled ?? originalSession.server?.disabled) === true) {
                 notifyServerDisabled(fmServer ?? originalSession.server);
+                return;
+            }
+            if ((fmServer?.accessBlocked ?? originalSession.server?.accessBlocked) === true) {
+                notifyAccessBlocked(fmServer ?? originalSession.server);
                 return;
             }
 
@@ -697,6 +727,10 @@ export const Servers = () => {
     const openDirectConnect = (server, placement = null) => {
         if (server?.disabled) {
             notifyServerDisabled(server);
+            return;
+        }
+        if (server?.accessBlocked) {
+            notifyAccessBlocked(server);
             return;
         }
         if (!requiresIdentity(server)) {

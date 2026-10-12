@@ -11,6 +11,7 @@ const PermissionGroup = require("../models/PermissionGroup");
 const GroupMember = require("../models/GroupMember");
 const AccountPermission = require("../models/AccountPermission");
 const AccountAccessPolicy = require("../models/AccountAccessPolicy");
+const GroupAccessPolicy = require("../models/GroupAccessPolicy");
 const { isAccountAdmin, countAdmins } = require("../utils/permission");
 const { saveAvatar, deleteAvatar, isWebP } = require("../utils/avatarService");
 const { ACCOUNT_VIEW_ATTRIBUTES } = require("../utils/accountView");
@@ -216,14 +217,17 @@ const attachGroups = async (users) => {
     if (!users.length) return users;
 
     const userIds = users.map((u) => u.id);
-    const [memberships, groups, policies] = await Promise.all([
+    const [memberships, groups, personalPolicies, groupPolicies] = await Promise.all([
         GroupMember.findAll({ where: { accountId: { [Op.in]: userIds } } }),
         PermissionGroup.findAll({ order: [["sortOrder", "ASC"], ["id", "ASC"]] }),
         AccountAccessPolicy.findAll({ where: { accountId: { [Op.in]: userIds } } }),
+        GroupAccessPolicy.findAll(),
     ]);
 
     const groupById = new Map(groups.map((g) => [g.id, g]));
-    const policyByAccountId = new Map(policies.map((p) => [p.accountId, p]));
+    const personalByAccountId = new Map(personalPolicies.map((p) => [p.accountId, p]));
+    const groupPolicyById = new Map(groupPolicies.map((p) => [p.groupId, p]));
+    const isActive = (p) => p && (p.ipMode !== "disabled" || p.engineMode !== "disabled");
     const defaultGroups = groups.filter((g) => g.isDefault);
     const toView = (g) => ({ id: g.id, name: g.name, color: g.color, isAdmin: g.isAdmin, isDefault: g.isDefault });
 
@@ -237,14 +241,13 @@ const attachGroups = async (users) => {
         for (const dg of defaultGroups) if (!all.some((g) => g.id === dg.id)) all.push(dg);
         all.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
 
-        const policy = policyByAccountId.get(user.id);
-        const accessPolicy = policy ? {
-            ipMode: policy.ipMode,
-            engineMode: policy.engineMode,
-            ipRuleCount: Array.isArray(policy.ipRules) ? policy.ipRules.length : 0,
-            engineCount: Array.isArray(policy.engineIds) ? policy.engineIds.length : 0,
-            restricted: policy.ipMode !== "disabled" || policy.engineMode !== "disabled",
-        } : { ipMode: "disabled", engineMode: "disabled", ipRuleCount: 0, engineCount: 0, restricted: false };
+        const personal = personalByAccountId.get(user.id);
+        const restricted = isActive(personal) || all.some((g) => isActive(groupPolicyById.get(g.id)));
+        const accessPolicy = {
+            ipMode: personal?.ipMode || "disabled",
+            engineMode: personal?.engineMode || "disabled",
+            restricted,
+        };
 
         return { ...user, groups: all.map(toView), accessPolicy };
     });

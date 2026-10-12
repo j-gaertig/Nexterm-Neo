@@ -1,7 +1,7 @@
 import "./styles.sass";
 import { useMemo, useState } from "react";
 import Icon from "@mdi/react";
-import { mdiPlus, mdiClose, mdiInformationOutline } from "@mdi/js";
+import { mdiPlus, mdiClose } from "@mdi/js";
 import Checkbox from "@/common/components/Checkbox";
 import { useTranslation } from "react-i18next";
 
@@ -14,7 +14,7 @@ const normalize = (policy) => ({
     engineIds: Array.isArray(policy?.engineIds) ? policy.engineIds : [],
 });
 
-export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
+export const AccessPolicyEditor = ({ value, onChange, engines = [], inheritedRestricted = false }) => {
     const { t } = useTranslation();
     const policy = normalize(value);
     const [draft, setDraft] = useState("");
@@ -79,7 +79,6 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
             <div className="ape-section">
                 <div className="ape-section-head">
                     <h3>{t("settings.permissions.access.ipTitle")}</h3>
-                    <p>{t("settings.permissions.access.ipDescription")}</p>
                 </div>
                 <div className="ape-modes">
                     {MODES.map((mode) => (
@@ -96,10 +95,6 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
 
                 {ipActive && (
                     <>
-                        <div className="ape-hint">
-                            <Icon path={mdiInformationOutline} />
-                            <span>{t(`settings.permissions.access.${policy.ipMode === "whitelist" ? "ipWhitelistHint" : "ipBlacklistHint"}`)}</span>
-                        </div>
                         <div className="ape-add-row">
                             <input
                                 className="text-input"
@@ -125,9 +120,7 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
                             </div>
                         ) : (
                             <p className="empty">
-                                {policy.ipMode === "whitelist"
-                                    ? t("settings.permissions.access.whitelistEmpty")
-                                    : t("settings.permissions.access.noRules")}
+                                {t(`settings.permissions.access.${policy.ipMode === "whitelist" ? "emptyRestricted" : "emptyAllowed"}`)}
                             </p>
                         )}
                     </>
@@ -137,7 +130,6 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
             <div className="ape-section">
                 <div className="ape-section-head">
                     <h3>{t("settings.permissions.access.engineTitle")}</h3>
-                    <p>{t("settings.permissions.access.engineDescription")}</p>
                 </div>
                 <div className="ape-modes">
                     {MODES.map((mode) => (
@@ -154,10 +146,6 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
 
                 {engineActive && (
                     <>
-                        <div className="ape-hint">
-                            <Icon path={mdiInformationOutline} />
-                            <span>{t(`settings.permissions.access.${policy.engineMode === "whitelist" ? "engineWhitelistHint" : "engineBlacklistHint"}`)}</span>
-                        </div>
                         {engineOptions.length > 1 ? (
                             <div className="ape-engine-list">
                                 {engineOptions.map((engine) => {
@@ -234,9 +222,16 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [] }) => {
                                 ))}
                             </div>
                         )}
+                        {policy.engineMode === "whitelist" && policy.engineIds.length === 0 && (
+                            <p className="empty">{t("settings.permissions.access.emptyRestricted")}</p>
+                        )}
                     </>
                 )}
             </div>
+
+            {inheritedRestricted && (
+                <p className="ape-inherited-note">{t("settings.permissions.access.inheritedNote")}</p>
+            )}
         </div>
     );
 };

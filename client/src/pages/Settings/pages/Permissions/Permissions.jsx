@@ -5,7 +5,7 @@ import Icon from "@mdi/react";
 import {
     mdiAccountMultipleOutline, mdiChevronDown, mdiPlus, mdiShieldAccount, mdiShieldKeyOutline,
     mdiShieldCrownOutline, mdiTrashCanOutline, mdiCogOutline, mdiAccountGroup,
-    mdiDragVertical,
+    mdiDragVertical, mdiEarth,
 } from "@mdi/js";
 import { getRequest, patchRequest, deleteRequest, putRequest } from "@/common/utils/RequestUtil.js";
 import { useToast } from "@/common/contexts/ToastContext.jsx";
@@ -13,6 +13,7 @@ import { useTranslation } from "react-i18next";
 import Button from "@/common/components/Button";
 import TabSwitcher from "@/common/components/TabSwitcher";
 import PermissionMatrix from "@/common/components/PermissionMatrix";
+import AccessPolicyEditor from "./components/AccessPolicyEditor";
 import { ActionConfirmDialog } from "@/common/components/ActionConfirmDialog/ActionConfirmDialog.jsx";
 import CreateRoleDialog from "./components/CreateRoleDialog";
 import RoleMembers from "./components/RoleMembers";
@@ -52,6 +53,7 @@ export const Permissions = () => {
     const [details, setDetails] = useState({});
     const [createOpen, setCreateOpen] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState(null);
+    const [engines, setEngines] = useState([]);
 
     const loadGroups = useCallback(async () => {
         try {
@@ -63,6 +65,7 @@ export const Permissions = () => {
 
     useEffect(() => {
         getRequest("permissions/catalog").then((res) => setCatalog(res.system)).catch(() => {});
+        getRequest("permissions/access-engines").then(setEngines).catch(() => setEngines([]));
         loadGroups();
     }, [loadGroups]);
 
@@ -110,6 +113,17 @@ export const Permissions = () => {
             loadGroups();
         } catch (error) {
             sendToast("Error", error.message || t("settings.permissions.saveError"));
+        }
+    };
+
+    const changeAccessPolicy = async (group, policy) => {
+        const current = details[group.id] || {};
+        setDetails((prev) => ({ ...prev, [group.id]: { ...current, accessPolicy: policy } }));
+        try {
+            await putRequest(`permissions/groups/${group.id}/access`, policy);
+        } catch (error) {
+            sendToast("Error", error.message || t("settings.permissions.saveError"));
+            loadDetail(group.id);
         }
     };
 
@@ -205,6 +219,7 @@ export const Permissions = () => {
                                             tabs={[
                                                 { key: "permissions", label: t("settings.permissions.permissionsTab"), icon: mdiShieldKeyOutline },
                                                 { key: "members", label: t("settings.permissions.membersTab"), icon: mdiAccountMultipleOutline },
+                                                { key: "access", label: t("settings.permissions.accessTab"), icon: mdiEarth },
                                                 ...(!group.isSystem ? [{ key: "settings", label: t("settings.permissions.settingsTab"), icon: mdiCogOutline }] : []),
                                             ]}
                                             activeTab={subTab}
@@ -233,6 +248,14 @@ export const Permissions = () => {
                                                                  void loadDetail(group.id);
                                                                  void loadGroups();
                                                              }} />
+                                            )}
+
+                                            {subTab === "access" && detail && (
+                                                <AccessPolicyEditor
+                                                    value={detail.accessPolicy}
+                                                    engines={engines}
+                                                    onChange={(policy) => changeAccessPolicy(group, policy)}
+                                                />
                                             )}
 
                                             {subTab === "settings" && !group.isSystem && (
