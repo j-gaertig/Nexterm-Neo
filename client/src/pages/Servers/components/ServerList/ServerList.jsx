@@ -44,6 +44,7 @@ import {
     mdiTunnel,
     mdiWeb,
     mdiNoteEditOutline,
+    mdiPause,
 } from "@mdi/js";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/common/components/ContextMenu";
 import { useDrop, useDragLayer } from "react-dnd";
@@ -427,6 +428,17 @@ export const ServerList = ({
             setEditServerId(integrationId);
             setProxmoxDialogOpen();
         }
+    };
+
+    const toggleServerDisabled = () => {
+        if (!server) return;
+        const nextDisabled = !server.disabled;
+        patchRequest(`entries/${server.id}`, { disabled: nextDisabled })
+            .then(loadServers)
+            .catch(() => sendToast("Error", t(nextDisabled
+                ? "servers.contextMenu.disableFailed"
+                : "servers.contextMenu.enableFailed", { name: server.name })));
+        contextMenu.close();
     };
 
     const postPVEAction = (type) => {
@@ -944,6 +956,14 @@ export const ServerList = ({
                                 />
 
                                 <ContextMenuItem
+                                    icon={server?.disabled ? mdiPlay : mdiPause}
+                                    label={t(server?.disabled
+                                        ? "servers.contextMenu.enableServer"
+                                        : "servers.contextMenu.disableServer")}
+                                    onClick={toggleServerDisabled}
+                                />
+
+                                <ContextMenuItem
                                     icon={mdiTag}
                                     label={t("servers.tags.title")}
                                 >
@@ -1015,6 +1035,13 @@ export const ServerList = ({
                                 >
                                     <TagsSubmenu entryId={contextClickedId} entryTags={server?.tags || []} />
                                 </ContextMenuItem>
+                                <ContextMenuItem
+                                    icon={server?.disabled ? mdiPlay : mdiPause}
+                                    label={t(server?.disabled
+                                        ? "servers.contextMenu.enableServer"
+                                        : "servers.contextMenu.disableServer")}
+                                    onClick={toggleServerDisabled}
+                                />
                                 {(server?.status === "running" || server?.status === "online") && server.type !== "pve-shell" && (
                                     <>
                                         <ContextMenuSeparator />

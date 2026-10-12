@@ -124,6 +124,13 @@
       &:hover
         background-color: color-mix(in srgb, colors.$primary 20%, transparent)
 
+    &.disabled
+      opacity: 0.45
+      filter: grayscale(1)
+
+      .item-icon
+        background-color: colors.$gray
+
     .item-icon
       width: 2rem
       height: 2rem

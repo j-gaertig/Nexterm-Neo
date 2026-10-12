@@ -69,6 +69,7 @@ const resolveJumpHosts = async (entry) => {
     for (const jumpHostId of jumpHostIds) {
         const jhEntry = await Entry.findByPk(jumpHostId);
         if (!jhEntry) throw new Error(`Jump host entry ${jumpHostId} not found`);
+        if (jhEntry.disabled) throw new Error(`Jump host entry ${jumpHostId} is disabled`);
 
         const { host, port } = getHostPort(jhEntry);
         const identityResult = await resolveIdentity(jhEntry, null, null, null);
@@ -103,6 +104,7 @@ const createConnectionForSession = async (sessionId, accountId) => {
 
     const entry = await Entry.findByPk(session.entryId);
     if (!entry) throw new Error("Entry not found");
+    if (entry.disabled) throw new Error("Server is disabled");
 
     const { type, identityId, directIdentity, scriptId } = session.configuration;
     if (type === "sftp") return { success: true, skipped: true };

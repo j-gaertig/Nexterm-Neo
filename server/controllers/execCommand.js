@@ -16,6 +16,10 @@ const execCommand = async (accountId, entryId, identityId, command) => {
         return { code: 403, message: "Access denied" };
     }
 
+    if (entry.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     if (entry.config?.protocol !== "ssh") {
         return { code: 400, message: "Command execution is only supported for SSH entries" };
     }

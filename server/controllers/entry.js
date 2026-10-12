@@ -95,6 +95,13 @@ const validateJumpHosts = async (accountId, jumpHosts) => {
             };
         }
 
+        if (jumpHostEntry.disabled) {
+            return {
+                valid: false,
+                error: { code: 403, message: `Jump host ${jumpHostId} is disabled` }
+            };
+        }
+
         const accessCheck = await validateEntryAccess(accountId, jumpHostEntry, "You don't have permission to use this jump host");
         if (!accessCheck.valid) {
             return { valid: false, error: accessCheck };
@@ -333,6 +340,7 @@ module.exports.getEntry = async (accountId, entryId) => {
 
     return {
         ...entry,
+        disabled: Boolean(entry.disabled ?? entry.dataValues?.disabled),
         identities: filteredIdentityIds
     };
 };
@@ -423,6 +431,7 @@ module.exports.listEntries = async (accountId) => {
             icon: entry.icon,
             name: entry.name,
             status: entry.status,
+            disabled: Boolean(entry.disabled),
             position: entry.position,
             renderer: entry.renderer,
             tags: tags || [],
@@ -485,6 +494,7 @@ module.exports.duplicateEntry = async (accountId, entryId) => {
     const newEntry = await Entry.create({
         ...entry,
         id: undefined,
+        disabled: false,
         name: entry.name + " (Copy)",
     });
 
@@ -719,6 +729,10 @@ module.exports.wakeEntry = async (accountId, entryId) => {
         return { code: 400, message: "Wake-On-LAN is only supported for server entries" };
     }
 
+    if (entry.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     const config = entry.config || {};
     const macAddress = config.macAddress;
 
@@ -803,6 +817,7 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
                     name: entry.name,
                     icon: entry.icon,
                     type: entry.type,
+                    disabled: Boolean(entry.disabled),
                     protocol: entry.config?.protocol || null,
                     connectionType: log.action,
                     timestamp: log.timestamp,

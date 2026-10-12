@@ -197,6 +197,7 @@
         "authenticationFailed": "Authentifizierung fehlgeschlagen",
         "permissionDenied": "Erlaubnis verweigert",
         "failed": "Verbindung fehlgeschlagen",
+        "disabled": "Server ist deaktiviert",
         "closedUnexpectedly": "Verbindung unerwartet geschlossen",
         "error": "Verbindungsfehler aufgetreten",
         "scriptClosedUnexpectedly": "Unerwartetes Schließen der Skriptverbindung",
@@ -1618,6 +1619,10 @@
       "editServer": "Server bearbeiten",
       "editIntegration": "Integration bearbeiten",
       "duplicateServer": "Server duplizieren",
+      "disableServer": "Server deaktivieren",
+      "enableServer": "Server aktivieren",
+      "disableFailed": "„{{name}}“ konnte nicht deaktiviert werden.",
+      "enableFailed": "„{{name}}“ konnte nicht aktiviert werden.",
       "pasteIdentityPassword": "Passwort einfügen",
       "deleteServer": "Server löschen",
       "deleteConfirm": "Bist du sicher, dass du „{{name}}“ löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
@@ -1670,7 +1675,8 @@
       "createFailed": "Server kann nicht erstellt werden",
       "updateFailed": "Server kann nicht aktualisiert werden",
       "createIdentityFailed": "Identität kann nicht erstellt werden",
-      "updateIdentityFailed": "Identität kann nicht aktualisiert werden"
+      "updateIdentityFailed": "Identität kann nicht aktualisiert werden",
+      "serverDisabled": "Server „{{name}}“ ist deaktiviert"
     },
     "dialog": {
       "addServer": "Server hinzufügen",

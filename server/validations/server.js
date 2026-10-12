@@ -48,6 +48,7 @@ module.exports.createServerValidation = Joi.object({
     icon: Joi.string().optional(),
     type: Joi.string().valid("server").optional().default("server"),
     renderer: Joi.string().optional(),
+    disabled: Joi.boolean().optional(),
     identities: Joi.array().items(Joi.number()).optional(),
     config: configValidation.required()
 });
@@ -59,6 +60,7 @@ module.exports.updateServerValidation = Joi.object({
     icon: Joi.string().optional(),
     type: Joi.string().valid("server", "pve-shell", "pve-lxc", "pve-qemu").optional(),
     renderer: Joi.string().optional(),
+    disabled: Joi.boolean().optional(),
     identities: Joi.array().items(Joi.number()).optional(),
     config: configValidation
 });

@@ -88,6 +88,10 @@ const createSession = async ({
         return { code: 403, message: "Access denied" };
     }
 
+    if (entry.disabled) {
+        return { code: 403, message: "Server is disabled" };
+    }
+
     if (directIdentity && entry.type?.startsWith('pve-')) {
         return { code: 400, message: "Direct connections are not supported for Proxmox entries" };
     }
@@ -316,6 +320,7 @@ const getSession = async (accountId, sessionId) => {
         type: entry.type,
         icon: entry.icon,
         renderer: entry.renderer,
+        disabled: Boolean(entry.disabled),
         protocol: entry.config?.protocol,
     };
 
