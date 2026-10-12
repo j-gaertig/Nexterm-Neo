@@ -13,6 +13,8 @@ const { getAdminGroupIds, countAdmins, isAccountAdmin } = require("../utils/perm
 const { ACCOUNT_VIEW_ATTRIBUTES, toAccountView } = require("../utils/accountView");
 const { revokeLiveSessionAccess } = require("./liveSession");
 const logger = require("../utils/logger");
+const { getAccessPolicy, setAccessPolicy } = require("../utils/accessPolicy");
+const Engine = require("../models/Engine");
 
 const TRI = ["allow", "deny", "neutral"];
 
@@ -173,10 +175,11 @@ module.exports.getUserPermissions = async (accountId) => {
     const account = await Account.findByPk(accountId);
     if (!account) return { code: 404, message: "Account not found" };
 
-    const [memberships, overrides, effective] = await Promise.all([
+    const [memberships, overrides, effective, accessPolicy] = await Promise.all([
         GroupMember.findAll({ where: { accountId } }),
         AccountPermission.findAll({ where: { accountId } }),
         getSystemPermissions(accountId),
+        getAccessPolicy(accountId),
     ]);
 
     return {
@@ -184,6 +187,7 @@ module.exports.getUserPermissions = async (accountId) => {
         groupIds: memberships.map((m) => m.groupId),
         overrides: overrides.reduce((acc, o) => ({ ...acc, [o.permission]: o.value }), {}),
         effective,
+        accessPolicy,
     };
 };
 
@@ -253,4 +257,25 @@ module.exports.setOrgMemberPermissions = async (organizationId, accountId, permi
     revokeLiveSessionAccess(organizationId, accountId);
 
     return await module.exports.getOrgMemberPermissions(organizationId, accountId);
+};
+
+module.exports.getUserAccessPolicy = async (accountId) => {
+    const account = await Account.findByPk(accountId);
+    if (!account) return { code: 404, message: "Account not found" };
+    return await getAccessPolicy(accountId);
+};
+
+module.exports.setUserAccessPolicy = async (accountId, input) => {
+    const account = await Account.findByPk(accountId);
+    if (!account) return { code: 404, message: "Account not found" };
+    return await setAccessPolicy(accountId, input || {});
+};
+
+module.exports.listAccessEngines = async () => {
+    const engines = await Engine.findAll({ order: [["createdAt", "ASC"]] });
+    return engines.map((engine) => ({
+        id: engine.id,
+        name: engine.name,
+        isLocal: !!engine.isLocal,
+    }));
 };

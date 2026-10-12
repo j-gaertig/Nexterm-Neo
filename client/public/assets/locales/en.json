@@ -862,8 +862,10 @@
         "deleteUser": "Delete user",
         "loginAsUser": "Login as user",
         "deleteConfirm": "This will permanently delete the user and all associated data.",
-        "managePermissions": "Manage permissions"
-      }
+        "managePermissions": "Manage permissions",
+        "networkRestrictions": "Network restrictions"
+      },
+      "accessRestrictedHint": "This user has IP or engine restrictions"
     },
     "userDialog": {
       "title": "Create new user",
@@ -1551,7 +1553,30 @@
       "deleteRole": "Delete role",
       "deleteConfirm": "This will permanently delete the role \"{{name}}\" and remove it from all members.",
       "inheritsAllow": "Inherits: Allowed",
-      "inheritsDeny": "Inherits: Denied"
+      "inheritsDeny": "Inherits: Denied",
+      "accessTab": "Network",
+      "access": {
+        "ipTitle": "IP addresses",
+        "ipDescription": "Control which server IPs or hostnames this user may connect to and see in monitoring.",
+        "engineTitle": "Engines",
+        "engineDescription": "Control which engines this user may connect through.",
+        "mode": {
+          "disabled": "No restriction",
+          "blacklist": "Blacklist",
+          "whitelist": "Whitelist"
+        },
+        "ipPlaceholder": "e.g. 10.0.0.5, 10.0.0.0/24, *.example.com",
+        "ipBlacklistHint": "Connections and monitoring for these IPs/hostnames are blocked. Supports exact values, * wildcards and IPv4 CIDR ranges.",
+        "ipWhitelistHint": "Only these IPs/hostnames can be connected to and seen in monitoring. Supports exact values, * wildcards and IPv4 CIDR ranges.",
+        "engineBlacklistHint": "Connections through these engines are blocked.",
+        "engineWhitelistHint": "Only connections through these engines are allowed.",
+        "noRules": "No entries yet — add IPs, hostnames or CIDR ranges above.",
+        "whitelistEmpty": "Whitelist is empty: nothing is allowed until you add at least one entry.",
+        "defaultEngine": "Default (automatic)",
+        "localEngine": "local",
+        "unknownEngine": "Engine #{{id}}",
+        "engineIdPlaceholder": "Engine ID, e.g. 2"
+      }
     }
   },
   "tunnel": {

@@ -31,3 +31,10 @@ module.exports.setGroupsValidation = Joi.object({
 module.exports.reorderGroupsValidation = Joi.object({
     order: Joi.array().items(Joi.number().integer().positive()).required(),
 });
+
+module.exports.setAccessPolicyValidation = Joi.object({
+    ipMode: Joi.string().valid("disabled", "blacklist", "whitelist").optional(),
+    ipRules: Joi.array().items(Joi.string().max(253)).max(200).optional(),
+    engineMode: Joi.string().valid("disabled", "blacklist", "whitelist").optional(),
+    engineIds: Joi.array().items(Joi.number().integer().positive().allow(null)).max(100).optional(),
+});

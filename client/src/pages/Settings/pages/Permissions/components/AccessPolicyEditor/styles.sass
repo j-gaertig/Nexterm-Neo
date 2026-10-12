@@ -1,0 +1,155 @@
+@use "@/common/styles/colors"
+
+.access-policy-editor
+  display: flex
+  flex-direction: column
+  gap: 1.5rem
+
+  .ape-section
+    display: flex
+    flex-direction: column
+    gap: 0.75rem
+
+    .ape-section-head
+      h3
+        margin: 0
+        font-size: 0.95rem
+        color: colors.$white
+
+      p
+        margin: 0.25rem 0 0
+        font-size: 0.8rem
+        color: colors.$subtext
+
+    .ape-modes
+      display: flex
+      gap: 0.5rem
+
+      .ape-mode
+        flex: 1
+        padding: 0.5rem 0.75rem
+        border-radius: 0.6rem
+        border: 1px solid colors.$dark-gray
+        background-color: colors.$lighter-background
+        color: colors.$subtext
+        font-size: 0.82rem
+        font-weight: 600
+        cursor: pointer
+        transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease
+
+        &:hover
+          border-color: colors.$gray
+
+        &.selected
+          border-color: colors.$primary
+          background-color: colors.$primary-opacity
+          color: colors.$white
+
+    .ape-hint
+      display: flex
+      align-items: flex-start
+      gap: 0.5rem
+      font-size: 0.78rem
+      color: colors.$subtext
+
+      svg
+        width: 1rem
+        height: 1rem
+        flex-shrink: 0
+        margin-top: 0.1rem
+
+    .ape-add-row
+      display: flex
+      gap: 0.5rem
+
+      .text-input
+        flex: 1
+
+      .ape-add-btn
+        display: flex
+        align-items: center
+        justify-content: center
+        width: 2.5rem
+        border-radius: 0.6rem
+        border: 1px solid colors.$dark-gray
+        background-color: colors.$lighter-background
+        color: colors.$white
+        cursor: pointer
+
+        svg
+          width: 1.1rem
+          height: 1.1rem
+
+        &:hover
+          border-color: colors.$primary
+
+    .ape-tags
+      display: flex
+      flex-wrap: wrap
+      gap: 0.45rem
+
+      .ape-tag
+        display: inline-flex
+        align-items: center
+        gap: 0.4rem
+        padding: 0.3rem 0.35rem 0.3rem 0.7rem
+        border-radius: 2rem
+        background-color: colors.$primary-opacity
+        border: 1px solid colors.$primary
+        color: colors.$white
+        font-size: 0.78rem
+        font-family: monospace
+
+        button
+          display: flex
+          align-items: center
+          justify-content: center
+          width: 1.3rem
+          height: 1.3rem
+          border: none
+          border-radius: 50%
+          background: transparent
+          color: colors.$subtext
+          cursor: pointer
+
+          svg
+            width: 0.85rem
+            height: 0.85rem
+
+          &:hover
+            color: colors.$white
+
+    .empty
+      color: colors.$subtext
+      font-size: 0.8rem
+      margin: 0
+
+    .ape-engine-list
+      display: flex
+      flex-direction: column
+      gap: 0.5rem
+
+    .ape-engine-item
+      display: flex
+      align-items: center
+      justify-content: space-between
+      gap: 0.75rem
+      padding: 0.6rem 0.85rem
+      border-radius: 0.65rem
+      border: 1px solid colors.$dark-gray
+      background-color: colors.$lighter-background
+      color: colors.$white
+      cursor: pointer
+      font-size: 0.85rem
+
+      &:hover
+        border-color: colors.$gray
+
+      &.selected
+        border-color: colors.$primary
+        background-color: colors.$primary-opacity
+
+      .ape-engine-name
+        overflow: hidden
+        text-overflow: ellipsis
+        white-space: nowrap

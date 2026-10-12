@@ -68,6 +68,8 @@ const authenticateOrganizationJoin = async (ws, query) => {
     const entry = await Entry.findByPk(access.session.entryId, { attributes: SHARED_ENTRY_ATTRIBUTES });
     if (!entry) return ws.close(4005, "Entry not found"), null;
 
+    if (!(await checkOrgJoinAccessPolicy(ws, auth.user.id, entry))) return null;
+
     SessionManager.updateActivity(joinSessionId);
 
     return buildSharedContext(query, access.session, entry, {
@@ -122,8 +124,39 @@ const authenticateWebSocket = async (ws, query) => {
         return null;
     }
 
+    try {
+        const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
+        const integrationForPolicy = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
+        const policyCheck = await checkEntryAccessPolicy(user.id, entry, integrationForPolicy);
+        if (!policyCheck.allowed) {
+            ws.close(4403, policyCheck.reason === "engine"
+                ? "This server must be reached through a different engine"
+                : "This server IP is not allowed for your account");
+            return null;
+        }
+    } catch (error) {
+        require("../utils/logger").error("Failed to check access policy for websocket", { error: error.message });
+    }
+
     return { user, entry, session, serverSession };
 }
+
+const checkOrgJoinAccessPolicy = async (ws, userId, entry) => {
+    try {
+        const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
+        const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
+        const policyCheck = await checkEntryAccessPolicy(userId, entry, integration);
+        if (!policyCheck.allowed) {
+            safeCloseWs(ws, 4403, policyCheck.reason === "engine"
+                ? "This server must be reached through a different engine"
+                : "This server IP is not allowed for your account");
+            return false;
+        }
+    } catch (error) {
+        require("../utils/logger").error("Failed to check access policy for organization join", { error: error.message });
+    }
+    return true;
+};
 
 module.exports = async (ws, req) => {
     const sharedAuth = await authenticateSharedSession(ws, req.query);

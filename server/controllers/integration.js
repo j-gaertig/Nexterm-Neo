@@ -405,6 +405,21 @@ module.exports.performEntryAction = async (accountId, entryId, action) => {
     const accessCheck = await validateIntegrationAccess(accountId, integration);
     if (!accessCheck.valid) return accessCheck.error;
 
+    try {
+        const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
+        const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
+        if (!policyCheck.allowed) {
+            return {
+                code: 403,
+                message: policyCheck.reason === "engine"
+                    ? "Access denied: this server must be reached through a different engine"
+                    : "Access denied: this server IP is not allowed for your account",
+            };
+        }
+    } catch (error) {
+        logger.error("Failed to check access policy for entry action", { entryId, error: error.message });
+    }
+
     const provider = getProvider(integration.type);
     if (!provider || !provider.supportsPower || !provider.supportsPower(entry)) {
         return { code: 400, message: "This resource does not support power actions" };

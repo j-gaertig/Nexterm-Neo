@@ -10,6 +10,7 @@ const OrganizationMemberPermission = require("../models/OrganizationMemberPermis
 const PermissionGroup = require("../models/PermissionGroup");
 const GroupMember = require("../models/GroupMember");
 const AccountPermission = require("../models/AccountPermission");
+const AccountAccessPolicy = require("../models/AccountAccessPolicy");
 const { isAccountAdmin, countAdmins } = require("../utils/permission");
 const { saveAvatar, deleteAvatar, isWebP } = require("../utils/avatarService");
 const { ACCOUNT_VIEW_ATTRIBUTES } = require("../utils/accountView");
@@ -75,6 +76,7 @@ module.exports.deleteAccount = async (id) => {
     await OrganizationMember.destroy({ where: { accountId: id } });
     await GroupMember.destroy({ where: { accountId: id } });
     await AccountPermission.destroy({ where: { accountId: id } });
+    await AccountAccessPolicy.destroy({ where: { accountId: id } });
     await OrganizationMemberPermission.destroy({ where: { accountId: id } });
 
     deleteAvatar(id);
@@ -214,12 +216,14 @@ const attachGroups = async (users) => {
     if (!users.length) return users;
 
     const userIds = users.map((u) => u.id);
-    const [memberships, groups] = await Promise.all([
+    const [memberships, groups, policies] = await Promise.all([
         GroupMember.findAll({ where: { accountId: { [Op.in]: userIds } } }),
         PermissionGroup.findAll({ order: [["sortOrder", "ASC"], ["id", "ASC"]] }),
+        AccountAccessPolicy.findAll({ where: { accountId: { [Op.in]: userIds } } }),
     ]);
 
     const groupById = new Map(groups.map((g) => [g.id, g]));
+    const policyByAccountId = new Map(policies.map((p) => [p.accountId, p]));
     const defaultGroups = groups.filter((g) => g.isDefault);
     const toView = (g) => ({ id: g.id, name: g.name, color: g.color, isAdmin: g.isAdmin, isDefault: g.isDefault });
 
@@ -233,7 +237,16 @@ const attachGroups = async (users) => {
         for (const dg of defaultGroups) if (!all.some((g) => g.id === dg.id)) all.push(dg);
         all.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id);
 
-        return { ...user, groups: all.map(toView) };
+        const policy = policyByAccountId.get(user.id);
+        const accessPolicy = policy ? {
+            ipMode: policy.ipMode,
+            engineMode: policy.engineMode,
+            ipRuleCount: Array.isArray(policy.ipRules) ? policy.ipRules.length : 0,
+            engineCount: Array.isArray(policy.engineIds) ? policy.engineIds.length : 0,
+            restricted: policy.ipMode !== "disabled" || policy.engineMode !== "disabled",
+        } : { ipMode: "disabled", engineMode: "disabled", ipRuleCount: 0, engineCount: 0, restricted: false };
+
+        return { ...user, groups: all.map(toView), accessPolicy };
     });
 };
 module.exports.attachGroups = attachGroups;

@@ -6,6 +6,8 @@ const { createSession } = require("../controllers/session");
 const { passwordChangeValidation } = require("../validations/account");
 const { requirePermission } = require("../middlewares/permission");
 const { Permission } = require("../permissions/registry");
+const permissionController = require("../controllers/permission");
+const { setAccessPolicyValidation } = require("../validations/permission");
 
 const app = Router();
 
@@ -105,6 +107,55 @@ app.patch("/:accountId/password", requirePermission(Permission.USERS_MANAGE), as
     if (account?.code) return res.json(account);
 
     res.json({ message: "Password got successfully updated" });
+});
+
+/**
+ * GET /users/access-engines
+ * @summary List Engines For Access Policy
+ * @description Returns id/name of all engines for the per-user access policy editor.
+ * @tags Users
+ * @produces application/json
+ * @security BearerAuth
+ * @return {array} 200 - Engines with id, name and isLocal flag
+ */
+app.get("/access-engines", async (req, res) => {
+    const result = await permissionController.listAccessEngines();
+    if (result?.code) return res.json(result);
+    res.json(result);
+});
+
+/**
+ * GET /users/{accountId}/access
+ * @summary Get User Access Policy
+ * @description Returns the per-user IP/engine blacklist/whitelist policy. Requires the "users.manage" permission.
+ * @tags Users
+ * @produces application/json
+ * @security BearerAuth
+ * @param {string} accountId.path.required - The unique identifier of the user account
+ * @return {object} 200 - The user's access policy
+ */
+app.get("/:accountId/access", requirePermission(Permission.USERS_MANAGE), async (req, res) => {
+    const result = await permissionController.getUserAccessPolicy(req.params.accountId);
+    if (result?.code) return res.json(result);
+    res.json(result);
+});
+
+/**
+ * PUT /users/{accountId}/access
+ * @summary Set User Access Policy
+ * @description Sets the per-user IP/engine blacklist/whitelist policy. Requires the "users.manage" permission.
+ * @tags Users
+ * @produces application/json
+ * @security BearerAuth
+ * @param {string} accountId.path.required - The unique identifier of the user account
+ * @param {object} request.body.required - { ipMode, ipRules, engineMode, engineIds }
+ * @return {object} 200 - The user's updated access policy
+ */
+app.put("/:accountId/access", requirePermission(Permission.USERS_MANAGE), async (req, res) => {
+    if (validateSchema(res, setAccessPolicyValidation, req.body)) return;
+    const result = await permissionController.setUserAccessPolicy(req.params.accountId, req.body);
+    if (result?.code) return res.json(result);
+    res.json(result);
 });
 
 module.exports = app;

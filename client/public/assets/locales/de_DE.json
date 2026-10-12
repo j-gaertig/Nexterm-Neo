@@ -859,8 +859,10 @@
         "deleteUser": "Benutzer löschen",
         "loginAsUser": "Anmeldung als Benutzer",
         "deleteConfirm": "Dadurch wird der Benutzer und alle zugehörigen Daten endgültig gelöscht.",
-        "managePermissions": "Berechtigungen verwalten"
-      }
+        "managePermissions": "Berechtigungen verwalten",
+        "networkRestrictions": "Netzwerk-Beschränkungen"
+      },
+      "accessRestrictedHint": "Dieser Benutzer hat IP- oder Engine-Beschränkungen"
     },
     "userDialog": {
       "title": "Neuen Benutzer erstellen",
@@ -1531,7 +1533,30 @@
       "deleteRole": "Benutzergruppe löschen",
       "deleteConfirm": "Dadurch wird die Benutzergruppe „{{name}}“ endgültig gelöscht und von allen Mitgliedern entfernt.",
       "inheritsAllow": "Vererbung: Erlaubt",
-      "inheritsDeny": "Vererbung: Verweigert"
+      "inheritsDeny": "Vererbung: Verweigert",
+      "accessTab": "Netzwerk",
+      "access": {
+        "ipTitle": "IP-Adressen",
+        "ipDescription": "Steuert, zu welchen Server-IPs oder Hostnamen dieser Benutzer verbinden und Monitoring sehen darf.",
+        "engineTitle": "Engines",
+        "engineDescription": "Steuert, über welche Engines dieser Benutzer verbinden darf.",
+        "mode": {
+          "disabled": "Keine Beschränkung",
+          "blacklist": "Blacklist",
+          "whitelist": "Whitelist"
+        },
+        "ipPlaceholder": "z. B. 10.0.0.5, 10.0.0.0/24, *.example.com",
+        "ipBlacklistHint": "Verbindungen und Monitoring für diese IPs/Hostnamen sind blockiert. Exakte Werte, *-Wildcards und IPv4-CIDR-Bereiche werden unterstützt.",
+        "ipWhitelistHint": "Nur diese IPs/Hostnamen können verbunden und im Monitoring gesehen werden. Exakte Werte, *-Wildcards und IPv4-CIDR-Bereiche werden unterstützt.",
+        "engineBlacklistHint": "Verbindungen über diese Engines sind blockiert.",
+        "engineWhitelistHint": "Nur Verbindungen über diese Engines sind erlaubt.",
+        "noRules": "Noch keine Einträge — füge oben IPs, Hostnamen oder CIDR-Bereiche hinzu.",
+        "whitelistEmpty": "Whitelist ist leer: Nichts ist erlaubt, bis mindestens ein Eintrag hinzugefügt wird.",
+        "defaultEngine": "Standard (automatisch)",
+        "localEngine": "lokal",
+        "unknownEngine": "Engine #{{id}}",
+        "engineIdPlaceholder": "Engine-ID, z. B. 2"
+      }
     }
   },
   "tunnel": {

@@ -5,6 +5,8 @@ const EntryIdentity = require("../models/EntryIdentity");
 const Account = require("../models/Account");
 const MonitoringSnapshot = require("../models/MonitoringSnapshot");
 const { validateEntryAccess } = require("./entry");
+const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
+const Integration = require("../models/Integration");
 const { getIdentityCredentials, getIdentity } = require("./identity");
 const { getOrganizationAuditSettingsInternal, createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES } = require("./audit");
 const { resolveIdentity } = require("../utils/identityResolver");
@@ -86,6 +88,18 @@ const createSession = async ({
     const accessResult = await validateEntryAccess(accountId, entry, "Access denied", requiredPermission);
     if (!accessResult.valid) {
         return { code: 403, message: "Access denied" };
+    }
+
+    const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
+    const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
+    if (!policyCheck.allowed) {
+        logger.info("Connection blocked by access policy", { accountId, entryId, reason: policyCheck.reason });
+        return {
+            code: 403,
+            message: policyCheck.reason === "engine"
+                ? "Access denied: this server must be reached through a different engine"
+                : "Access denied: this server IP is not allowed for your account",
+        };
     }
 
     if (directIdentity && entry.type?.startsWith('pve-')) {
