@@ -333,7 +333,7 @@ class SessionManager extends ChangeNotifier {
     final renderer = config['renderer'] as String?;
     if (cfgType == 'sftp' || renderer == 'sftp') return ConnectionType.sftp;
     final protocol = server.protocol?.toLowerCase();
-    if (protocol == 'rdp' || protocol == 'vnc' || renderer == 'guac') {
+    if (protocol == 'rdp' || protocol == 'vnc' || protocol == 'spice' || renderer == 'guac') {
       return ConnectionType.guacamole;
     }
     return ConnectionType.terminal;

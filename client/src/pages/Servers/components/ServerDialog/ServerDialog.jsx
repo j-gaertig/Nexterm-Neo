@@ -15,7 +15,7 @@ import { getAvailableTabs, validateRequiredFields, getFieldConfig } from "./util
 import Icon from "@mdi/react";
 import * as mdiIcons from "@mdi/js";
 
-const PROTOCOL_DEFAULT_ICONS = { ssh: "mdiConsole", telnet: "mdiConsole", rdp: "mdiMicrosoftWindows", vnc: "mdiMonitor", sftp: "mdiFolderNetwork", ftp: "mdiFolderNetwork", ftps: "mdiFolderNetwork", demo: "mdiFlaskOutline" };
+const PROTOCOL_DEFAULT_ICONS = { ssh: "mdiConsole", telnet: "mdiConsole", rdp: "mdiMicrosoftWindows", vnc: "mdiMonitor", spice: "mdiMonitor", sftp: "mdiFolderNetwork", ftp: "mdiFolderNetwork", ftps: "mdiFolderNetwork", demo: "mdiFlaskOutline" };
 
 export const ServerDialog = ({ open, onClose, currentFolderId, currentOrganizationId, editServerId, initialProtocol }) => {
     const { t } = useTranslation();
@@ -26,7 +26,7 @@ export const ServerDialog = ({ open, onClose, currentFolderId, currentOrganizati
 
     const getProtocolIcon = (protocol, type) => {
         if (type?.startsWith('pve')) return "mdiServerNetwork";
-        return { ssh: "mdiConsole", telnet: "mdiConsole", rdp: "mdiMonitor", vnc: "mdiDesktopClassic", sftp: "mdiFolderNetwork", ftp: "mdiFolderNetwork", ftps: "mdiFolderNetwork", demo: "mdiFlaskOutline" }[protocol] || "mdiServerNetwork";
+        return { ssh: "mdiConsole", telnet: "mdiConsole", rdp: "mdiMonitor", vnc: "mdiDesktopClassic", spice: "mdiMonitor", sftp: "mdiFolderNetwork", ftp: "mdiFolderNetwork", ftps: "mdiFolderNetwork", demo: "mdiFlaskOutline" }[protocol] || "mdiServerNetwork";
     };
 
     const [name, setName] = useState("");
@@ -244,7 +244,7 @@ export const ServerDialog = ({ open, onClose, currentFolderId, currentOrganizati
             setEntryType("server");
             
             if (initialProtocol) {
-                const portMap = { ssh: "22", telnet: "23", rdp: "3389", vnc: "5900", sftp: "22", ftp: "21", ftps: "21" };
+                const portMap = { ssh: "22", telnet: "23", rdp: "3389", vnc: "5900", spice: "5900", sftp: "22", ftp: "21", ftps: "21" };
 
                 let initialConfig = { protocol: initialProtocol };
                 if (getFieldConfig("server", initialProtocol).showIpPort) {
