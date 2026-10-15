@@ -87,6 +87,25 @@ const buildVncParams = async (cfg, identity) => {
     return params;
 };
 
+const buildSpiceParams = async (cfg, identity) => {
+    const params = {
+        hostname: cfg.ip,
+        port: String(cfg.port || 5900),
+        "color-depth": String(cfg.colorDepth || 24),
+        "enable-audio": cfg.enableAudio !== false ? "true" : "false",
+    };
+
+    if (identity) {
+        const credentials = await resolveCredentials(identity);
+        if (identity.username) params.username = identity.username;
+        if (credentials?.password) params.password = credentials.password;
+    }
+
+    if (cfg.keyboardLayout) params["server-layout"] = cfg.keyboardLayout;
+
+    return params;
+};
+
 const buildWebParams = (vncPort) => ({
     hostname: "127.0.0.1",
     port: String(vncPort),
@@ -95,4 +114,4 @@ const buildWebParams = (vncPort) => ({
 
 const buildDemoParams = async () => ({});
 
-module.exports = { buildPveQemuParams, buildRdpParams, buildVncParams, buildWebParams, buildDemoParams };
+module.exports = { buildPveQemuParams, buildRdpParams, buildVncParams, buildSpiceParams, buildWebParams, buildDemoParams };

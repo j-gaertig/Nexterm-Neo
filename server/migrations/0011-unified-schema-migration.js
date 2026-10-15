@@ -177,7 +177,7 @@ module.exports = {
 
             for (const server of servers) {
                 let type = "server", renderer = "terminal";
-                if (server.protocol === "rdp" || server.protocol === "vnc") renderer = "guac";
+                if (server.protocol === "rdp" || server.protocol === "vnc" || server.protocol === "spice") renderer = "guac";
 
                 let oldConfig = {};
                 if (server.config) {

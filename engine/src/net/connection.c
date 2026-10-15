@@ -155,6 +155,7 @@ static const char* session_type_to_protocol(session_type_t type) {
         case SESSION_TYPE_TELNET: return "telnet";
         case SESSION_TYPE_DEMO:   return "demo";
         case SESSION_TYPE_WEB:    return "vnc";
+        case SESSION_TYPE_SPICE:  return "spice";
         default:                  return NULL;
     }
 }

@@ -15,11 +15,12 @@ const { SessionType } = require("./generated/control_plane_generated");
 const controlPlane = require("./controlPlane/ControlPlaneServer");
 const { isRecordingEnabled } = require("../utils/recordingService");
 const EngineSftpClient = require("./EngineSftpClient");
-const { buildPveQemuParams, buildRdpParams, buildVncParams, buildWebParams, buildDemoParams } = require("./guacParamBuilders");
+const { buildPveQemuParams, buildRdpParams, buildVncParams, buildSpiceParams, buildWebParams, buildDemoParams } = require("./guacParamBuilders");
 
 const GUAC_PROTOCOLS = {
     rdp: { sessionType: SessionType.RDP, defaultPort: 3389 },
     vnc: { sessionType: SessionType.VNC, defaultPort: 5900 },
+    spice: { sessionType: SessionType.SPICE, defaultPort: 5900 },
     "pve-qemu": { sessionType: SessionType.VNC, defaultPort: 5900 },
     demo: { sessionType: SessionType.Demo, defaultPort: 0 },
 };
@@ -131,6 +132,7 @@ const createConnectionForSession = async (sessionId, accountId) => {
         case "pve-qemu":
         case "rdp":
         case "vnc":
+        case "spice":
         case "demo": return prepareGuacamoleSession(sessionId, entry, identity, organizationId);
         case "sftp":
         case "ftp":
@@ -516,6 +518,8 @@ const prepareGuacamoleSession = async (sessionId, entry, identity, organizationI
         params.dpi = String(session.configuration.displayDpi || 96);
     } else if (protocol === "vnc") {
         params = await buildVncParams(cfg, identity);
+    } else if (protocol === "spice") {
+        params = await buildSpiceParams(cfg, identity);
     } else if (protocol === "demo") {
         params = await buildDemoParams();
     } else {

@@ -11,6 +11,7 @@ const PROTOCOL_OPTIONS = [
     { label: "Telnet", value: "telnet" },
     { label: "RDP", value: "rdp" },
     { label: "VNC", value: "vnc" },
+    { label: "SPICE", value: "spice" },
     { label: "SFTP", value: "sftp" },
     { label: "FTP", value: "ftp" },
     { label: "FTPS", value: "ftps" }

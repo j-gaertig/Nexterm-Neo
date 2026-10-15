@@ -1281,6 +1281,7 @@ class _ServersScreenState extends State<ServersScreen> {
     final p = server.protocol?.toLowerCase();
     if (p == 'rdp') return AppIcons.brandWindows;
     if (p == 'vnc') return AppIcons.brandMonitor;
+    if (p == 'spice') return AppIcons.brandMonitor;
     if (p == 'ssh' || p == 'telnet') return AppIcons.brandConsole;
     if (p == 'sftp' || p == 'ftp' || p == 'ftps') return AppIcons.folderOutline;
     return AppIcons.brandServer;

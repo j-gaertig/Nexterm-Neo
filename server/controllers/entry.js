@@ -23,6 +23,7 @@ const PROTOCOL_RENDERERS = {
     telnet: "terminal",
     rdp: "guac",
     vnc: "guac",
+    spice: "guac",
     demo: "guac",
     sftp: "sftp",
     ftp: "sftp",
@@ -788,6 +789,7 @@ module.exports.getRecentConnections = async (accountId, limit = 5) => {
             AUDIT_ACTIONS.PVE_CONNECT,
             AUDIT_ACTIONS.RDP_CONNECT,
             AUDIT_ACTIONS.VNC_CONNECT,
+            AUDIT_ACTIONS.SPICE_CONNECT,
             AUDIT_ACTIONS.DEMO_CONNECT,
         ];
 
