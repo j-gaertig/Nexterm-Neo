@@ -88,9 +88,10 @@ const buildVncParams = async (cfg, identity) => {
 };
 
 const buildSpiceParams = async (cfg, identity) => {
+    const { SPICE_DEFAULT_PORT } = require("./spiceUtils");
     const params = {
         hostname: cfg.ip,
-        port: String(cfg.port || 5900),
+        port: String(cfg.port || SPICE_DEFAULT_PORT),
         "color-depth": String(cfg.colorDepth || 24),
         "enable-audio": cfg.enableAudio !== false ? "true" : "false",
     };

@@ -1,10 +1,12 @@
 export const GUACAMOLE_STATUS = Object.freeze({
     UPSTREAM_TIMEOUT: 0x0202,
+    UPSTREAM_ERROR: 0x0203,
     UPSTREAM_NOT_FOUND: 0x0207,
     UPSTREAM_UNAVAILABLE: 0x0208,
     SESSION_CONFLICT: 0x0209,
     SESSION_TIMEOUT: 0x020A,
     SESSION_CLOSED: 0x020B,
+    CLIENT_UNAUTHORIZED: 0x0301,
 });
 
 const RDP_TERMINAL_STATUSES = new Set([
@@ -32,6 +34,14 @@ const isRdpServerDisconnectMessage = (message) => [
 ].some(fragment => message.includes(fragment));
 
 export const shouldAutoReconnect = ({ protocol, statusCode, rawMessage }) => {
+    const msg = String(rawMessage || "").toLowerCase();
+    if (msg.includes("failed to load protocol plugin")) return false;
+    if (normalizeProtocol(protocol) === "spice" || msg.includes("spice")) {
+        const code = normalizeStatusCode(statusCode);
+        if (code === GUACAMOLE_STATUS.CLIENT_UNAUTHORIZED) return false;
+        if (msg.includes("spice authentication failed") || msg.includes("password (ticket)")) return false;
+        if (msg.includes("authentication failed")) return false;
+    }
     if (normalizeProtocol(protocol) !== "rdp") return true;
 
     const code = normalizeStatusCode(statusCode);
@@ -41,10 +51,11 @@ export const shouldAutoReconnect = ({ protocol, statusCode, rawMessage }) => {
 };
 
 export const mapConnectionError = (rawMessage, t, statusCode = null, protocol = null) => {
-    const cleaned = String(rawMessage || "").replace(/^error:\s*/i, "").trim();
+    const cleaned = String(rawMessage || "").replace(/^(error:\s*|master connection failed:\s*)+/i, "").trim();
     const msg = cleaned.toLowerCase();
     const code = normalizeStatusCode(statusCode);
     const isRdp = normalizeProtocol(protocol) === "rdp";
+    const isSpice = normalizeProtocol(protocol) === "spice" || msg.includes("spice");
 
     if (isRdp && code === GUACAMOLE_STATUS.SESSION_CONFLICT) {
         return t("common.errors.connection.rdpSessionConflict");
@@ -65,6 +76,34 @@ export const mapConnectionError = (rawMessage, t, statusCode = null, protocol = 
         return t("common.errors.connection.rdpSessionClosed");
     }
     if (!cleaned) return t("common.errors.connection.failed");
+    if (msg.includes("failed to load protocol plugin")) {
+        if (msg.includes("spice")) {
+            try {
+                const translated = t("common.errors.connection.spiceUnavailable");
+                if (translated && translated !== "common.errors.connection.spiceUnavailable") return translated;
+            } catch {}
+            return "SPICE support is not available on the connected engine (missing libguac-client-spice). Rebuild the engine with SPICE support.";
+        }
+        return cleaned.replace(/\(see logs\)/gi, "").trim() || t("common.errors.connection.failed");
+    }
+    if (isSpice && (code === GUACAMOLE_STATUS.CLIENT_UNAUTHORIZED
+        || msg.includes("spice authentication failed")
+        || msg.includes("password (ticket)"))) {
+        return t("common.errors.connection.authenticationFailed");
+    }
+    if (isSpice && (code === GUACAMOLE_STATUS.UPSTREAM_NOT_FOUND
+        || code === GUACAMOLE_STATUS.UPSTREAM_UNAVAILABLE
+        || code === GUACAMOLE_STATUS.UPSTREAM_TIMEOUT
+        || msg.includes("unable to connect to spice")
+        || msg.includes("unable to initiate connection to spice")
+        || msg.includes("spice backend unreachable"))) {
+        return t("common.errors.connection.hostUnreachable");
+    }
+    if (isSpice && (code === GUACAMOLE_STATUS.UPSTREAM_ERROR
+        || msg.includes("connection to spice server failed")
+        || msg.includes("tls error while connecting to spice"))) {
+        return t("common.errors.connection.hostUnreachable");
+    }
     if (msg.includes("server is disabled")) {
         return t("common.errors.connection.disabled");
     }

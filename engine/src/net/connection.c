@@ -194,10 +194,24 @@ static guac_client* guac_setup_client(nexterm_session_t* session,
     client->log_handler = nexterm_guac_log_handler;
 
     if (guac_client_load_plugin(client, protocol_name)) {
+        const char* detail = guac_error_message ? guac_error_message : guac_status_string(guac_error);
+        if (!detail) detail = "unknown error";
         LOG_ERROR("Failed to load guac plugin '%s': %s",
-                  protocol_name, guac_status_string(guac_error));
+                  protocol_name, detail);
+        char errbuf[512];
+        if (strcmp(protocol_name, "spice") == 0) {
+            snprintf(errbuf, sizeof(errbuf),
+                     "Failed to load protocol plugin 'spice': %s "
+                     "(SPICE support not built into this engine build; "
+                     "rebuild with spice-gtk/spice-client-glib available)",
+                     detail);
+        } else {
+            snprintf(errbuf, sizeof(errbuf),
+                     "Failed to load protocol plugin '%s': %s",
+                     protocol_name, detail);
+        }
         nexterm_cp_send_session_result(cp, session->session_id, false,
-                                       "Failed to load protocol plugin", NULL);
+                                       errbuf, NULL);
         guac_client_free(client);
         close(data_fd); session->data_fd = -1;
         close(session->join_pipe[0]); session->join_pipe[0] = -1;
