@@ -160,6 +160,7 @@ class ServerEditorConstants {
     'telnet': '23',
     'rdp': '3389',
     'vnc': '5900',
+    'spice': '5930',
     'sftp': '22',
     'ftp': '21',
     'ftps': '21',

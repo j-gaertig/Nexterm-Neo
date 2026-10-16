@@ -16,11 +16,12 @@ const controlPlane = require("./controlPlane/ControlPlaneServer");
 const { isRecordingEnabled } = require("../utils/recordingService");
 const EngineSftpClient = require("./EngineSftpClient");
 const { buildPveQemuParams, buildRdpParams, buildVncParams, buildSpiceParams, buildWebParams, buildDemoParams } = require("./guacParamBuilders");
+const { SPICE_DEFAULT_PORT } = require("./spiceUtils");
 
 const GUAC_PROTOCOLS = {
     rdp: { sessionType: SessionType.RDP, defaultPort: 3389 },
     vnc: { sessionType: SessionType.VNC, defaultPort: 5900 },
-    spice: { sessionType: SessionType.SPICE, defaultPort: 5900 },
+    spice: { sessionType: SessionType.SPICE, defaultPort: SPICE_DEFAULT_PORT },
     "pve-qemu": { sessionType: SessionType.VNC, defaultPort: 5900 },
     demo: { sessionType: SessionType.Demo, defaultPort: 0 },
 };
@@ -530,6 +531,16 @@ const prepareGuacamoleSession = async (sessionId, entry, identity, organizationI
     const host = params.hostname || cfg.ip || "";
     const port = Number.parseInt(params.port || cfg.port || defaultPort, 10);
     const jumpHosts = await resolveJumpHosts(entry);
+
+    if (protocol === "spice") {
+        const { checkSpiceTcpReachable } = require("./spiceUtils");
+        try {
+            await checkSpiceTcpReachable(host, port, 5000);
+        } catch (preflightErr) {
+            logger.warn("SPICE preflight TCP check failed", { sessionId, target: host, port, error: preflightErr.message });
+            throw preflightErr;
+        }
+    }
 
     const dataSocket = await openEngineSession(
         sessionId, sessionType, host, port, params, jumpHosts, entry.config?.engineId

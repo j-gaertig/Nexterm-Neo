@@ -204,7 +204,8 @@
         "scriptError": "Script connection error occurred",
         "rdpSessionConflict": "The session was disconnected by the server because another connection was opened.",
         "rdpSessionTimeout": "The RDP session was disconnected because its session time limit was reached.",
-        "rdpSessionClosed": "The RDP session was ended by the remote server or an administrator."
+        "rdpSessionClosed": "The RDP session was ended by the remote server or an administrator.",
+        "spiceUnavailable": "SPICE support is not available on the connected engine (missing libguac-client-spice). Rebuild the engine with SPICE support."
       }
     },
     "messages": {
