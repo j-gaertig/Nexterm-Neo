@@ -1,8 +1,9 @@
 import "./styles.sass";
 import { useMemo, useState } from "react";
 import Icon from "@mdi/react";
-import { mdiPlus, mdiClose } from "@mdi/js";
+import { mdiPlus, mdiClose, mdiServerNetwork, mdiPound } from "@mdi/js";
 import Checkbox from "@/common/components/Checkbox";
+import IconInput from "@/common/components/IconInput";
 import { useTranslation } from "react-i18next";
 
 const MODES = ["disabled", "blacklist", "whitelist"];
@@ -96,10 +97,11 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [], inheritedRes
                 {ipActive && (
                     <>
                         <div className="ape-add-row">
-                            <input
-                                className="text-input"
+                            <IconInput
+                                type="text"
+                                icon={mdiServerNetwork}
                                 value={draft}
-                                onChange={(e) => setDraft(e.target.value)}
+                                setValue={setDraft}
                                 onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addRules(); } }}
                                 placeholder={t("settings.permissions.access.ipPlaceholder")}
                             />
@@ -190,12 +192,11 @@ export const AccessPolicyEditor = ({ value, onChange, engines = [], inheritedRes
                                     </span>
                                 </div>
                                 <div className="ape-add-row">
-                                    <input
-                                        className="text-input"
+                                    <IconInput
                                         type="number"
-                                        min="1"
+                                        icon={mdiPound}
                                         value={engineDraft}
-                                        onChange={(e) => setEngineDraft(e.target.value)}
+                                        setValue={setEngineDraft}
                                         placeholder={t("settings.permissions.access.engineIdPlaceholder")}
                                         onKeyDown={(e) => {
                                             if (e.key === "Enter") {
