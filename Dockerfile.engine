@@ -86,11 +86,23 @@ RUN apk add --no-cache \
     libpulse libvorbis libogg libssh2 \
     libvncserver freerdp-libs libcurl
 
-# Runtime library for libguac-client-spice. The plugin is only built when
-# spice-gtk was available to the builder, so a missing package here simply
-# leaves the image without SPICE support.
-RUN apk add --no-cache spice-gtk \
-    || echo "spice-gtk unavailable; SPICE support disabled"
+# Runtime library for libguac-client-spice. This MUST stay in sync with the
+# builder: if the plugin was built but this package is missing, every SPICE
+# session fails at runtime with "Failed to load protocol plugin". Fail the
+# build loudly instead of shipping a broken image.
+RUN apk add --no-cache spice-gtk
+
+# Guard: refuse to ship a libguac-client-spice.so with unresolvable
+# dependencies (would break all SPICE sessions at runtime).
+RUN if [ -f /usr/local/lib/libguac-client-spice.so ]; then \
+        if command -v ldd >/dev/null 2>&1; then \
+            ldd /usr/local/lib/libguac-client-spice.so; \
+            if ldd /usr/local/lib/libguac-client-spice.so 2>&1 | grep -q "not found"; then \
+                echo "ERROR: libguac-client-spice.so has missing dependencies" >&2; \
+                exit 1; \
+            fi; \
+        fi; \
+    fi
 
 COPY scripts/install-browser-runtime.sh /tmp/install-browser-runtime.sh
 RUN sh /tmp/install-browser-runtime.sh && rm -f /tmp/install-browser-runtime.sh
