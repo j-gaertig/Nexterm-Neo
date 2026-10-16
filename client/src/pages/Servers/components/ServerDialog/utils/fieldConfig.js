@@ -55,6 +55,19 @@ export const getFieldConfig = (type, protocol) => {
                     allowedAuthTypes: ["password-only", "password"],
                     showWakeOnLan: true,
                 };
+            case "spice":
+                return {
+                    showProtocol: false,
+                    showIpPort: true,
+                    showIdentities: true,
+                    showSettings: true,
+                    showMonitoring: false,
+                    showKeyboardLayout: false,
+                    showDisplaySettings: true,
+                    showAudioSettings: true,
+                    allowedAuthTypes: ["password-only", "password"],
+                    showWakeOnLan: true,
+                };
             case "demo":
                 return {
                     showProtocol: false,

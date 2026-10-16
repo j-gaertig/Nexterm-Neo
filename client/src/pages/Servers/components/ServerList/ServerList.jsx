@@ -678,6 +678,11 @@ export const ServerList = ({
                                             label={t("servers.contextMenu.vncServer")}
                                             onClick={() => createServer("vnc")}
                                         />
+                                        <ContextMenuItem
+                                            icon={mdiMonitor}
+                                            label={t("servers.contextMenu.spiceServer")}
+                                            onClick={() => createServer("spice")}
+                                        />
                                         <ContextMenuSeparator />
                                         <ContextMenuItem
                                             icon={mdiFolderNetwork}
@@ -917,7 +922,7 @@ export const ServerList = ({
                                     />
                                 )}
 
-                                {server?.type === "server" && (server?.protocol === "ssh" || server?.protocol === "telnet" || server?.protocol === "rdp" || server?.protocol === "vnc" || server?.protocol === "sftp" || server?.protocol === "ftp" || server?.protocol === "ftps") && (
+                                {server?.type === "server" && (server?.protocol === "ssh" || server?.protocol === "telnet" || server?.protocol === "rdp" || server?.protocol === "vnc" || server?.protocol === "spice" || server?.protocol === "sftp" || server?.protocol === "ftp" || server?.protocol === "ftps") && (
                                     <ContextMenuItem
                                         icon={mdiCursorDefaultClick}
                                         label={t("servers.contextMenu.quickConnect")}

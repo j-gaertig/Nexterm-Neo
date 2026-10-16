@@ -1641,6 +1641,7 @@
       "telnetServer": "Telnet Server",
       "rdpServer": "RDP Server",
       "vncServer": "VNC Server",
+      "spiceServer": "SPICE Server",
       "demoServer": "Demo Connection",
       "sftpServer": "SFTP Server",
       "ftpServer": "FTP Server",

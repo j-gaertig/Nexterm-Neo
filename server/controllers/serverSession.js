@@ -21,6 +21,7 @@ const ENTRY_TYPE_TO_AUDIT_ACTION = {
     'telnet': AUDIT_ACTIONS.SSH_CONNECT,
     'rdp': AUDIT_ACTIONS.RDP_CONNECT,
     'vnc': AUDIT_ACTIONS.VNC_CONNECT,
+    'spice': AUDIT_ACTIONS.SPICE_CONNECT,
     'web': AUDIT_ACTIONS.WEB_CONNECT,
     'demo': AUDIT_ACTIONS.DEMO_CONNECT,
     'pve-lxc': AUDIT_ACTIONS.PVE_CONNECT,
@@ -36,6 +37,8 @@ const ENTRY_TYPE_TO_CONNECT_PERMISSION = {
     'telnet': Permission.CONNECT_SSH,
     'rdp': Permission.CONNECT_RDP,
     'vnc': Permission.CONNECT_VNC,
+    // reuse VNC permission until a dedicated CONNECT_SPICE exists
+    'spice': Permission.CONNECT_VNC,
     'web': Permission.CONNECT_WEB,
     'demo': Permission.CONNECT_VNC,
     'pve-lxc': Permission.CONNECT_PROXMOX,
