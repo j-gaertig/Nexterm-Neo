@@ -9,7 +9,8 @@ RUN apk add --no-cache \
     pango libwebp openssl \
     libpulse libvorbis libogg libssh2 \
     libvncserver freerdp-libs libcurl \
-    util-linux samba-client
+    util-linux samba-client \
+    spice-gtk
 
 COPY scripts/install-browser-runtime.sh /tmp/install-browser-runtime.sh
 RUN sh /tmp/install-browser-runtime.sh && rm -f /tmp/install-browser-runtime.sh
@@ -20,6 +21,10 @@ COPY --from=engine /usr/lib/libEGL.so* /usr/lib/libGL.so* /usr/lib/libGLESv2.so*
      /usr/lib/libgbm.so* /usr/lib/libgallium-*.so /usr/lib/
 
 COPY --from=engine /usr/lib/libvncclient.so.1 /usr/lib/
+
+# Runtime lib for the SPICE protocol plugin copied below via /usr/local/lib.
+# Without this, every SPICE session dies with "Failed to load protocol plugin".
+COPY --from=engine /usr/lib/libspice-client-glib-2.0.so* /usr/lib/
 
 COPY --from=engine /usr/local/lib/ /usr/local/lib/
 
