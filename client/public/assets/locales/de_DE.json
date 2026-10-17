@@ -1550,8 +1550,8 @@
           "whitelist": "Whitelist"
         },
         "ipPlaceholder": "IP, Hostname, Wildcard, CIDR-Bereich",
-        "emptyAllowed": "Leere Liste — alles ist erlaubt.",
-        "emptyRestricted": "Leere Liste — alles ist gesperrt.",
+        "emptyAllowed": "Leere Liste: alles ist erlaubt.",
+        "emptyRestricted": "Leere Liste: alles ist gesperrt.",
         "defaultEngine": "Standard (automatisch)",
         "localEngine": "lokal",
         "unknownEngine": "Engine #{{id}}",
