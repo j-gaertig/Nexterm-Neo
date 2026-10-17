@@ -54,15 +54,29 @@
       display: flex
       gap: 0.5rem
 
-      .input-container
+      input
         flex: 1
         min-width: 0
+        padding: 0.6rem 0.75rem
+        border: 1px solid colors.$dark-gray
+        border-radius: 0.6rem
+        background-color: colors.$lighter-background
+        color: colors.$white
+        font-size: 0.9rem
+        outline: none
+
+        &::placeholder
+          color: colors.$subtext
+
+        &:focus
+          border-color: colors.$primary
 
       .ape-add-btn
         display: flex
         align-items: center
         justify-content: center
-        width: 2.5rem
+        width: 3rem
+        align-self: stretch
         border-radius: 0.6rem
         border: 1px solid colors.$dark-gray
         background-color: colors.$lighter-background
@@ -70,8 +84,8 @@
         cursor: pointer
 
         svg
-          width: 1.1rem
-          height: 1.1rem
+          width: 1.6rem
+          height: 1.6rem
 
         &:hover
           border-color: colors.$primary

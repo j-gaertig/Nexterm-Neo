@@ -1570,8 +1570,8 @@
           "whitelist": "Whitelist"
         },
         "ipPlaceholder": "IP, hostname, wildcard, CIDR range",
-        "emptyAllowed": "Empty list — everything is allowed.",
-        "emptyRestricted": "Empty list — everything is blocked.",
+        "emptyAllowed": "Empty list: everything is allowed.",
+        "emptyRestricted": "Empty list: everything is blocked.",
         "defaultEngine": "Default (automatic)",
         "localEngine": "local",
         "unknownEngine": "Engine #{{id}}",
