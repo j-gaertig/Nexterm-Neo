@@ -10,7 +10,8 @@ const { getMonitoringSettingsInternal } = require("../controllers/monitoring");
 const controlPlane = require("../lib/controlPlane/ControlPlaneServer");
 const { buildSSHParams, resolveJumpHosts } = require("../lib/ConnectionService");
 const { buildWindowsMonitoringCommand, isWindowsProbeResult, isPowerShellProbeResult, parseWindowsMonitoringOutput } = require("./windowsMonitoring");
-const { COMMANDS, WINDOWS_OS_COMMAND, parseCPUUsage, parseMeminfo, parseMemoryUsage, parseDiskUsage, parseUptime, parseLoadAverage, parseProcessCount, parseProcessList, parseOSInfo, parseNetworkInterfaces } = require("./monitoringParsers");
+const { parseCPUUsage } = require("./cpuUsage");
+const { COMMANDS, WINDOWS_OS_COMMAND, parseMeminfo, parseMemoryUsage, parseDiskUsage, parseUptime, parseLoadAverage, parseProcessCount, parseProcessList, parseOSInfo, parseNetworkInterfaces } = require("./monitoringParsers");
 
 let monitoringInterval = null;
 let isRunning = false;

@@ -1,3 +1,5 @@
+const { parseCPUUsage } = require("./cpuUsage");
+
 const IFACE_DETAIL_CMD =
     'for d in /sys/class/net/*; do n=$(basename "$d"); ' +
     'printf "%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$n" ' +
@@ -14,7 +16,7 @@ const WINDOWS_OS_COMMAND = `powershell.exe -NoProfile -NonInteractive -EncodedCo
 ).toString("base64")}`;
 
 const COMMANDS = {
-    cpu: "grep 'cpu ' /proc/stat",
+    cpu: "grep 'cpu ' /proc/stat; sleep 1; grep 'cpu ' /proc/stat",
     memory: "cat /proc/meminfo",
     memoryFallback: "LC_ALL=C free -b",
     uptime: "cat /proc/uptime",
@@ -30,16 +32,6 @@ const COMMANDS = {
     hostname: "hostname",
     ipAddr: "LC_ALL=C ip -o addr show",
     ifaceDetails: IFACE_DETAIL_CMD,
-};
-
-const parseCPUUsage = (output) => {
-    try {
-        const vals = String(output || "").split(" ").filter(Boolean).slice(1).map(Number);
-        const total = vals.reduce((a, b) => a + b, 0);
-        if (!vals.length || !(total > 0) || !Number.isFinite(vals[3])) return null;
-        const result = Math.round(((total - vals[3]) / total) * 100);
-        return Number.isFinite(result) ? result : null;
-    } catch { return null; }
 };
 
 const parseMeminfo = (output) => {

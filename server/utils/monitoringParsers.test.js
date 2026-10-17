@@ -113,8 +113,9 @@ test("keeps dot decimals in process list", () => {
     assert.equal(proc.mem, 0.1);
 });
 
-test("computes cpu usage and returns null for empty input", () => {
-    assert.equal(parseCPUUsage("cpu  100 200 300 400 0 0 0 0 0 0"), 60);
+test("computes cpu usage from two samples and returns null for a single sample", () => {
+    assert.equal(parseCPUUsage("cpu  100 200 300 400 0 0 0 0 0 0\ncpu  130 200 330 440 0 0 0 0 0 0"), 60);
+    assert.equal(parseCPUUsage("cpu  100 200 300 400 0 0 0 0 0 0"), null);
     assert.equal(parseCPUUsage(""), null);
     assert.equal(parseCPUUsage(null), null);
 });
