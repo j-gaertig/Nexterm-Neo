@@ -32,6 +32,16 @@ class AppSession {
   /// back to a stored server identity in that case.
   bool usedDirectIdentity;
 
+  /// Script execution session (web `session.scriptId`). When set, the
+  /// session renders the script runner instead of the plain terminal.
+  int? scriptId;
+
+  /// Local script name for titles. Not stored server-side, so restored
+  /// script sessions fall back to a generic label.
+  String? scriptName;
+
+  bool get isScriptSession => scriptId != null;
+
   GuacClient? guacClient;
   GuacWebSocketTunnel? guacTunnel;
 
@@ -58,6 +68,8 @@ class AppSession {
     this.error,
     this.identityId,
     this.usedDirectIdentity = false,
+    this.scriptId,
+    this.scriptName,
     this.guacClient,
     this.guacTunnel,
     this.terminal,
@@ -157,6 +169,56 @@ class SessionManager extends ChangeNotifier {
       termChannel: channel,
       identityId: identityId,
       usedDirectIdentity: directIdentity != null,
+    );
+
+    _sessions[session.sessionId] = session;
+    _activeSessionId = session.sessionId;
+    notifyListeners();
+    return session;
+  }
+
+  /// Opens an SSH session that runs a script. Mirrors `createTerminalSession`
+  /// but sends `scriptId` to `POST /connections` — the server then attaches a
+  /// `ScriptLayer` and pushes `\x1F` control messages over `/ws/term`.
+  Future<AppSession> createScriptSession({
+    required String token,
+    required Server server,
+    required int scriptId,
+    required String scriptName,
+    int? identityId,
+    String? connectionReason,
+  }) async {
+    final cs = await ConnectionService.createSession(
+      token: token,
+      entryId: server.id is int ? server.id : int.parse(server.id.toString()),
+      identityId: identityId ?? 0,
+      connectionReason: connectionReason,
+      scriptId: scriptId,
+    );
+
+    final terminal = Terminal(maxLines: 10000);
+
+    final queryParams = <String, String>{
+      'sessionToken': token,
+      'entryId': server.id.toString(),
+      'sessionId': cs.sessionId,
+      if (identityId != null) 'identityId': identityId.toString(),
+    };
+
+    final channel = IOWebSocketChannel.connect(
+      Uri.parse(ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams)),
+      headers: {'User-Agent': ApiClient.userAgent},
+    );
+
+    final session = AppSession(
+      sessionId: cs.sessionId,
+      server: server,
+      type: ConnectionType.terminal,
+      terminal: terminal,
+      termChannel: channel,
+      identityId: identityId,
+      scriptId: scriptId,
+      scriptName: scriptName,
     );
 
     _sessions[session.sessionId] = session;
@@ -288,6 +350,10 @@ class SessionManager extends ChangeNotifier {
                 identityId: identityId is int
                     ? identityId
                     : int.tryParse(identityId?.toString() ?? ''),
+                scriptId: (config['scriptId'] as num?)?.toInt(),
+                // `scriptName` is client-side only on the web too; restored
+                // script sessions fall back to a generic label.
+                scriptName: config['scriptName']?.toString(),
                 // Known limitation: the session list strips ad-hoc
                 // `directIdentity` payloads, so a restored quick-connect
                 // session cannot be distinguished from a stored-identity one.

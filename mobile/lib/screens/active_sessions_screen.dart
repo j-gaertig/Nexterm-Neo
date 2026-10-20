@@ -10,6 +10,7 @@ import '../utils/sftp_settings.dart';
 import 'renderers/guacamole_renderer.dart';
 import 'renderers/sftp_renderer.dart';
 import 'renderers/terminal_renderer.dart';
+import 'renderers/script_renderer.dart';
 
 class ActiveSessionsScreen extends StatefulWidget {
   final SessionManager sessionManager;
@@ -237,12 +238,12 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_iconForType(active.type), size: 14, color: cs.primary),
+                Icon(_iconForSession(active), size: 14, color: cs.primary),
                 const SizedBox(width: 5),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 80),
                   child: Text(
-                    active.server.name,
+                    active.isScriptSession ? (active.scriptName ?? 'Script') : active.server.name,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -307,6 +308,14 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   Widget _buildRenderer(AppSession session) {
     final token = widget.authManager.sessionToken ?? '';
     session.onCallbacksReady = _onChanged;
+    if (session.isScriptSession) {
+      return ScriptRenderer(
+        key: ValueKey('script_${session.sessionId}'),
+        session: session,
+        token: token,
+        sessionManager: widget.sessionManager,
+      );
+    }
     switch (session.type) {
       case ConnectionType.guacamole:
         return GuacamoleRenderer(
@@ -334,6 +343,11 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
           sftpSettings: widget.sftpSettings,
         );
     }
+  }
+
+  IconData _iconForSession(AppSession session) {
+    if (session.isScriptSession) return AppIcons.codeBracesBox;
+    return _iconForType(session.type);
   }
 
   IconData _iconForType(ConnectionType type) {
@@ -464,6 +478,7 @@ class _SessionTile extends StatelessWidget {
   });
 
   IconData get _icon {
+    if (session.isScriptSession) return AppIcons.codeBracesBox;
     switch (session.type) {
       case ConnectionType.guacamole: return AppIcons.monitorSmall;
       case ConnectionType.terminal: return AppIcons.console;
@@ -472,6 +487,7 @@ class _SessionTile extends StatelessWidget {
   }
 
   String get _typeLabel {
+    if (session.isScriptSession) return 'Script';
     switch (session.type) {
       case ConnectionType.guacamole: return 'Remote Desktop';
       case ConnectionType.terminal: return 'Terminal';
@@ -501,7 +517,9 @@ class _SessionTile extends StatelessWidget {
           child: Icon(_icon, size: 18,
               color: isActive ? cs.onPrimaryContainer : cs.primary),
         ),
-        title: Text(session.server.name,
+        title: Text(session.isScriptSession
+                ? (session.scriptName ?? 'Script')
+                : session.server.name,
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
