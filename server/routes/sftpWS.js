@@ -50,6 +50,16 @@ const resolveDirectory = (sftp, path) => new Promise((resolve, reject) => {
     );
 });
 
+// Paths synced by clients must be absolute; if a client ever sends a relative
+// path (e.g. a session whose stored path predates root anchoring), resolve it
+// against the session root so directory navigation never regresses.
+const WINDOWS_ABSOLUTE = /^[a-z]:[\\/]/i;
+const anchorToRoot = (path, rootPath) => {
+    if (!path || path.startsWith("/") || WINDOWS_ABSOLUTE.test(path)) return path;
+    const root = rootPath && rootPath !== "/" ? rootPath.replace(/\/+$/, "") : "";
+    return `${root}/${path}`;
+};
+
 const SHELL_LESS_PROTOCOLS = new Set(["ftp", "ftps"]);
 const TERMINAL_LESS_PROTOCOLS = new Set(["sftp", "ftp", "ftps"]);
 
@@ -243,10 +253,11 @@ module.exports = async (ws, req) => {
             if (!storedPath) {
                 if (home?.path && home.isDirectory) storedPath = home.path;
                 storedPath ||= rootPath;
-                SessionManager.setSftpPath(sessionId, storedPath);
             }
+            storedPath = anchorToRoot(storedPath, rootPath) || rootPath;
+            SessionManager.setSftpPath(sessionId, storedPath);
         }
-        storedPath ||= rootPath;
+        storedPath = anchorToRoot(storedPath, rootPath) || rootPath;
         sendResult(ws, OP.READY, { path: storedPath, rootPath, capabilities });
 
         const logAudit = (action, resource, details) => {
@@ -261,12 +272,13 @@ module.exports = async (ws, req) => {
                 let payload;
                 try { payload = JSON.parse(msg.slice(1).toString()); } catch {}
                 if (payload?.path) {
-                    SessionManager.setSftpPath(sessionId, payload.path);
+                    const syncedPath = anchorToRoot(payload.path, rootPath);
+                    SessionManager.setSftpPath(sessionId, syncedPath);
                     const session = SessionManager.get(sessionId);
                     if (session) {
                         for (const other of session.connectedWs) {
                             if (other !== ws && other.readyState === 1) {
-                                sendResult(other, OP.PATH_SYNC, { path: payload.path });
+                                sendResult(other, OP.PATH_SYNC, { path: syncedPath });
                             }
                         }
                     }

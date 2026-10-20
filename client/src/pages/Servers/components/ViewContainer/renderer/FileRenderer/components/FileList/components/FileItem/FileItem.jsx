@@ -7,7 +7,7 @@ import Tooltip from "@/common/components/Tooltip";
 import { getBaseUrl } from "@/common/utils/ConnectionUtil.js";
 import {
     getExtension, getIconByFileEnding, getIconColor, convertUnits, isThumbnailSupported,
-    formatPermissionsString, formatOctal,
+    formatPermissionsString, formatOctal, childPath,
 } from "../../utils/fileUtils";
 
 export const FileItem = memo(({
@@ -59,7 +59,7 @@ export const FileItem = memo(({
     };
 
     const getThumbnailUrl = () => {
-        const fullPath = `${path.endsWith("/") ? path : path + "/"}${item.name}`;
+        const fullPath = childPath(path, item.name);
         return `${getBaseUrl()}/api/entries/sftp?sessionId=${session.id}&path=${encodeURIComponent(fullPath)}&sessionToken=${sessionToken}&thumbnail=true&size=100`;
     };
 

@@ -124,6 +124,10 @@ class EngineSftpClient extends EventEmitter {
         this._socket.on("data", (chunk) => frameParser(chunk));
         this._socket.on("error", (err) => this._abort(err));
         this._socket.on("close", () => this._abort(new Error("Connection closed"), true));
+        // ControlPlaneServer pauses SFTP data connections after ConnectionReady
+        // to keep frames from being dropped before this client attaches. Resume
+        // now that the frame parser is in place.
+        this._socket.resume();
     }
 
     waitForReady() {

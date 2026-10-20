@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { childPath } from "../utils/fileUtils";
 
 export const useDragDrop = ({ path, sessionId, selectedItems, isItemSelected, moveFiles, copyFiles, dragDropAction, updatePath }) => {
     const [draggedItems, setDraggedItems] = useState([]);
@@ -10,7 +11,7 @@ export const useDragDrop = ({ path, sessionId, selectedItems, isItemSelected, mo
     const handleDragStart = useCallback((event, item) => {
         const itemsToDrag = isItemSelected(item) ? selectedItems : [item];
         setDraggedItems(itemsToDrag);
-        const paths = itemsToDrag.map(i => `${path}/${i.name}`);
+        const paths = itemsToDrag.map(i => childPath(path, i.name));
         const dragData = { paths, items: itemsToDrag, sessionId };
         event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
         event.dataTransfer.setData("application/x-sftp-files", JSON.stringify(dragData));
@@ -54,7 +55,7 @@ export const useDragDrop = ({ path, sessionId, selectedItems, isItemSelected, mo
             setDropTarget(item.name);
             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
             hoverTimerRef.current = setTimeout(() => {
-                updatePath(`${path.endsWith("/") ? path : path + "/"}${item.name}`);
+                updatePath(childPath(path, item.name));
                 setDropTarget(null);
             }, 800);
         }
@@ -87,7 +88,7 @@ export const useDragDrop = ({ path, sessionId, selectedItems, isItemSelected, mo
         try {
             const data = JSON.parse(event.dataTransfer.getData("application/x-sftp-files"));
             if (!data?.paths?.length || data.sessionId !== sessionId || data.items?.some(d => d.name === item.name)) return;
-            const destination = `${path.endsWith("/") ? path : path + "/"}${item.name}`;
+            const destination = childPath(path, item.name);
             if (!executeDrop(data.paths, destination, dragDropAction)) {
                 setPendingDrop({ paths: data.paths, destination });
                 openDropMenu(event);

@@ -7,6 +7,7 @@ const { EventEmitter } = require("node:events");
 const flatbuffers = require("flatbuffers");
 const {
     MessageType,
+    SessionType,
     Envelope,
 } = require("../generated/control_plane_generated");
 const {
@@ -44,6 +45,7 @@ class ControlPlaneServer extends EventEmitter {
         this._dataConnections = new Map();
         this._pending = new Map();
         this._sessionEngineMap = new Map();
+        this._sessionTypes = new Map();
         this._pingInterval = null;
         this._tlsContext = null;
         this._recordingMeta = new Map();
@@ -100,9 +102,13 @@ class ControlPlaneServer extends EventEmitter {
 
         const resolvedEngineId = engineId ? String(engineId) : this._getDefaultEngineId();
         if (resolvedEngineId) this._sessionEngineMap.set(sessionId, resolvedEngineId);
+        this._sessionTypes.set(sessionId, sessionType);
 
         return this._createPendingRequest(sessionId, (result) => {
-            if (!result.success) this._sessionEngineMap.delete(sessionId);
+            if (!result.success) {
+                this._sessionEngineMap.delete(sessionId);
+                this._sessionTypes.delete(sessionId);
+            }
         }, () => {
             this._sendFrame(engine.socket, buildSessionOpen(sessionId, sessionType, host, port, params, jumpHosts));
         }, null, engine.engineId);
@@ -113,6 +119,7 @@ class ControlPlaneServer extends EventEmitter {
         if (!engine) return;
         this._sendFrame(engine.socket, buildSessionClose(sessionId));
         this._sessionEngineMap.delete(sessionId);
+        this._sessionTypes.delete(sessionId);
     }
 
     closeSessionAndWait(sessionId, engineId = null, timeoutMs = 5000) {
@@ -133,6 +140,7 @@ class ControlPlaneServer extends EventEmitter {
             this.on("sessionClosed", handleClosed);
             this._sendFrame(engine.socket, buildSessionClose(sessionId));
             this._sessionEngineMap.delete(sessionId);
+            this._sessionTypes.delete(sessionId);
             timeout = setTimeout(() => finish(false), timeoutMs);
         });
     }
@@ -508,6 +516,16 @@ class ControlPlaneServer extends EventEmitter {
         if (residualBuf && residualBuf.length > 0) {
             socket.unshift(residualBuf);
         }
+
+        // SFTP uses a length-framed protocol where the first frames (e.g. the
+        // SFTP Ready message) may already be queued behind ConnectionReady.
+        // Without a data listener the socket keeps draining and silently drops
+        // them, leaving EngineSftpClient.waitForReady() pending forever. Pause
+        // the socket here; the consumer (EngineSftpClient) resumes once its own
+        // frame parser is attached.
+        if (this._sessionTypes.get(sessionId) === SessionType.SFTP) {
+            socket.pause();
+        }
     }
 
     _handleRecordingUpload(socket, envelope, remoteAddr, residualBuf) {
@@ -625,6 +643,7 @@ class ControlPlaneServer extends EventEmitter {
                 if (!closed) break;
                 const sessionId = closed.sessionId();
                 this._sessionEngineMap.delete(sessionId);
+                this._sessionTypes.delete(sessionId);
                 logger.info(`SessionClosed: session=${sessionId} reason=${closed.reason()}`);
                 this.emit("sessionClosed", { sessionId, reason: closed.reason() });
                 break;
@@ -747,6 +766,7 @@ class ControlPlaneServer extends EventEmitter {
                 if (eid === engineId) {
                     affectedSessions.push(sid);
                     this._sessionEngineMap.delete(sid);
+                    this._sessionTypes.delete(sid);
                 }
             }
 

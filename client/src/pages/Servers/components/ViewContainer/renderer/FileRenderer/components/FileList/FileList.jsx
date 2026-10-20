@@ -14,7 +14,7 @@ import SelectionActionBar from "../SelectionActionBar";
 import FileItem from "./components/FileItem";
 import PropertiesDialog from "./components/PropertiesDialog";
 import { useBoxSelection, useDragDrop, useKeyboardNavigation, useClipboard } from "./hooks";
-import { isPreviewable, getFullPath, OPERATIONS } from "./utils/fileUtils";
+import { isPreviewable, getFullPath, childPath, OPERATIONS } from "./utils/fileUtils";
 
 export const FileList = forwardRef(({
     items, updatePath, path, sendOperation, downloadFile, downloadMultipleFiles,
@@ -136,12 +136,12 @@ export const FileList = forwardRef(({
 
     const handleMassDownload = useCallback(() => {
         if (selectedItems.length === 0) return;
-        downloadMultipleFiles?.(selectedItems.map(item => `${path}/${item.name}`));
+        downloadMultipleFiles?.(selectedItems.map(item => childPath(path, item.name)));
     }, [selectedItems, path, downloadMultipleFiles]);
 
     const executeMassDelete = useCallback(() => {
         selectedItems.forEach(item => {
-            sendOperation(item.type === "folder" ? OPERATIONS.DELETE_FOLDER : OPERATIONS.DELETE_FILE, { path: `${path}/${item.name}` });
+            sendOperation(item.type === "folder" ? OPERATIONS.DELETE_FOLDER : OPERATIONS.DELETE_FILE, { path: childPath(path, item.name) });
         });
         setSelectedItems([]);
     }, [selectedItems, path, sendOperation]);
@@ -168,16 +168,16 @@ export const FileList = forwardRef(({
         handleContextMenu(event, item, true);
     };
 
-    const handleDelete = () => sendOperation(selectedItem.type === "folder" ? OPERATIONS.DELETE_FOLDER : OPERATIONS.DELETE_FILE, { path: `${path}/${selectedItem?.name}` });
+    const handleDelete = () => sendOperation(selectedItem.type === "folder" ? OPERATIONS.DELETE_FOLDER : OPERATIONS.DELETE_FILE, { path: childPath(path, selectedItem?.name) });
     const handleDeleteClick = () => confirmBeforeDelete ? setDeleteDialogOpen(true) : handleDelete();
-    const handleRename = (item, newName) => { if (newName && newName !== item.name) sendOperation(OPERATIONS.RENAME_FILE, { path: `${path}/${item.name}`, newPath: `${path}/${newName}` }); setRenamingItem(null); };
+    const handleRename = (item, newName) => { if (newName && newName !== item.name) sendOperation(OPERATIONS.RENAME_FILE, { path: childPath(path, item.name), newPath: childPath(path, newName) }); setRenamingItem(null); };
     const startRename = (item) => { setRenamingItem(item); setRenameValue(item.name); };
     const handleRenameKeyDown = (e, item) => e.key === 'Enter' ? (e.preventDefault(), handleRename(item, renameValue)) : e.key === 'Escape' && setRenamingItem(null);
     const handleCreateFolder = () => { if (newFolderName.trim()) createFolder(newFolderName.trim()); setCreatingFolder(false); };
     const handleCreateFolderKeyDown = (e) => e.key === 'Enter' ? (e.preventDefault(), handleCreateFolder()) : e.key === 'Escape' && setCreatingFolder(false);
     const handleCreateFile = () => { if (newFileName.trim()) createFile(newFileName.trim()); setCreatingFile(false); };
     const handleCreateFileKeyDown = (e) => e.key === 'Enter' ? (e.preventDefault(), handleCreateFile()) : e.key === 'Escape' && setCreatingFile(false);
-    const openFile = () => selectedItem?.size >= 1024 * 1024 ? setBigFileDialogOpen(true) : setCurrentFile(`${path}/${selectedItem?.name}`);
+    const openFile = () => selectedItem?.size >= 1024 * 1024 ? setBigFileDialogOpen(true) : setCurrentFile(childPath(path, selectedItem?.name));
     const handlePropertiesClick = (item = null) => { setPropertiesItem(item); setPropertiesDialogOpen(true); };
     const handleEmptyContextMenu = (e) => { if (e.target.closest('.file-item')) return; e.preventDefault(); emptyContextMenu.open(e, { x: e.pageX, y: e.pageY }); };
     const handleOpenTerminal = (targetPath = null) => onOpenTerminal?.(targetPath || path);
@@ -258,7 +258,7 @@ export const FileList = forwardRef(({
                             isRenaming={renamingItem?.name === item.name}
                             isBeingDragged={draggedItems.some(d => d.name === item.name)}
                             isDropTarget={dropTarget === item.name}
-                            isCut={isItemCut(`${path}/${item.name}`)}
+                            isCut={isItemCut(childPath(path, item.name))}
                             isDimmed={showHiddenFiles && item.name.startsWith(".")}
                             showThumbnails={showThumbnails}
                             highlight={query}
@@ -283,7 +283,7 @@ export const FileList = forwardRef(({
 
             <SelectionActionBar selectedItems={selectedItems} onClearSelection={clearSelection} onDownload={handleMassDownload} onDelete={handleMassDelete} containerRef={containerRef} />
 
-            <ActionConfirmDialog open={bigFileDialogOpen} setOpen={setBigFileDialogOpen} onConfirm={() => setCurrentFile(`${path}/${selectedItem?.name}`)} text={t("servers.fileManager.contextMenu.bigFileConfirm", { size: Math.round(selectedItem?.size / 1024 / 1024) })} />
+            <ActionConfirmDialog open={bigFileDialogOpen} setOpen={setBigFileDialogOpen} onConfirm={() => setCurrentFile(childPath(path, selectedItem?.name))} text={t("servers.fileManager.contextMenu.bigFileConfirm", { size: Math.round(selectedItem?.size / 1024 / 1024) })} />
             <ActionConfirmDialog open={deleteDialogOpen} setOpen={setDeleteDialogOpen} onConfirm={handleDelete} text={t("servers.fileManager.contextMenu.deleteConfirm", { name: selectedItem?.name })} />
             <ActionConfirmDialog open={massDeleteDialogOpen} setOpen={setMassDeleteDialogOpen} onConfirm={executeMassDelete} text={t("servers.fileManager.selection.deleteConfirm", { count: selectedItems.length })} />
 
@@ -302,14 +302,14 @@ export const FileList = forwardRef(({
                 <ContextMenuItem icon={mdiFormTextbox} label={t("servers.fileManager.contextMenu.rename")} onClick={() => startRename(selectedItem)} />
                 {selectedItem?.type === "file" && (
                     <>
-                        {isPreviewable(selectedItem.name) && <ContextMenuItem icon={mdiEye} label={t("servers.fileManager.contextMenu.preview")} onClick={() => setPreviewFile?.(`${path}/${selectedItem.name}`)} />}
+                        {isPreviewable(selectedItem.name) && <ContextMenuItem icon={mdiEye} label={t("servers.fileManager.contextMenu.preview")} onClick={() => setPreviewFile?.(childPath(path, selectedItem.name))} />}
                         <ContextMenuItem icon={mdiTextBoxEdit} label={t("servers.fileManager.contextMenu.edit")} onClick={openFile} />
                     </>
                 )}
-                <ContextMenuItem icon={mdiFileDownload} label={t("servers.fileManager.contextMenu.download")} onClick={() => downloadFile(`${path}/${selectedItem?.name}`)} />
+                <ContextMenuItem icon={mdiFileDownload} label={t("servers.fileManager.contextMenu.download")} onClick={() => downloadFile(childPath(path, selectedItem?.name))} />
                 <ContextMenuItem icon={mdiInformationOutline} label={t("servers.fileManager.contextMenu.properties")} onClick={() => handlePropertiesClick(selectedItem)} />
                 {selectedItem?.type === "folder" && capabilities.terminal && (
-                    <ContextMenuItem icon={mdiConsole} label={t("servers.fileManager.contextMenu.openTerminal")} onClick={() => handleOpenTerminal(`${path}/${selectedItem.name}`)} />
+                    <ContextMenuItem icon={mdiConsole} label={t("servers.fileManager.contextMenu.openTerminal")} onClick={() => handleOpenTerminal(childPath(path, selectedItem.name))} />
                 )}
                 <ContextMenuItem icon={mdiTrashCan} label={t("servers.fileManager.contextMenu.delete")} onClick={handleDeleteClick} danger />
             </ContextMenu>

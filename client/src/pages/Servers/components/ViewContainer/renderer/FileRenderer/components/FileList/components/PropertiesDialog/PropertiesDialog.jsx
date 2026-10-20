@@ -6,7 +6,7 @@ import { DialogProvider } from "@/common/components/Dialog";
 import Button from "@/common/components/Button";
 import Tooltip from "@/common/components/Tooltip";
 import TabSwitcher from "@/common/components/TabSwitcher";
-import { parsePermissions, permissionsToMode, formatOctal } from "../../utils/fileUtils";
+import { parsePermissions, permissionsToMode, formatOctal, childPath } from "../../utils/fileUtils";
 import { GeneralTab } from "./tabs/GeneralTab.jsx";
 import { PermissionsTab } from "./tabs/PermissionsTab.jsx";
 import { ChecksumTab } from "./tabs/ChecksumTab.jsx";
@@ -27,7 +27,7 @@ export const PropertiesDialog = ({ open, onClose, item, path, sendOperation, OPE
     const [permissionsSaving, setPermissionsSaving] = useState(false);
 
     const isFolder = item?.type === "folder" || !item;
-    const fullPath = item ? `${path}/${item.name}` : path;
+    const fullPath = item ? childPath(path, item.name) : path;
     const displayName = item?.name || path.split("/").pop() || "/";
 
     useEffect(() => {
