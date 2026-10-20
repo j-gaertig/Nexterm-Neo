@@ -41,6 +41,14 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.13.1
 
+dependency_overrides:
+  # shared_preferences_android 2.5.0/2.5.1 breaks R8 release builds at
+  # startup (splash hang, NoSuchMethodError in the Pigeon JNI registrar,
+  # flutter/flutter#194649). Pin to the last known-good version until the
+  # upstream consumer-rules fix is published. Remove together with the
+  # keep rules in android/app/proguard-rules.pro.
+  shared_preferences_android: 2.4.28
+
 flutter:
   uses-material-design: true
   assets:

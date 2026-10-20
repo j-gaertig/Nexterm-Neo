@@ -12,6 +12,7 @@ import '../utils/server_view_settings.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/connection_reason_dialog.dart';
 import 'widgets/server_protocol_sheet.dart';
+import 'widgets/script/run_script_sheet.dart';
 import '../services/server_editor_service.dart';
 import 'server_editor_screen.dart';
 
@@ -802,7 +803,7 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _initiateConnection(Server server,
-      {ConnectionType type = ConnectionType.terminal, Map<String, dynamic>? directIdentity}) async {
+      {ConnectionType type = ConnectionType.terminal, Map<String, dynamic>? directIdentity, RunScriptSelection? script}) async {
     if (server.disabled) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -820,16 +821,27 @@ class _ServersScreenState extends State<ServersScreen> {
     }
 
     try {
-      switch (type) {
-        case ConnectionType.guacamole:
-          await widget.sessionManager.createGuacSession(
-            token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
-        case ConnectionType.terminal:
-          await widget.sessionManager.createTerminalSession(
-            token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
-        case ConnectionType.sftp:
-          await widget.sessionManager.createSftpSession(
-            token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+      if (script != null) {
+        await widget.sessionManager.createScriptSession(
+          token: token,
+          server: server,
+          scriptId: script.scriptId,
+          scriptName: script.scriptName,
+          identityId: script.identityId,
+          connectionReason: connectionReason,
+        );
+      } else {
+        switch (type) {
+          case ConnectionType.guacamole:
+            await widget.sessionManager.createGuacSession(
+              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+          case ConnectionType.terminal:
+            await widget.sessionManager.createTerminalSession(
+              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+          case ConnectionType.sftp:
+            await widget.sessionManager.createSftpSession(
+              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+        }
       }
       if (mounted) widget.onSwitchToSessions?.call();
     } catch (e) {
@@ -839,6 +851,35 @@ class _ServersScreenState extends State<ServersScreen> {
           : 'Failed to connect: $e';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
     }
+  }
+
+  /// Opens the script picker and starts a script session with the chosen
+  /// script (mirrors the web `runScript` → `initiateConnection({scriptId})`).
+  Future<void> _runScript(Server server) async {
+    if (server.disabled) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      return;
+    }
+    if (server.isStopped) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${server.name} is ${server.isPve ? "not running" : "offline"}'),
+        behavior: SnackBarBehavior.floating));
+      return;
+    }
+    final token = widget.authManager.sessionToken;
+    if (token == null) return;
+    if (server.identities == null || server.identities!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('${server.name} has no identity configured for script execution'),
+        behavior: SnackBarBehavior.floating));
+      return;
+    }
+
+    final selection = await showRunScriptSheet(context, server, token);
+    if (selection == null || !mounted) return;
+
+    await _initiateConnection(server, script: selection);
   }
 
   bool _requiresConnectionReason(Server server) {
@@ -894,6 +935,10 @@ class _ServersScreenState extends State<ServersScreen> {
         _menuItem(ctx, AppIcons.connection, 'Connect', cs, () {
           Navigator.pop(ctx); _connectToServer(server);
         }),
+        if (showQuick && (server.identities?.isNotEmpty == true) && server.protocol?.toLowerCase() == 'ssh')
+          _menuItem(ctx, AppIcons.codeBracesBox, 'Run Script', cs, () {
+            Navigator.pop(ctx); _runScript(server);
+          }),
         if (showQuick)
           _menuItem(ctx, AppIcons.cursorDefaultClick, 'Quick Connect', cs, () {
             Navigator.pop(ctx); _quickConnect(server);

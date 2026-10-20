@@ -28,7 +28,7 @@ class ConnectionService {
 
   static Future<ConnectionSession> createSession({
     required String token, required int entryId, int? identityId, String? connectionReason, String? type,
-    Map<String, dynamic>? directIdentity, String? startPath,
+    Map<String, dynamic>? directIdentity, String? startPath, int? scriptId,
   }) async {
     final body = <String, dynamic>{
       'entryId': entryId,
@@ -39,6 +39,7 @@ class ConnectionService {
       if (type != null) 'type': type,
       if (directIdentity != null) 'directIdentity': directIdentity,
       if (startPath != null && startPath.isNotEmpty) 'startPath': startPath,
+      if (scriptId != null) 'scriptId': scriptId,
     };
 
     final response = await ApiClient.post('/connections', body: body, token: token);
