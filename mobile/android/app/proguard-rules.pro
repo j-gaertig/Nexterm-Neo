@@ -39,3 +39,15 @@
 -dontwarn com.google.android.play.core.tasks.OnFailureListener
 -dontwarn com.google.android.play.core.tasks.OnSuccessListener
 -dontwarn com.google.android.play.core.tasks.Task
+
+# Keep the Kotlin coroutine classes referenced by name through JNI by the
+# Pigeon native-interop bindings of shared_preferences_android >= 2.5.0; R8
+# otherwise renames them, breaking release builds at startup
+# (flutter/flutter#194649). Remove together with the dependency_overrides
+# entry in pubspec.yaml once the upstream consumer rules ship.
+-keep class kotlin.Unit { *; }
+-keep class kotlin.Result { *; }
+-keep class kotlin.Result$Failure { *; }
+-keep class kotlin.coroutines.Continuation { *; }
+-keep class kotlin.coroutines.intrinsics.CoroutineSingletons { *; }
+-keep class kotlin.coroutines.intrinsics.IntrinsicsKt { *; }
