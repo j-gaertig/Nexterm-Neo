@@ -73,7 +73,8 @@ export const ActionBar = ({
     const joinRoot = (segments) => {
         const root = normalizeRoot(rootPath);
         if (!segments.length) return root;
-        const prefix = root === "/" ? "" : root.endsWith("/") ? root : `${root}/`;
+        if (root === "/") return `/${segments.join("/")}`;
+        const prefix = root.endsWith("/") ? root : `${root}/`;
         return `${prefix}${segments.join("/")}` || "/";
     };
     const getPathArray = () => {
@@ -173,7 +174,7 @@ export const ActionBar = ({
                 const suggestion = directorySuggestions[selectedSuggestion];
                 if (selectedSuggestion >= 0 && suggestion) {
                     setEditPath(suggestion);
-                    updatePath(suggestion);
+                    updatePath(resolvePathInput(suggestion));
                     resetInputState();
                 } else {
                     submitPath();
@@ -217,15 +218,19 @@ export const ActionBar = ({
         }
     };
 
-    const submitPath = () => {
-        let newPath = editPath.trim();
+    const resolvePathInput = (value) => {
+        let newPath = String(value).trim();
         if (!newPath.startsWith("/") && !/^[a-z]:[\\/]/i.test(newPath)) {
             const root = normalizeRoot(rootPath);
-            const prefix = root === "/" ? "" : root.endsWith("/") ? root : `${root}/`;
+            const prefix = root === "/" ? "/" : root.endsWith("/") ? root : `${root}/`;
             newPath = `${prefix}${newPath}` || "/";
         }
         if (newPath.length > 1 && newPath.endsWith("/") && !/^[a-z]:\/$/i.test(newPath)) newPath = newPath.slice(0, -1);
-        updatePath(newPath);
+        return newPath;
+    };
+
+    const submitPath = () => {
+        updatePath(resolvePathInput(editPath));
         resetInputState();
     };
 
@@ -371,7 +376,7 @@ export const ActionBar = ({
                                          onMouseDown={(e) => {
                                              e.preventDefault();
                                              setEditPath(s);
-                                             updatePath(s);
+                                             updatePath(resolvePathInput(s));
                                              resetInputState();
                                          }}>
                                         {s}

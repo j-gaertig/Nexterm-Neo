@@ -49,7 +49,14 @@ export const convertUnits = (bytes) => {
     return Math.round(bytes / Math.pow(1024, i)) + " " + sizes[i];
 };
 
-export const getFullPath = (path, name) => `${path.endsWith("/") ? path : path + "/"}${name}`;
+// Join a directory path with a child name, avoiding a double slash when the
+// directory is the filesystem root ("/").
+export const childPath = (path, name) => {
+    if (path === "/") return `/${name}`;
+    return `${path.endsWith("/") ? path : path + "/"}${name}`;
+};
+
+export const getFullPath = (path, name) => childPath(path, name);
 
 export const parsePermissions = (mode) => {
     if (typeof mode !== 'number') return { owner: { r: false, w: false, x: false }, group: { r: false, w: false, x: false }, others: { r: false, w: false, x: false } };

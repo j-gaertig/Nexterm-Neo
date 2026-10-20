@@ -113,7 +113,7 @@ export const FileRenderer = ({ session, disconnectFromServer, setOpenFileEditors
     const downloadFile = async (path) => {
         const baseUrl = getBaseUrl();
         const fileName = path.split("/").pop();
-        const url = `${baseUrl}/api/entries/sftp?sessionId=${session.id}&path=${path}&sessionToken=${sessionToken}`;
+        const url = `${baseUrl}/api/entries/sftp?sessionId=${session.id}&path=${encodeURIComponent(path)}&sessionToken=${sessionToken}`;
         
         if (isTauri()) {
             try {
