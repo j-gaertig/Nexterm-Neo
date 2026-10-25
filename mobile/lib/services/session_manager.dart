@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:guacamole_common_dart/guacamole_common_dart.dart';
 import 'package:web_socket_channel/io.dart';
-import 'package:xterm/xterm.dart';
+import 'package:kterm/kterm.dart';
 
 import '../models/server.dart';
 import '../utils/api_client.dart';

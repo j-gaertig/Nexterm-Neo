@@ -4,6 +4,7 @@ const { parseResizeMessage } = require("../utils/sshEventHandlers");
 const { translateKeys } = require("../utils/keyTranslation");
 const controlPlane = require("../lib/controlPlane/ControlPlaneServer");
 const { buildParticipant, createWriteGuard } = require("../utils/sessionParticipant");
+const { createDecodedTextStream } = require("../utils/terminalStream");
 
 const bindHandlers = (ws, conn, sessionId, config, isShared, canWrite) => {
     const { dataSocket } = conn;
@@ -25,10 +26,13 @@ const bindHandlers = (ws, conn, sessionId, config, isShared, canWrite) => {
     };
     ws.on("message", msgHandler);
 
-    const dataHandler = (data) => ws.readyState === ws.OPEN && ws.send(data.toString());
+    const outputStream = createDecodedTextStream((text) => {
+        ws.readyState === ws.OPEN && ws.send(text);
+    });
+    const dataHandler = (data) => outputStream.write(data);
     dataSocket.on("data", dataHandler);
 
-    return { msgHandler, dataHandler };
+    return { msgHandler, dataHandler, endData: () => outputStream.end() };
 };
 
 module.exports = async (ws, ctx) => {
@@ -50,9 +54,10 @@ module.exports = async (ws, ctx) => {
     SessionManager.addWebSocket(sessionId, ws, isShared, buildParticipant(ctx));
     if (!isShared || canWrite()) SessionManager.setActiveWs(sessionId, ws);
 
-    const { msgHandler, dataHandler } = bindHandlers(ws, conn, sessionId, entry?.config, isShared, canWrite);
+    const { msgHandler, dataHandler, endData } = bindHandlers(ws, conn, sessionId, entry?.config, isShared, canWrite);
 
     ws.on("close", async () => {
+        endData();
         conn.dataSocket.removeListener("data", dataHandler);
         ws.removeListener("message", msgHandler);
         SessionManager.removeWebSocket(sessionId, ws, isShared);

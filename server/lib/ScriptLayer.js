@@ -1,6 +1,7 @@
 const { transformScript, getScriptCommands, processNextermLine, checkSudoPrompt, stripAnsi } = require("../utils/scriptUtils");
 const SessionManager = require("./SessionManager");
 const logger = require("../utils/logger");
+const { createDecodedTextStream } = require("../utils/terminalStream");
 
 const SCRIPT_MAGIC = "\x1F";
 const MSG = {
@@ -26,6 +27,7 @@ class ScriptLayer {
         this.commandQueue = [];
         this.commandIndex = 0;
         this.suppressOutput = true;
+        this.decoder = createDecodedTextStream((text) => this.processOutput(text));
         this.onData = this.onData.bind(this);
         this.onClose = this.onClose.bind(this);
     }
@@ -78,7 +80,7 @@ class ScriptLayer {
         }
     }
 
-    onData(data) { this.processOutput(data.toString()); }
+    onData(data) { this.decoder.write(data); }
 
     processOutput(output) {
         const sudo = checkSudoPrompt(output);
@@ -159,6 +161,7 @@ class ScriptLayer {
     handleEnd(exitCode) {
         if (!this.running) return;
         this.running = false;
+        this.decoder.end();
         if (this.buffer.trim()) this.processLine(this.buffer);
         this.buffer = "";
         this.broadcast(MSG.SCRIPT_END, { exitCode, success: exitCode === 0 });

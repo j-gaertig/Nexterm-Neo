@@ -14,6 +14,7 @@ const { ZipArchive } = require("archiver");
 const app = Router();
 const THUMB_EXTS = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp"]);
 const MAX_THUMB_SIZE = 10 * 1024 * 1024;
+const MAX_GRAPHICS_SIZE = 12 * 1024 * 1024;
 const MIME_TYPES = {
     pdf: "application/pdf", jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
     gif: "image/gif", webp: "image/webp", svg: "image/svg+xml", mp4: "video/mp4",
@@ -102,14 +103,28 @@ const validateSession = async (sessionToken, sessionId) => {
     if (!entry) return { error: "Entry not found", status: 404 };
 
     const conn = SessionManager.getConnection(sessionId);
-    if (!conn?.sftpClient) return { error: "No active SFTP connection", status: 400 };
+    if (!conn) return { error: "No active SFTP connection", status: 400 };
+
+    // Terminal SSH sessions do not have an SFTP client attached. Open the
+    // existing auxiliary transfer channel lazily so Kitty `t=f` image reads
+    // work from the terminal without forcing every SSH session to pay for a
+    // second subsystem up front.
+    if (!conn.sftpClient && conn.type !== "ssh") {
+        return { error: "No active SFTP connection", status: 400 };
+    }
 
     let sftpClient = conn.sftpClient;
-    try {
-        sftpClient = await getSFTPTransferClient(sessionId, entry, user.id);
-    } catch (err) {
-        logger.warn("Falling back to metadata SFTP client for transfer", { sessionId, error: err.message });
+    if (!sftpClient) {
+        // SSH terminal sessions only have the terminal's data channel. Open
+        // the auxiliary transfer subsystem lazily on first file access.
+        try {
+            sftpClient = await getSFTPTransferClient(sessionId, entry, user.id);
+        } catch (err) {
+            logger.warn("Failed to open SFTP transfer client", { sessionId, error: err.message });
+        }
     }
+
+    if (!sftpClient) return { error: "No active SFTP connection", status: 400 };
 
     return { session, user, serverSession, entry, sftpClient };
 };
@@ -117,6 +132,7 @@ const validateSession = async (sessionToken, sessionId) => {
 const validateRequest = (query) => {
     const { sessionToken, sessionId, path: remotePath } = query;
     if (!sessionToken || !sessionId || !remotePath) return "Missing parameters";
+    if (typeof remotePath !== "string" || remotePath.includes("\0")) return "Invalid path";
     if (remotePath.split("/").includes("..")) return "Invalid path";
     return null;
 };
@@ -193,7 +209,7 @@ app.get("/", async (req, res) => {
     const error = validateRequest(req.query);
     if (error) return res.status(400).json({ error });
 
-    const { sessionToken, sessionId, path: remotePath, preview, thumbnail, size } = req.query;
+    const { sessionToken, sessionId, path: remotePath, preview, thumbnail, size, graphics, maxSize } = req.query;
 
     try {
         const ctx = await validateSession(sessionToken, sessionId);
@@ -202,10 +218,23 @@ app.get("/", async (req, res) => {
         if (!(await checkFilePermission(ctx, Permission.FILES_DOWNLOAD)))
             return res.status(403).json({ error: "You don't have permission to download files" });
 
+        const isGraphics = graphics === "true";
+        const requestedGraphicsLimit = Number.parseInt(maxSize, 10);
+        const graphicsLimit = isGraphics
+            ? Math.min(Number.isFinite(requestedGraphicsLimit) && requestedGraphicsLimit > 0 ? requestedGraphicsLimit : MAX_GRAPHICS_SIZE, MAX_GRAPHICS_SIZE)
+            : null;
+
         const { sftpClient } = ctx;
         const stats = await sftpClient.stat(remotePath);
         const fileName = getFileName(remotePath);
         const safeFileName = sanitizeFileName(fileName);
+
+        if (isGraphics && stats.isDir) {
+            return res.status(400).json({ error: "Terminal images must be regular files" });
+        }
+        if (isGraphics && stats.size > graphicsLimit) {
+            return res.status(413).json({ error: `Terminal image exceeds the ${graphicsLimit} byte limit` });
+        }
 
         if (stats.isDir) {
             res.header("Content-Disposition", `attachment; filename="${safeFileName}.zip"`);

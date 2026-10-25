@@ -2,13 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:kterm/kterm.dart';
 import 'package:web_socket_channel/io.dart';
-import 'package:xterm/xterm.dart';
 
 import '../../services/session_manager.dart';
 import '../../utils/app_icons.dart';
 import '../../utils/script_protocol.dart';
+import '../../utils/terminal_font.dart';
+import '../../utils/terminal_graphics.dart';
+import '../../utils/terminal_image_fetch.dart';
 import '../widgets/script/script_message_sheet.dart';
 import '../widgets/script/script_overlay.dart';
 import '../widgets/script/script_prompt_sheet.dart';
@@ -42,6 +44,7 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   IOWebSocketChannel? get _channel => widget.session.termChannel;
 
   late final ScriptStreamParser _parser;
+  late final TerminalGraphicsProcessor _graphics;
 
   String _scriptName = '';
   List<String?> _steps = const ['Initializing...'];
@@ -63,8 +66,31 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   void initState() {
     super.initState();
     _scriptName = widget.session.scriptName ?? 'Script';
+    _graphics = TerminalGraphicsProcessor(
+      fetchImage: (path) => fetchRemoteTerminalImage(
+        token: widget.token,
+        sessionId: widget.session.sessionId,
+        path: path,
+      ),
+      viewportMetrics: () => (
+        columns: _terminal.viewWidth,
+        rows: _terminal.viewHeight,
+        cellWidth: _terminal.cellPixelWidth,
+        cellHeight: _terminal.cellPixelHeight,
+      ),
+      onError: (error) => debugPrint('Script terminal graphics: $error'),
+    );
     _parser = ScriptStreamParser(
-      onTerminalData: _terminal.write,
+      onTerminalData: (data) {
+        _graphics
+            .push(data)
+            .then((output) {
+              if (mounted && output.isNotEmpty) _terminal.write(output);
+            })
+            .catchError((Object error) {
+              debugPrint('Script terminal graphics processing failed: $error');
+            });
+      },
       onEvent: (event) => _handleEvent(event),
     );
     _terminal.onResize = (w, h, _, __) {
@@ -108,13 +134,15 @@ class _ScriptRendererState extends State<ScriptRenderer> {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted && _channel != null) {
         _channel?.sink.add(
-            '\x01${_terminal.viewWidth > 0 ? _terminal.viewWidth : 80},${_terminal.viewHeight > 0 ? _terminal.viewHeight : 30}');
+          '\x01${_terminal.viewWidth > 0 ? _terminal.viewWidth : 80},${_terminal.viewHeight > 0 ? _terminal.viewHeight : 30}',
+        );
       }
     });
   }
 
   @override
   void dispose() {
+    _graphics.dispose();
     _parser.discardPending();
     _terminal.onResize = null;
     if (_sheetShowing && _popActiveSheet != null) {
@@ -173,14 +201,17 @@ class _ScriptRendererState extends State<ScriptRenderer> {
       case ScriptMessageBoxEvent():
         _queueOrShowSheet(_requestFor(event));
       case ScriptNoticeEvent(:final kind, :final message):
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(message, style: const TextStyle(color: Colors.white)),
-          backgroundColor: switch (kind) {
-            ScriptNoticeKind.warning => Colors.orange.shade800,
-            ScriptNoticeKind.info => Theme.of(context).colorScheme.secondary,
-            ScriptNoticeKind.success => Colors.green.shade700,
-          },
-          behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message, style: const TextStyle(color: Colors.white)),
+            backgroundColor: switch (kind) {
+              ScriptNoticeKind.warning => Colors.orange.shade800,
+              ScriptNoticeKind.info => Theme.of(context).colorScheme.secondary,
+              ScriptNoticeKind.success => Colors.green.shade700,
+            },
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       case ScriptProgressEvent(:final percentage):
         setState(() => _currentProgress = percentage);
       case ScriptEndEvent(:final success):
@@ -194,12 +225,14 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   }
 
   ScriptSheetRequest _requestFor(ScriptEvent event) => switch (event) {
-        ScriptPromptEvent prompt => ScriptSheetRequest(prompt: prompt),
-        ScriptSummaryEvent summary => ScriptSheetRequest(summary: summary),
-        ScriptTableEvent table => ScriptSheetRequest(table: table),
-        ScriptMessageBoxEvent messageBox => ScriptSheetRequest(messageBox: messageBox),
-        _ => const ScriptSheetRequest(),
-      };
+    ScriptPromptEvent prompt => ScriptSheetRequest(prompt: prompt),
+    ScriptSummaryEvent summary => ScriptSheetRequest(summary: summary),
+    ScriptTableEvent table => ScriptSheetRequest(table: table),
+    ScriptMessageBoxEvent messageBox => ScriptSheetRequest(
+      messageBox: messageBox,
+    ),
+    _ => const ScriptSheetRequest(),
+  };
 
   // --- sheets --------------------------------------------------------------
 
@@ -250,17 +283,32 @@ class _ScriptRendererState extends State<ScriptRenderer> {
     _presentActiveSheet();
   }
 
-  void _handleSheetResult(ScriptSheetRequest request, ScriptSheetResult? result) {
+  void _handleSheetResult(
+    ScriptSheetRequest request,
+    ScriptSheetResult? result,
+  ) {
     if (result == null) return; // Dismissed programmatically (e.g. cancel).
     switch (result) {
       case ScriptInputResult(:final value) when request.prompt != null:
-        _sendControl('input_response', {'variable': request.prompt!.variable, 'value': value});
+        _sendControl('input_response', {
+          'variable': request.prompt!.variable,
+          'value': value,
+        });
       case ScriptClosedResult() when request.summary != null:
-        _sendControl('input_response', {'variable': 'NEXTERM_SUMMARY_RESULT', 'value': 'closed'});
+        _sendControl('input_response', {
+          'variable': 'NEXTERM_SUMMARY_RESULT',
+          'value': 'closed',
+        });
       case ScriptClosedResult() when request.table != null:
-        _sendControl('input_response', {'variable': 'NEXTERM_TABLE_RESULT', 'value': 'closed'});
+        _sendControl('input_response', {
+          'variable': 'NEXTERM_TABLE_RESULT',
+          'value': 'closed',
+        });
       case ScriptClosedResult() when request.messageBox != null:
-        _sendControl('input_response', {'variable': 'NEXTERM_MSGBOX_RESULT', 'value': 'closed'});
+        _sendControl('input_response', {
+          'variable': 'NEXTERM_MSGBOX_RESULT',
+          'value': 'closed',
+        });
       case ScriptCancelledResult():
         _sendControl('input_cancelled');
       case _:
@@ -284,7 +332,10 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   }
 
   Future<void> _closeSession() async {
-    await widget.sessionManager.closeSession(widget.session.sessionId, widget.token);
+    await widget.sessionManager.closeSession(
+      widget.session.sessionId,
+      widget.token,
+    );
   }
 
   // --- step visuals (port of web `getTypeByIndex`) --------------------------
@@ -296,7 +347,9 @@ class _ScriptRendererState extends State<ScriptRenderer> {
     if (index < _currentStep - 1) return StepVisual.success;
     if (index == _currentStep - 1) {
       if (_isCompleted && index == _steps.length - 1) return StepVisual.success;
-      return _currentProgress != null ? StepVisual.progress : StepVisual.loading;
+      return _currentProgress != null
+          ? StepVisual.progress
+          : StepVisual.loading;
     }
     return StepVisual.pending;
   }
@@ -304,59 +357,82 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Stack(children: [
-      Positioned.fill(
-        child: Container(
-          color: TerminalThemes.defaultTheme.background,
-          child: TerminalView(
-            _terminal,
-            readOnly: true,
-            autofocus: false,
-            textStyle: TerminalStyle(
-              fontSize: 13,
-              fontFamily: GoogleFonts.jetBrainsMono().fontFamily ?? 'monospace',
-              height: 1.2,
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: TerminalThemes.defaultTheme.background,
+            child: TerminalView(
+              _terminal,
+              readOnly: true,
+              autofocus: false,
+              textStyle: TerminalStyle(
+                fontSize: 13,
+                fontFamily: terminalNerdFontFamily,
+                fontFamilyFallback: terminalNerdFontFallback,
+                height: 1.2,
+              ),
+              padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
             ),
-            padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
           ),
         ),
-      ),
-      if (_errorMessage != null)
-        Positioned(
-          top: 0, left: 0, right: 0,
-          child: Material(
-            color: cs.errorContainer,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(children: [
-                  Icon(AppIcons.alertCircle, size: 18, color: cs.onErrorContainer),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(_errorMessage!,
-                      style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
-                ]),
+        if (_errorMessage != null)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Material(
+              color: cs.errorContainer,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        AppIcons.alertCircle,
+                        size: 18,
+                        color: cs.onErrorContainer,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _errorMessage!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: cs.onErrorContainer,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      Positioned(
-        left: 16, right: 16, bottom: 16,
-        child: SafeArea(
-          top: false,
-          child: ScriptOverlay(
-            scriptName: _scriptName,
-            steps: _steps,
-            failedStep: _failedStep,
-            isCompleted: _isCompleted,
-            currentStep: _currentStep,
-            currentProgress: _currentProgress,
-            visualForStep: _visualForStep,
-            onCancel: _cancelFromOverlay,
-            onClose: _isCompleted ? _closeSession : null,
+        Positioned(
+          left: 16,
+          right: 16,
+          bottom: 16,
+          child: SafeArea(
+            top: false,
+            child: ScriptOverlay(
+              scriptName: _scriptName,
+              steps: _steps,
+              failedStep: _failedStep,
+              isCompleted: _isCompleted,
+              currentStep: _currentStep,
+              currentProgress: _currentProgress,
+              visualForStep: _visualForStep,
+              onCancel: _cancelFromOverlay,
+              onClose: _isCompleted ? _closeSession : null,
+            ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 }
