@@ -17,6 +17,7 @@ const { isRecordingEnabled } = require("../utils/recordingService");
 const EngineSftpClient = require("./EngineSftpClient");
 const { buildPveQemuParams, buildRdpParams, buildVncParams, buildSpiceParams, buildWebParams, buildDemoParams } = require("./guacParamBuilders");
 const { SPICE_DEFAULT_PORT } = require("./spiceUtils");
+const { createDecodedTextStream } = require("../utils/terminalStream");
 
 const GUAC_PROTOCOLS = {
     rdp: { sessionType: SessionType.RDP, defaultPort: 3389 },
@@ -291,8 +292,10 @@ const createSSHConnectionForSession = async (sessionId, entry, identity, organiz
 
         await SessionManager.initRecording(sessionId, organizationId);
 
-        dataSocket.on("data", (data) => SessionManager.appendLog(sessionId, data.toString()));
+        const logStream = createDecodedTextStream((text) => SessionManager.appendLog(sessionId, text));
+        dataSocket.on("data", logStream.write);
         dataSocket.on("close", () => {
+            logStream.end();
             logger.info("SSH data connection closed", { sessionId });
             if (!SessionManager.get(sessionId)?._removing) {
                 SessionManager.markFailed(sessionId, "Connection lost");
@@ -353,8 +356,10 @@ const createTelnetConnectionForSession = async (sessionId, entry, organizationId
 
     await SessionManager.initRecording(sessionId, organizationId);
 
-    dataSocket.on("data", (data) => SessionManager.appendLog(sessionId, data.toString()));
+    const logStream = createDecodedTextStream((text) => SessionManager.appendLog(sessionId, text));
+    dataSocket.on("data", logStream.write);
     dataSocket.on("close", () => {
+        logStream.end();
         logger.info("Telnet data connection closed", { sessionId });
         if (!SessionManager.get(sessionId)?._removing) {
             SessionManager.markFailed(sessionId, "Connection lost");
@@ -413,12 +418,13 @@ const createPveLxcConnectionForSession = async (sessionId, entry, organizationId
         if (!dataSocket.destroyed) dataSocket.write("2");
     }, 30000);
 
-    dataSocket.on("data", (data) => {
-        const text = data.toString();
+    const logStream = createDecodedTextStream((text) => {
         if (text !== "OK") SessionManager.appendLog(sessionId, text);
     });
+    dataSocket.on("data", logStream.write);
 
     dataSocket.on("close", () => {
+        logStream.end();
         clearInterval(keepAliveTimer);
         if (!SessionManager.get(sessionId)?._removing) {
             SessionManager.markFailed(sessionId, "Connection lost");

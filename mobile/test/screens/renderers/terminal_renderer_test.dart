@@ -8,7 +8,7 @@ import 'package:nexterm/utils/app_icons.dart';
 import 'package:nexterm/utils/snippet_manager.dart';
 import 'package:nexterm/utils/terminal_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:xterm/xterm.dart';
+import 'package:kterm/kterm.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -112,7 +112,11 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byType(TerminalView));
+    // The connection loader covers the terminal until the first WebSocket
+    // frame arrives. Focus the terminal directly; this test is about the
+    // keyboard toolbar, not connection state.
+    final terminalView = tester.widget<TerminalView>(find.byType(TerminalView));
+    terminalView.focusNode!.requestFocus();
     await tester.pump();
 
     expect(find.byIcon(AppIcons.arrowUp), findsOneWidget);
@@ -128,6 +132,7 @@ void main() {
     expect(find.text('←'), findsNothing);
     expect(find.text('→'), findsNothing);
 
+    await tester.pump(const Duration(milliseconds: 150));
     await tester.pumpWidget(const SizedBox.shrink());
     settings.dispose();
   });

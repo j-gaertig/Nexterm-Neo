@@ -14,7 +14,9 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  xterm: ^4.0.0
+  kterm:
+    path: packages/kterm
+  image: ^4.2.0
   shared_preferences: ^2.3.4
   http: ^1.2.0
   web_socket_channel: ^3.0.1
@@ -53,6 +55,11 @@ flutter:
   uses-material-design: true
   assets:
     - favicon.png
+  fonts:
+    - family: JetBrainsMono Nerd Font Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMonoNerdFontMono-Regular.ttf
+          weight: 400
 
 flutter_launcher_icons:
   android: true

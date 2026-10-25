@@ -1,6 +1,7 @@
 const { updateAuditLogWithSessionDuration } = require("../controllers/audit");
 const SessionManager = require("../lib/SessionManager");
 const { buildParticipant, createWriteGuard } = require("../utils/sessionParticipant");
+const { createDecodedTextStream } = require("../utils/terminalStream");
 
 const handleShared = (ws, ctx) => {
     const { serverSession } = ctx;
@@ -16,8 +17,14 @@ const handleShared = (ws, ctx) => {
     SessionManager.addWebSocket(sessionId, ws, true, buildParticipant(ctx));
     if (canWrite()) SessionManager.setActiveWs(sessionId, ws);
 
-    const onData = (data) => { const text = data.toString(); if (text !== "OK" && ws.readyState === ws.OPEN) ws.send(text); };
-    const onClose = () => ws.readyState === ws.OPEN && ws.close(4014, "Session ended");
+    const outputStream = createDecodedTextStream((text) => {
+        if (text !== "OK" && ws.readyState === ws.OPEN) ws.send(text);
+    });
+    const onData = (data) => outputStream.write(data);
+    const onClose = () => {
+        outputStream.end();
+        ws.readyState === ws.OPEN && ws.close(4014, "Session ended");
+    };
     const onErr = () => ws.readyState === ws.OPEN && ws.close(4014, "Session error");
 
     dataSocket.on("data", onData);
@@ -38,6 +45,7 @@ const handleShared = (ws, ctx) => {
     });
 
     ws.on("close", () => {
+        outputStream.end();
         dataSocket.removeListener("data", onData);
         dataSocket.removeListener("close", onClose);
         dataSocket.removeListener("error", onErr);
@@ -46,6 +54,9 @@ const handleShared = (ws, ctx) => {
 };
 
 const setupHandler = (ws, dataSocket, sessionId) => {
+    const outputStream = createDecodedTextStream((text) => {
+        if (text !== "OK" && ws.readyState === ws.OPEN) ws.send(text);
+    });
     ws.on("message", (data) => {
         if (dataSocket.destroyed) return;
         data = data.toString();
@@ -63,6 +74,7 @@ const setupHandler = (ws, dataSocket, sessionId) => {
         }
         dataSocket.write(`0:${data.length}:${data}`);
     });
+    return outputStream;
 };
 
 module.exports = async (ws, context) => {
@@ -82,9 +94,9 @@ module.exports = async (ws, context) => {
 
     SessionManager.addWebSocket(serverSession.sessionId, ws, false, buildParticipant(context));
     SessionManager.setActiveWs(serverSession.sessionId, ws);
-    setupHandler(ws, dataSocket, serverSession.sessionId);
+    const outputStream = setupHandler(ws, dataSocket, serverSession.sessionId);
 
-    const onData = (data) => { const text = data.toString(); if (text !== "OK" && ws.readyState === ws.OPEN) ws.send(text); };
+    const onData = (data) => outputStream.write(data);
     dataSocket.on("data", onData);
 
     const onFirstResize = (data) => {
@@ -101,6 +113,7 @@ module.exports = async (ws, context) => {
     ws.on("message", onFirstResize);
 
     ws.on("close", async () => {
+        outputStream.end();
         dataSocket.removeListener("data", onData);
         ws.removeListener("message", onFirstResize);
         SessionManager.removeWebSocket(serverSession.sessionId, ws);

@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nexterm/utils/password_prompt.dart';
 import 'package:nexterm/utils/password_prompt_localizations.dart';
-import 'package:xterm/xterm.dart';
+import 'package:kterm/kterm.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

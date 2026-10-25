@@ -1,7 +1,11 @@
 import { useRef, useState, useCallback, useEffect, useContext } from "react";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
 import { attachOsc52, stripOsc52 } from "@/common/utils/osc52.js";
+import { ensureTerminalFontsLoaded } from "@/common/utils/terminalFonts.js";
+import { createTerminalGraphicsResolver, stripGraphicsSequences } from "@/common/utils/terminalGraphics.js";
+import { createRemoteImageFetcher } from "@/common/utils/terminalImageFetch.js";
 import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { getWebSocketUrl } from "@/common/utils/ConnectionUtil.js";
@@ -31,6 +35,7 @@ const DIALOG_TYPES = { input: "input", summary: "summary", table: "table", msgbo
 export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession, updateProgress, savedState, saveState, markSessionErrored, getSessionError }) => {
     const containerRef = useRef(null);
     const termRef = useRef(null);
+    const graphicsResolverRef = useRef(null);
     const wsRef = useRef(null);
     const fitAddonRef = useRef(null);
     const isAnyDialogOpenRef = useRef(false);
@@ -146,22 +151,37 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
         }
     }, [sendToast, updateProgress, session.id, queueOrShowPrompt]);
 
+    const writeTerminalData = useCallback((data) => {
+        const clean = stripOsc52(data);
+        if (!clean) return;
+
+        const resolver = graphicsResolverRef.current;
+        const term = termRef.current;
+        if (!resolver || !term) {
+            term?.write(clean);
+            appendTerminalContent(stripGraphicsSequences(clean));
+            return;
+        }
+
+        void resolver.push(clean).then((output) => {
+            if (!output || graphicsResolverRef.current !== resolver) return;
+            termRef.current?.write(output);
+            appendTerminalContent(stripGraphicsSequences(output));
+        }).catch((error) => console.warn("Script terminal graphics:", error));
+    }, [appendTerminalContent]);
+
     const processMessage = useCallback((data) => {
         const term = termRef.current;
         if (!term || typeof data !== 'string') return;
 
         const magicIndex = data.indexOf(SCRIPT_MAGIC);
         if (magicIndex === -1) {
-            const clean = stripOsc52(data);
-            term.write(clean);
-            appendTerminalContent(clean);
+            writeTerminalData(data);
             return;
         }
 
         if (magicIndex > 0) {
-            const terminalData = stripOsc52(data.slice(0, magicIndex));
-            term.write(terminalData);
-            appendTerminalContent(terminalData);
+            writeTerminalData(data.slice(0, magicIndex));
         }
 
         const jsonStart = magicIndex + 1;
@@ -175,7 +195,7 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
         }
 
         if (jsonEnd < data.length) processMessage(data.slice(jsonEnd));
-    }, [handleControlMessage, appendTerminalContent]);
+    }, [handleControlMessage, writeTerminalData]);
 
     useEffect(() => {
         handlersRef.current = { processMessage, handleControlMessage, appendTerminalContent };
@@ -188,6 +208,11 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
         if (getSessionError?.(session.id)) return;
 
         let isCleaningUp = false;
+        let cleanup = () => {};
+
+        const initialise = async () => {
+        await ensureTerminalFontsLoaded(selectedFont, fontSize);
+        if (isCleaningUp) return;
 
         const terminalTheme = getCurrentTheme();
         const isLightTerminalTheme = selectedTheme === "light";
@@ -225,8 +250,19 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
         const fitAddon = new FitAddon();
         fitAddonRef.current = fitAddon;
         term.loadAddon(fitAddon);
+        term.loadAddon(new ImageAddon());
         term.open(containerRef.current);
         const osc52Disposable = attachOsc52(term, !session.isJoined);
+
+        const graphicsResolver = createTerminalGraphicsResolver({
+            fetchImage: createRemoteImageFetcher({
+                sessionToken,
+                sessionId: session.id,
+                isShared: Boolean(session.isJoined),
+            }),
+            onError: (error) => console.warn("Script terminal graphics:", error.message),
+        });
+        graphicsResolverRef.current = graphicsResolver;
 
         if (initialTerminalContentRef.current?.length > 0) {
             initialTerminalContentRef.current.forEach(content => term.write(stripOsc52(content)));
@@ -301,7 +337,7 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
             }
         });
 
-        return () => {
+        cleanup = () => {
             isCleaningUp = true;
             window.removeEventListener("resize", handleResize);
             clearInterval(interval);
@@ -315,10 +351,26 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
             try {
                 osc52Disposable?.dispose();
             } catch {}
+            graphicsResolver.dispose();
+            if (graphicsResolverRef.current === graphicsResolver) {
+                graphicsResolverRef.current = null;
+            }
             term.dispose();
             termRef.current = null;
             wsRef.current = null;
             fitAddonRef.current = null;
+        };
+        };
+
+        void initialise().catch((error) => {
+            if (isCleaningUp) return;
+            console.error("Failed to initialise script terminal:", error);
+            setConnectionError(error?.message || t("common.errors.connection.scriptError"));
+        });
+
+        return () => {
+            isCleaningUp = true;
+            cleanup();
         };
     }, [sessionToken, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, session.id, getCurrentTheme, theme]);
 

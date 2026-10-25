@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { patchRequest } from "@/common/utils/RequestUtil.js";
+import { NERD_FONT_STACK, TERMINAL_FONT_OPTIONS } from "@/common/utils/terminalFonts.js";
 import i18n from "@/i18n.js";
 
 const PreferencesContext = createContext({});
@@ -357,14 +358,9 @@ const DEFAULT_TERMINAL_THEMES = {
 };
 
 const DEFAULT_FONTS = [
-    { name: "Monospace", value: "monospace" },
-    { name: "Fira Code", value: "'Fira Code', monospace" },
-    { name: "JetBrains Mono", value: "'JetBrains Mono', monospace" },
-    { name: "Source Code Pro", value: "'Source Code Pro', monospace" },
-    { name: "Inconsolata", value: "Inconsolata, monospace" },
-    { name: "Ubuntu Mono", value: "'Ubuntu Mono', monospace" },
-    { name: "Roboto Mono", value: "'Roboto Mono', monospace" },
-    { name: "Hack", value: "Hack, monospace" },
+    { name: "Nerd Font Mono (Recommended)", value: NERD_FONT_STACK },
+    { name: "System Monospace", value: "monospace" },
+    ...TERMINAL_FONT_OPTIONS.map(font => ({ name: font.name, value: `'${font.family}', monospace` })),
 ];
 
 const CURSOR_STYLES = [
@@ -521,7 +517,7 @@ export const PreferencesProvider = ({ children, user, refreshUser }) => {
     }, [uiScale]);
 
     const selectedTheme = get("terminal.theme", "default");
-    const selectedFont = get("terminal.fontFamily", "monospace");
+    const selectedFont = get("terminal.fontFamily", NERD_FONT_STACK);
     const fontSize = get("terminal.fontSize", 16);
     const cursorStyle = get("terminal.cursorStyle", "block");
     const cursorBlink = get("terminal.cursorBlink", true);
