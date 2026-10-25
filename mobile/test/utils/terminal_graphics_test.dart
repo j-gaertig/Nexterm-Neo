@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
+import 'package:kterm/kterm.dart';
 import 'package:nexterm/utils/terminal_graphics.dart';
 
 const _st = '\x1b\\';
@@ -56,6 +57,14 @@ Future<String> _pushAll(
   return output.toString();
 }
 
+Future<void> _waitForPlacements(Terminal terminal, int count) async {
+  for (var attempt = 0; attempt < 200; attempt++) {
+    if (terminal.graphicsManager.placementCount >= count) return;
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  fail('Timed out waiting for $count image placements');
+}
+
 List<({String control, String payload})> _kittyChunks(String value) {
   return RegExp(r'\x1b_G([^;]*);([^\x1b]*)\x1b\\')
       .allMatches(value)
@@ -64,6 +73,8 @@ List<({String control, String payload})> _kittyChunks(String value) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('TerminalGraphicsProcessor Kitty file transport', () {
     test(
       'rewrites the exact fastfetch avatar sequence with one fetch',
@@ -342,5 +353,73 @@ void main() {
       const input = 'a\x1bP\$q544e\x1b\\b';
       expect(await _pushAll(processor, [input]), input);
     });
+  });
+
+  group('TerminalGraphicsProcessor output ordering', () {
+    test(
+      'writes multi-chunk fastfetch output in source order after a slow image',
+      () async {
+        final terminal = Terminal(maxLines: 1000);
+        terminal.resize(80, 24, 8, 16);
+        final writes = <String>[];
+
+        final sequence =
+            '\x1b_Ga=T,f=100,t=f,q=2,C=1,c=6,r=3;'
+            '${base64Encode(utf8.encode(_avatarPath))}$_st';
+        const logo1 = '             .-------------------------:';
+        const logo2 = '            .+=========================.';
+        final source =
+            '\r\n'
+            '$logo1\r\n'
+            '$logo2\r\n'
+            '$sequence\x1b[8Cjgaertig\r\n'
+            '\r\n'
+            '\r\n'
+            '╭─ Host test\r\n'
+            '├─ CPU test\r\n'
+            '╰─ IP 192.0.2.1\r\n';
+
+        final processor = TerminalGraphicsProcessor(
+          fetchImage: (_) async {
+            await Future<void>.delayed(const Duration(milliseconds: 20));
+            return _png;
+          },
+          onOutput: (text) {
+            writes.add(text);
+            terminal.write(text);
+          },
+        );
+        addTearDown(processor.dispose);
+
+        final pushes = [
+          for (final chunk in _splitEvery(source, 7)) processor.push(chunk),
+        ];
+        await Future.wait(pushes);
+        await _waitForPlacements(terminal, 1);
+
+        final output = writes.join();
+        final outputLogo = output.indexOf(logo1);
+        final outputHost = output.indexOf('Host test');
+        final outputCpu = output.indexOf('CPU test');
+        final outputIp = output.indexOf('IP 192.0.2.1');
+        expect(outputLogo, greaterThanOrEqualTo(0));
+        expect(outputHost, greaterThan(outputLogo));
+        expect(outputCpu, greaterThan(outputHost));
+        expect(outputIp, greaterThan(outputCpu));
+
+        final lines = [
+          for (var i = 0; i < terminal.buffer.lines.length; i++)
+            terminal.buffer.lines[i].toString().trimRight(),
+        ];
+        final logo = lines.indexOf(logo1);
+        final host = lines.indexOf('╭─ Host test');
+        final cpu = lines.indexOf('├─ CPU test');
+        final ip = lines.indexOf('╰─ IP 192.0.2.1');
+        expect(logo, greaterThanOrEqualTo(0));
+        expect(host, greaterThan(logo));
+        expect(cpu, greaterThan(host));
+        expect(ip, greaterThan(cpu));
+      },
+    );
   });
 }

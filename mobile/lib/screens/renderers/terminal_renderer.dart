@@ -89,8 +89,21 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         cellWidth: _terminal.cellPixelWidth,
         cellHeight: _terminal.cellPixelHeight,
       ),
+      onOutput: _writeProcessedOutput,
       onError: (error) => debugPrint('Terminal graphics: $error'),
     );
+  }
+
+  void _writeProcessedOutput(String text) {
+    if (!mounted || text.isEmpty) return;
+    // TOTP second-factor prompts (\x02) are written without the marker and
+    // never feed password detection, like the web client.
+    if (text.startsWith('\x02')) {
+      _terminal.write(text.substring(1));
+      return;
+    }
+    _terminal.write(text);
+    _trackPasswordPrompt(text);
   }
 
   void _resetGraphicsProcessor() {
@@ -509,27 +522,14 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             setState(() => _receivedData = true);
           }
           if (data is String) {
-            final processor = _graphics;
-            processor
-                .push(data)
-                .then((text) {
-                  if (!mounted ||
-                      !identical(processor, _graphics) ||
-                      text.isEmpty) {
-                    return;
-                  }
-                  // TOTP second-factor prompts (\x02) are written without the
-                  // marker and never feed password detection, like the web client.
-                  if (text.startsWith('\x02')) {
-                    _terminal.write(text.substring(1));
-                    return;
-                  }
-                  _terminal.write(text);
-                  _trackPasswordPrompt(text);
-                })
-                .catchError((Object error) {
-                  debugPrint('Terminal graphics processing failed: $error');
-                });
+            // The processor writes through onOutput before the next chunk is
+            // processed, so a slow image fetch cannot reorder terminal writes.
+            unawaited(
+              _graphics.push(data).catchError((Object error) {
+                debugPrint('Terminal graphics processing failed: $error');
+                return '';
+              }),
+            );
           }
         },
         onError: (error) {

@@ -26,10 +26,13 @@ typedef TerminalViewportMetrics = ({
 /// - SIXEL DCS -> decoded PNG -> Kitty `t=d`
 ///
 /// The processor is serialized: a slow image fetch cannot reorder the text
-/// that follows it.
+/// that follows it. When [onOutput] is set, processed text is delivered through
+/// it in source order before the next chunk is processed. The future returned
+/// by [push] still resolves to the same text.
 class TerminalGraphicsProcessor {
   TerminalGraphicsProcessor({
     this.fetchImage,
+    this.onOutput,
     this.onError,
     this.viewportMetrics,
     this.maxImageBytes = 12 * 1024 * 1024,
@@ -37,6 +40,7 @@ class TerminalGraphicsProcessor {
   });
 
   final TerminalImageFetcher? fetchImage;
+  final void Function(String text)? onOutput;
   final void Function(Object error)? onError;
   final TerminalViewportMetrics? Function()? viewportMetrics;
   final int maxImageBytes;
@@ -49,7 +53,13 @@ class TerminalGraphicsProcessor {
 
   Future<String> push(String chunk) {
     if (_disposed) return Future<String>.value('');
-    final run = _chain.then((_) => _process(chunk));
+    final run = _chain.then((_) async {
+      final text = await _process(chunk);
+      if (!_disposed && text.isNotEmpty) {
+        onOutput?.call(text);
+      }
+      return text;
+    });
     _chain = run.then<void>((_) {}, onError: (Object _, StackTrace __) {});
     return run;
   }
