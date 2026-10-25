@@ -1,6 +1,7 @@
 import { useEffect, useRef, useContext } from "react";
 import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
+import { useTerminalFontReady } from "@/common/hooks/useTerminalFontReady.js";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { attachOsc52, stripOsc52 } from "@/common/utils/osc52.js";
@@ -54,8 +55,10 @@ export const useTerminal = (containerRef, session, options = {}) => {
 
     const { sessionToken } = useContext(UserContext);
     const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, isOledMode } = usePreferences();
+    const fontReady = useTerminalFontReady(selectedFont, fontSize);
 
     useEffect(() => {
+        if (!fontReady) return;
         if (!sessionToken || !containerRef.current) return;
 
         let isCleaningUp = false;
@@ -146,7 +149,7 @@ export const useTerminal = (containerRef, session, options = {}) => {
             wsRef.current = null;
             fitAddonRef.current = null;
         };
-    }, [sessionToken, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, isOledMode]);
+    }, [fontReady, sessionToken, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, isOledMode]);
 
     return { termRef, wsRef, fitAddonRef };
 };

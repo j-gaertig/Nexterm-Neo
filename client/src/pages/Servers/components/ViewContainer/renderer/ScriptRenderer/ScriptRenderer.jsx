@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect, useContext } from "react";
+import { useTerminalFontReady } from "@/common/hooks/useTerminalFontReady.js";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { attachOsc52, stripOsc52 } from "@/common/utils/osc52.js";
@@ -41,6 +42,7 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
     const { sessionToken } = useContext(UserContext);
     const [connectionError, setConnectionError] = useState(() => getSessionError?.(session.id) || null);
     const { theme, getCurrentTheme, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme } = usePreferences();
+    const fontReady = useTerminalFontReady(selectedFont, fontSize);
 
     const [state, setState] = useState({
         steps: savedState?.steps || ["Initializing..."],
@@ -184,6 +186,7 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
     const initialTerminalContentRef = useRef(savedState?.terminalContent || []);
 
     useEffect(() => {
+        if (!fontReady) return;
         if (!sessionToken || !containerRef.current) return;
         if (getSessionError?.(session.id)) return;
 
@@ -320,7 +323,7 @@ export const ScriptRenderer = ({ session, disconnectFromServer, reconnectSession
             wsRef.current = null;
             fitAddonRef.current = null;
         };
-    }, [sessionToken, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, session.id, getCurrentTheme, theme]);
+    }, [fontReady, sessionToken, selectedFont, fontSize, cursorStyle, cursorBlink, selectedTheme, session.id, getCurrentTheme, theme]);
 
     const sendInput = useCallback((value) => {
         if (dialogs.inputPrompt) {

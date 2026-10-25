@@ -3,6 +3,7 @@ import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { IdentityContext } from "@/common/contexts/IdentityContext.jsx";
 import { AIContext } from "@/common/contexts/AIContext.jsx";
 import { useKeymaps, matchesKeybind, isMac } from "@/common/contexts/KeymapContext.jsx";
+import { useTerminalFontReady } from "@/common/hooks/useTerminalFontReady.js";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { FitAddon } from "@xterm/addon-fit";
@@ -52,6 +53,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     copyPasteBehaviorRef.current = copyPasteBehavior;
     const effectiveFont = (isShared && session.fontFamily) ? session.fontFamily : selectedFont;
     const effectiveFontSize = (isShared && session.fontSize) ? session.fontSize : fontSize;
+    const fontReady = useTerminalFontReady(effectiveFont, effectiveFontSize);
     const hintForeground = (theme === "light" && selectedTheme === "light") ? "#000000" : getCurrentTheme().foreground;
 
     useEffect(() => {
@@ -415,6 +417,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     };
 
     useEffect(() => {
+        if (!fontReady) return;
         if (!sessionToken && !isShared) return;
         if (getSessionError?.(session.id)) return;
 
@@ -887,7 +890,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             termRef.current = null;
             wsRef.current = null;
         };
-    }, [sessionToken, effectiveFont, effectiveFontSize, cursorStyle, cursorBlink, selectedTheme, isShared]);
+    }, [fontReady, sessionToken, effectiveFont, effectiveFontSize, cursorStyle, cursorBlink, selectedTheme, isShared]);
 
     return (
         <div className="xterm-container" onMouseDownCapture={handleMouseDown} onContextMenuCapture={handleContextMenu}>

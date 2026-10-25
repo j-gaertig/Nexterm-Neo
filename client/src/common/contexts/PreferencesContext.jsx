@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { patchRequest } from "@/common/utils/RequestUtil.js";
+import { DEFAULT_TERMINAL_FONT } from "@/common/utils/terminalFonts.js";
 import i18n from "@/i18n.js";
 
 const PreferencesContext = createContext({});
@@ -357,9 +358,9 @@ const DEFAULT_TERMINAL_THEMES = {
 };
 
 const DEFAULT_FONTS = [
-    { name: "Monospace", value: "monospace" },
+    { name: "System Monospace", value: "monospace" },
     { name: "Fira Code", value: "'Fira Code', monospace" },
-    { name: "JetBrains Mono", value: "'JetBrains Mono', monospace" },
+    { name: "JetBrains Mono", value: DEFAULT_TERMINAL_FONT },
     { name: "Source Code Pro", value: "'Source Code Pro', monospace" },
     { name: "Inconsolata", value: "Inconsolata, monospace" },
     { name: "Ubuntu Mono", value: "'Ubuntu Mono', monospace" },
@@ -521,7 +522,7 @@ export const PreferencesProvider = ({ children, user, refreshUser }) => {
     }, [uiScale]);
 
     const selectedTheme = get("terminal.theme", "default");
-    const selectedFont = get("terminal.fontFamily", "monospace");
+    const selectedFont = get("terminal.fontFamily", DEFAULT_TERMINAL_FONT);
     const fontSize = get("terminal.fontSize", 16);
     const cursorStyle = get("terminal.cursorStyle", "block");
     const cursorBlink = get("terminal.cursorBlink", true);
