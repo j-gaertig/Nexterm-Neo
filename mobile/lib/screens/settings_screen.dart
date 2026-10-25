@@ -474,7 +474,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 ]),
                                 const SizedBox(height: 4),
                                 Text(t.name, style: TextStyle(color: t.foreground, fontSize: 10, fontWeight: FontWeight.w600),
-                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  maxLines: 2, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
                               ]),
                             ),
                           ),
