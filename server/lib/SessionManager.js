@@ -5,6 +5,7 @@ const AuditLog = require("../models/AuditLog");
 const { isRecordingEnabled, getRecordingPath, compressRecording } = require("../utils/recordingService");
 const stateBroadcaster = require("./StateBroadcaster");
 const { safeCloseWs } = require("../utils/wsClose");
+const TerminalOutputSanitizer = require("./TerminalOutputSanitizer");
 
 const MAX_LOG_BUFFER_SIZE = 200 * 1024;
 const OSC52_REPLAY_RE = /(?:\x1b\]|\x9d)52;[^\x07\x1b\x9c]*(?:\x07|\x1b\\|\x9c)/g;
@@ -36,6 +37,7 @@ module.exports.create = ({
         lastActivity: new Date(),
         masterConnection: null,
         logBuffer: "",
+        logSanitizer: new TerminalOutputSanitizer(),
         activeWs: null,
         connectedWs: new Set(),
         sharedWs: new Set(),
@@ -164,8 +166,10 @@ module.exports.appendLog = (sessionId, data) => {
     if (!session) return;
     const str = typeof data === "string" ? data : String(data ?? "");
     if (!str) return;
+    const text = session.logSanitizer.push(str);
+    if (!text) return;
     OSC52_REPLAY_RE.lastIndex = 0;
-    const clean = str.replace(OSC52_REPLAY_RE, "").replace(OSC52_TAIL_RE, "");
+    const clean = text.replace(OSC52_REPLAY_RE, "").replace(OSC52_TAIL_RE, "");
     session.logBuffer += clean;
     if (session.logBuffer.length > MAX_LOG_BUFFER_SIZE) {
         session.logBuffer = session.logBuffer.slice(-MAX_LOG_BUFFER_SIZE);

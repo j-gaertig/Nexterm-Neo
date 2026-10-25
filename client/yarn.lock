@@ -602,15 +602,20 @@
   dependencies:
     "@rolldown/pluginutils" "^1.0.1"
 
-"@xterm/addon-fit@^0.11.0":
-  version "0.11.0"
-  resolved "https://registry.yarnpkg.com/@xterm/addon-fit/-/addon-fit-0.11.0.tgz#ba4778b69fcc9044a060c2176bbe077657d7b37e"
-  integrity sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g==
+"@xterm/addon-fit@0.12.0-beta.311":
+  version "0.12.0-beta.311"
+  resolved "https://registry.yarnpkg.com/@xterm/addon-fit/-/addon-fit-0.12.0-beta.311.tgz#591819737486ef00568c62884a379a3a5710d6d5"
+  integrity sha512-M40mAWDoAVKz+0zs5ipmBJ+tNilw8CzUbbGIX05NANmTiw0MS47FYeJ4d2El4zdvFphDJjtVLrxTKXuz2wUM6Q==
 
-"@xterm/xterm@^6.0.0":
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/@xterm/xterm/-/xterm-6.0.0.tgz#93637b0f2ee3a70718b5746a27c9c506af16745b"
-  integrity sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg==
+"@xterm/addon-image@0.10.0-beta.310":
+  version "0.10.0-beta.310"
+  resolved "https://registry.yarnpkg.com/@xterm/addon-image/-/addon-image-0.10.0-beta.310.tgz#f63c91f1b1563e23196365d557a8db9bef9bb57a"
+  integrity sha512-8fzgYV7HC9iWlw8ChZgnPmCXeBoYkC3Kyo9C0vyOQWD7Cm/bebKNNWhzNlDt5Qxbv+UBPbgkcO4i3dTYnggkRw==
+
+"@xterm/xterm@6.1.0-beta.315":
+  version "6.1.0-beta.315"
+  resolved "https://registry.yarnpkg.com/@xterm/xterm/-/xterm-6.1.0-beta.315.tgz#55708f827f0a41f9cdee4759c9115e182e8c4284"
+  integrity sha512-w7MeKxi6vbxE3IOFRiwgugkM6FZonE9gF9KyJ0OiE5HbYZOm38bz+CTGZg3+wqA6porJnHfjzX1KaihInP+iWg==
 
 acorn-jsx@^5.3.2:
   version "5.3.2"

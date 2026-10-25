@@ -3,19 +3,21 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../utils/app_icons.dart';
+import 'package:kterm/kterm.dart';
 import 'package:web_socket_channel/io.dart';
-import 'package:xterm/xterm.dart';
 
-import '../../services/session_manager.dart';
+import '../../models/managed_identity.dart';
 import '../../services/connection_service.dart';
 import '../../services/server_editor_service.dart';
-import '../../models/managed_identity.dart';
+import '../../services/session_manager.dart';
 import '../../utils/ai_manager.dart';
-import '../../utils/snippet_manager.dart';
+import '../../utils/app_icons.dart';
 import '../../utils/password_prompt.dart';
 import '../../utils/password_prompt_localizations.dart';
+import '../../utils/snippet_manager.dart';
+import '../../utils/terminal_font.dart';
+import '../../utils/terminal_graphics.dart';
+import '../../utils/terminal_image_fetch.dart';
 import '../../utils/terminal_key_input.dart';
 import '../../utils/terminal_settings.dart';
 import '../widgets/ai_assistant_sheet.dart';
@@ -49,7 +51,8 @@ class TerminalRenderer extends StatefulWidget {
 class _TerminalRendererState extends State<TerminalRenderer> {
   Terminal get _terminal => widget.session.terminal!;
   IOWebSocketChannel? get _channel => widget.session.termChannel;
-  final GlobalKey<TerminalViewState> _terminalViewKey = GlobalKey<TerminalViewState>();
+  final GlobalKey<TerminalViewState> _terminalViewKey =
+      GlobalKey<TerminalViewState>();
   final GlobalKey _cursorOverlayStackKey = GlobalKey();
   final ValueNotifier<int> _cursorRevision = ValueNotifier(0);
   bool _connected = false;
@@ -60,6 +63,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   bool _ctrlPressed = false;
   bool _altPressed = false;
   bool _initialized = false;
+  late TerminalGraphicsProcessor _graphics;
   final Map<String, Timer> _arrowRepeatTimers = {};
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
@@ -72,9 +76,45 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   int _passwordHintIndex = -1;
   bool _passwordPromptVisible = false;
 
+  TerminalGraphicsProcessor _createGraphicsProcessor() {
+    return TerminalGraphicsProcessor(
+      fetchImage: (path) => fetchRemoteTerminalImage(
+        token: widget.token,
+        sessionId: widget.session.sessionId,
+        path: path,
+      ),
+      viewportMetrics: () => (
+        columns: _terminal.viewWidth,
+        rows: _terminal.viewHeight,
+        cellWidth: _terminal.cellPixelWidth,
+        cellHeight: _terminal.cellPixelHeight,
+      ),
+      onOutput: _writeProcessedOutput,
+      onError: (error) => debugPrint('Terminal graphics: $error'),
+    );
+  }
+
+  void _writeProcessedOutput(String text) {
+    if (!mounted || text.isEmpty) return;
+    // TOTP second-factor prompts (\x02) are written without the marker and
+    // never feed password detection, like the web client.
+    if (text.startsWith('\x02')) {
+      _terminal.write(text.substring(1));
+      return;
+    }
+    _terminal.write(text);
+    _trackPasswordPrompt(text);
+  }
+
+  void _resetGraphicsProcessor() {
+    _graphics.dispose();
+    _graphics = _createGraphicsProcessor();
+  }
+
   @override
   void initState() {
     super.initState();
+    _graphics = _createGraphicsProcessor();
     _terminal.addListener(_onTerminalChanged);
     _terminalFocusNode.addListener(_onFocusChanged);
     widget.terminalSettings.addListener(_onTerminalSettingsChanged);
@@ -100,8 +140,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     final tokenChanged = oldWidget.token != widget.token;
     final identitiesChanged =
         oldWidget.session.identityId != widget.session.identityId ||
-            !_sameIdentityIds(oldWidget.session.server.identities,
-                widget.session.server.identities);
+        !_sameIdentityIds(
+          oldWidget.session.server.identities,
+          widget.session.server.identities,
+        );
     if (sessionChanged || tokenChanged || identitiesChanged) {
       _passwordPromptVisible = false;
       _passwordHintIndex = -1;
@@ -162,9 +204,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     // changed while the request was in flight.
     final requestToken = widget.token;
     final requestSessionId = widget.session.sessionId;
-    final requestServerIds = <int>[
-      ...?widget.session.server.identities,
-    ];
+    final requestServerIds = <int>[...?widget.session.server.identities];
     final requestIdentityId = widget.session.identityId;
     try {
       final all = await ServerEditorService.getIdentities(requestToken);
@@ -218,8 +258,9 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     } catch (_) {
       // Best effort: without identities there is simply no hint. Backdate
       // the attempt so a failed load retries after ~15s, not 60s.
-      _lastIdentityLoadAttempt =
-          DateTime.now().subtract(const Duration(seconds: 45));
+      _lastIdentityLoadAttempt = DateTime.now().subtract(
+        const Duration(seconds: 45),
+      );
       if (!mounted) return;
       if (widget.session.sessionId != requestSessionId ||
           widget.token != requestToken) {
@@ -310,8 +351,8 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         identityId: identityId == null
             ? null
             : (identityId is int
-                ? identityId
-                : int.tryParse(identityId.toString())),
+                  ? identityId
+                  : int.tryParse(identityId.toString())),
         submit: shouldSubmit,
       );
     } catch (_) {
@@ -334,13 +375,12 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
   void _onFocusChanged() {
     if (!_terminalFocusNode.hasFocus) _stopAllArrowRepeats();
-    if (mounted) setState(() => _showKeyboardToolbar = _terminalFocusNode.hasFocus);
+    if (mounted)
+      setState(() => _showKeyboardToolbar = _terminalFocusNode.hasFocus);
   }
 
   bool _handleHardwareKey(KeyEvent event) {
-    if (!mounted ||
-        !_terminalFocusNode.hasFocus ||
-        event is! KeyDownEvent) {
+    if (!mounted || !_terminalFocusNode.hasFocus || event is! KeyDownEvent) {
       return false;
     }
 
@@ -356,7 +396,8 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     if (_passwordPromptVisible) {
       final logicalKey = event.logicalKey;
       final isTab = logicalKey == LogicalKeyboardKey.tab;
-      final isEnter = logicalKey == LogicalKeyboardKey.enter ||
+      final isEnter =
+          logicalKey == LogicalKeyboardKey.enter ||
           logicalKey == LogicalKeyboardKey.numpadEnter;
       final isEscape = logicalKey == LogicalKeyboardKey.escape;
       final isUp = logicalKey == LogicalKeyboardKey.arrowUp;
@@ -365,10 +406,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         final count = _passwordIdentities.length;
         final current = count > 0
             ? _passwordIdentities[_passwordHintIndex < 0
-                ? 0
-                : (_passwordHintIndex >= count
-                    ? count - 1
-                    : _passwordHintIndex)]
+                  ? 0
+                  : (_passwordHintIndex >= count
+                        ? count - 1
+                        : _passwordHintIndex)]
             : null;
         unawaited(_fillIdentityPassword(current?.id));
         return true;
@@ -436,7 +477,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     }
 
     _sendSpecialKey(key);
-    _arrowRepeatTimers[key] = Timer(_arrowRepeatInterval, () => _repeatArrow(key));
+    _arrowRepeatTimers[key] = Timer(
+      _arrowRepeatInterval,
+      () => _repeatArrow(key),
+    );
   }
 
   void _stopArrowRepeat(String key) {
@@ -478,18 +522,23 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             setState(() => _receivedData = true);
           }
           if (data is String) {
-            // TOTP second-factor prompts (\x02) are written without the
-            // marker and never feed password detection, like the web client.
-            final isTotpPrompt = data.startsWith('\x02');
-            final text =
-                isTotpPrompt ? data.substring(1) : data;
-            _terminal.write(text);
-            if (!isTotpPrompt) _trackPasswordPrompt(text);
+            // The processor writes through onOutput before the next chunk is
+            // processed, so a slow image fetch cannot reorder terminal writes.
+            unawaited(
+              _graphics.push(data).catchError((Object error) {
+                debugPrint('Terminal graphics processing failed: $error');
+                return '';
+              }),
+            );
           }
         },
         onError: (error) {
           _stopAllArrowRepeats();
-          if (mounted) setState(() { _errorMessage = 'Connection error: $error'; _connected = false; });
+          if (mounted)
+            setState(() {
+              _errorMessage = 'Connection error: $error';
+              _connected = false;
+            });
           widget.session.isConnected = false;
           unawaited(_attemptReconnect());
         },
@@ -507,9 +556,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_channel == null) return;
-        _channel?.sink.add(_terminal.viewHeight > 0 && _terminal.viewWidth > 0
-            ? '\x01${_terminal.viewWidth},${_terminal.viewHeight}'
-            : '\x0180,30');
+        _channel?.sink.add(
+          _terminal.viewHeight > 0 && _terminal.viewWidth > 0
+              ? '\x01${_terminal.viewWidth},${_terminal.viewHeight}'
+              : '\x0180,30',
+        );
       });
     } else {
       _connected = widget.session.isConnected;
@@ -518,6 +569,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
   @override
   void dispose() {
+    _graphics.dispose();
     _terminal.removeListener(_onTerminalChanged);
     widget.terminalSettings.removeListener(_onTerminalSettingsChanged);
     _cursorRevision.dispose();
@@ -552,6 +604,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
     if (success) {
       _initialized = false;
+      _resetGraphicsProcessor();
       widget.session.termSubscription = null;
       // Fresh stream: drop prompt tracking so a stale hint cannot submit
       // into the new shell, then refresh the identity list.
@@ -570,9 +623,15 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
   void _sendSpecialKey(String key) {
     switch (key) {
-      case 'CTRL': if (mounted) setState(() => _ctrlPressed = !_ctrlPressed); return;
-      case 'ALT': if (mounted) setState(() => _altPressed = !_altPressed); return;
-      default: _sendTerminalKey(key); return;
+      case 'CTRL':
+        if (mounted) setState(() => _ctrlPressed = !_ctrlPressed);
+        return;
+      case 'ALT':
+        if (mounted) setState(() => _altPressed = !_altPressed);
+        return;
+      default:
+        _sendTerminalKey(key);
+        return;
     }
   }
 
@@ -640,65 +699,129 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       clipBehavior: Clip.antiAliasWithSaveLayer,
       builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7, minChildSize: 0.5, maxChildSize: 0.95, expand: false,
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
         builder: (ctx, scrollController) {
-          if (sm.isLoading) return const Center(child: CircularProgressIndicator());
+          if (sm.isLoading)
+            return const Center(child: CircularProgressIndicator());
           if (sm.error != null) {
-            return Center(child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(AppIcons.alertCircleOutline, size: 48, color: Theme.of(ctx).colorScheme.error),
-                const SizedBox(height: 16),
-                Text('Failed to load snippets', style: Theme.of(ctx).textTheme.titleMedium),
-              ]),
-            ));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      AppIcons.alertCircleOutline,
+                      size: 48,
+                      color: Theme.of(ctx).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Failed to load snippets',
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           if (sm.snippets.isEmpty) {
-            return Center(child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                Icon(AppIcons.codeBracesBox, size: 48, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-                const SizedBox(height: 16),
-                Text('No snippets available', style: Theme.of(ctx).textTheme.titleMedium),
-              ]),
-            ));
-          }
-          return Column(children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).colorScheme.surface,
-                border: Border(bottom: BorderSide(color: Theme.of(ctx).colorScheme.outlineVariant)),
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      AppIcons.codeBracesBox,
+                      size: 48,
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No snippets available',
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
+                  ],
+                ),
               ),
-              child: Row(children: [
-                Icon(AppIcons.codeBraces, color: Theme.of(ctx).colorScheme.primary),
-                const SizedBox(width: 12),
-                Text('Snippets', style: Theme.of(ctx).textTheme.titleLarge),
-                const Spacer(),
-                IconButton(icon: Icon(AppIcons.close), onPressed: () => Navigator.pop(ctx)),
-              ]),
-            ),
-            Expanded(child: ListView.builder(
-              controller: scrollController,
-              itemCount: sm.snippets.length,
-              itemBuilder: (ctx, i) {
-                final s = sm.snippets[i];
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Theme.of(ctx).colorScheme.primaryContainer,
-                    child: Icon(AppIcons.console, color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 20),
+            );
+          }
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.surface,
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(ctx).colorScheme.outlineVariant,
+                    ),
                   ),
-                  title: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: s.description != null ? Text(s.description!, maxLines: 2, overflow: TextOverflow.ellipsis) : null,
-                  trailing: Icon(AppIcons.chevronRight, size: 16),
-                  onTap: () { Navigator.pop(ctx); _channel?.sink.add(s.command); },
-                );
-              },
-            )),
-          ]);
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      AppIcons.codeBraces,
+                      color: Theme.of(ctx).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Snippets', style: Theme.of(ctx).textTheme.titleLarge),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(AppIcons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: sm.snippets.length,
+                  itemBuilder: (ctx, i) {
+                    final s = sm.snippets[i];
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Theme.of(
+                          ctx,
+                        ).colorScheme.primaryContainer,
+                        child: Icon(
+                          AppIcons.console,
+                          color: Theme.of(ctx).colorScheme.onPrimaryContainer,
+                          size: 20,
+                        ),
+                      ),
+                      title: Text(
+                        s.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: s.description != null
+                          ? Text(
+                              s.description!,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            )
+                          : null,
+                      trailing: Icon(AppIcons.chevronRight, size: 16),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _channel?.sink.add(s.command);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
         },
       ),
     );
@@ -735,15 +858,21 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                             TerminalView(
                               _terminal,
                               key: _terminalViewKey,
-                              theme: _hideTerminalCursor(widget.terminalSettings.colorTheme.theme),
+                              theme: _hideTerminalCursor(
+                                widget.terminalSettings.colorTheme.theme,
+                              ),
                               cursorType: TerminalCursorType.block,
                               keyboardType: TextInputType.visiblePassword,
                               textStyle: TerminalStyle(
                                 fontSize: widget.terminalSettings.fontSize,
-                                fontFamily: GoogleFonts.jetBrainsMono().fontFamily ?? 'monospace',
+                                fontFamily: terminalNerdFontFamily,
+                                fontFamilyFallback: terminalNerdFontFallback,
                                 height: 1.2,
                               ),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               focusNode: _terminalFocusNode,
                               autofocus: false,
                               deleteDetection: Platform.isIOS,
@@ -756,7 +885,11 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                                     terminalViewKey: _terminalViewKey,
                                     stackKey: _cursorOverlayStackKey,
                                     repaint: _cursorRevision,
-                                    color: widget.terminalSettings.colorTheme.theme.cursor,
+                                    color: widget
+                                        .terminalSettings
+                                        .colorTheme
+                                        .theme
+                                        .cursor,
                                   ),
                                 ),
                               ),
@@ -787,7 +920,9 @@ class _TerminalRendererState extends State<TerminalRenderer> {
               ),
             ),
             Positioned.fill(
-              child: ConnectionLoader(visible: !_receivedData && _errorMessage == null),
+              child: ConnectionLoader(
+                visible: !_receivedData && _errorMessage == null,
+              ),
             ),
           ],
         );
@@ -798,13 +933,26 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   Widget _errorBanner() {
     final colors = Theme.of(context).colorScheme;
     return Container(
-      width: double.infinity, padding: const EdgeInsets.all(8), color: colors.errorContainer,
-      child: Row(children: [
-        Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
-        const SizedBox(width: 8),
-        Expanded(child: Text(_errorMessage!, style: TextStyle(color: colors.onErrorContainer))),
-        IconButton(icon: Icon(AppIcons.close), onPressed: () => setState(() => _errorMessage = null), color: colors.onErrorContainer),
-      ]),
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      color: colors.errorContainer,
+      child: Row(
+        children: [
+          Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: colors.onErrorContainer),
+            ),
+          ),
+          IconButton(
+            icon: Icon(AppIcons.close),
+            onPressed: () => setState(() => _errorMessage = null),
+            color: colors.onErrorContainer,
+          ),
+        ],
+      ),
     );
   }
 
@@ -813,7 +961,13 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, -2))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         top: false,
@@ -821,27 +975,30 @@ class _TerminalRendererState extends State<TerminalRenderer> {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: Row(children: [
-              _toolbarBtn('ESC'), const SizedBox(width: 8),
-              _toolbarBtn('TAB'), const SizedBox(width: 8),
-              // Manual fill (web context-menu / `paste-identity-password`
-              // keybind equivalent): pastes the session default password
-              // without submitting unless a prompt is currently visible.
-              if (_passwordIdentities.isNotEmpty) ...[
-                Tooltip(
-                  message: PasswordPromptLocalizations.of(context)
-                      .pasteIdentityPassword,
-                  child: _toolbarBtn(
-                    'Password',
-                    icon: AppIcons.key,
-                    onPressed: () => _fillIdentityPassword(),
+            child: Row(
+              children: [
+                _toolbarBtn('ESC'), const SizedBox(width: 8),
+                _toolbarBtn('TAB'), const SizedBox(width: 8),
+                // Manual fill (web context-menu / `paste-identity-password`
+                // keybind equivalent): pastes the session default password
+                // without submitting unless a prompt is currently visible.
+                if (_passwordIdentities.isNotEmpty) ...[
+                  Tooltip(
+                    message: PasswordPromptLocalizations.of(
+                      context,
+                    ).pasteIdentityPassword,
+                    child: _toolbarBtn(
+                      'Password',
+                      icon: AppIcons.key,
+                      onPressed: () => _fillIdentityPassword(),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  const SizedBox(width: 8),
+                ],
+                for (final group in ts.groupOrder)
+                  if (ts.isGroupEnabled(group)) ..._buildGroupButtons(group),
               ],
-              for (final group in ts.groupOrder)
-                if (ts.isGroupEnabled(group)) ..._buildGroupButtons(group),
-            ]),
+            ),
           ),
         ),
       ),
@@ -852,58 +1009,136 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     switch (group) {
       case ToolbarGroup.modifiers:
         return [
-          _toolbarBtn('CTRL', isToggle: true, isActive: _ctrlPressed), const SizedBox(width: 8),
-          _toolbarBtn('ALT', isToggle: true, isActive: _altPressed), const SizedBox(width: 16),
+          _toolbarBtn('CTRL', isToggle: true, isActive: _ctrlPressed),
+          const SizedBox(width: 8),
+          _toolbarBtn('ALT', isToggle: true, isActive: _altPressed),
+          const SizedBox(width: 16),
         ];
       case ToolbarGroup.signals:
         return [
-          _toolbarBtn('^C', onPressed: () => _sendTerminalKey('c', forceCtrl: true), compact: true), const SizedBox(width: 8),
-          _toolbarBtn('^Z', onPressed: () => _sendTerminalKey('z', forceCtrl: true), compact: true), const SizedBox(width: 8),
-          _toolbarBtn('^D', onPressed: () => _sendTerminalKey('d', forceCtrl: true), compact: true), const SizedBox(width: 16),
+          _toolbarBtn(
+            '^C',
+            onPressed: () => _sendTerminalKey('c', forceCtrl: true),
+            compact: true,
+          ),
+          const SizedBox(width: 8),
+          _toolbarBtn(
+            '^Z',
+            onPressed: () => _sendTerminalKey('z', forceCtrl: true),
+            compact: true,
+          ),
+          const SizedBox(width: 8),
+          _toolbarBtn(
+            '^D',
+            onPressed: () => _sendTerminalKey('d', forceCtrl: true),
+            compact: true,
+          ),
+          const SizedBox(width: 16),
         ];
       case ToolbarGroup.arrows:
         return [
-          _toolbarBtn('UP', icon: AppIcons.arrowUp, holdKey: 'UP', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('DOWN', icon: AppIcons.arrowDown, holdKey: 'DOWN', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('LEFT', icon: AppIcons.arrowLeft, holdKey: 'LEFT', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('RIGHT', icon: AppIcons.arrowRight, holdKey: 'RIGHT', compact: true), const SizedBox(width: 16),
+          _toolbarBtn(
+            'UP',
+            icon: AppIcons.arrowUp,
+            holdKey: 'UP',
+            compact: true,
+          ),
+          const SizedBox(width: 8),
+          _toolbarBtn(
+            'DOWN',
+            icon: AppIcons.arrowDown,
+            holdKey: 'DOWN',
+            compact: true,
+          ),
+          const SizedBox(width: 8),
+          _toolbarBtn(
+            'LEFT',
+            icon: AppIcons.arrowLeft,
+            holdKey: 'LEFT',
+            compact: true,
+          ),
+          const SizedBox(width: 8),
+          _toolbarBtn(
+            'RIGHT',
+            icon: AppIcons.arrowRight,
+            holdKey: 'RIGHT',
+            compact: true,
+          ),
+          const SizedBox(width: 16),
         ];
       case ToolbarGroup.navigation:
         return [
-          _toolbarBtn('HOME', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('END', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('PGUP', compact: true), const SizedBox(width: 8),
-          _toolbarBtn('PGDN', compact: true), const SizedBox(width: 16),
+          _toolbarBtn('HOME', compact: true),
+          const SizedBox(width: 8),
+          _toolbarBtn('END', compact: true),
+          const SizedBox(width: 8),
+          _toolbarBtn('PGUP', compact: true),
+          const SizedBox(width: 8),
+          _toolbarBtn('PGDN', compact: true),
+          const SizedBox(width: 16),
         ];
       case ToolbarGroup.functionKeys:
         return [
           for (int i = 1; i <= 12; i++) ...[
-            _toolbarBtn('F$i', onPressed: () => _sendFunctionKey(i), compact: true),
+            _toolbarBtn(
+              'F$i',
+              onPressed: () => _sendFunctionKey(i),
+              compact: true,
+            ),
             if (i < 12) const SizedBox(width: 8),
           ],
         ];
     }
   }
 
-  Widget _toolbarBtn(String label, {IconData? icon, VoidCallback? onPressed, String? holdKey, bool isToggle = false, bool isActive = false, bool compact = false}) {
+  Widget _toolbarBtn(
+    String label, {
+    IconData? icon,
+    VoidCallback? onPressed,
+    String? holdKey,
+    bool isToggle = false,
+    bool isActive = false,
+    bool compact = false,
+  }) {
     final theme = Theme.of(context);
-    final bgColor = isActive ? theme.colorScheme.primary : theme.colorScheme.surfaceContainerHighest;
-    final fgColor = isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
+    final bgColor = isActive
+        ? theme.colorScheme.primary
+        : theme.colorScheme.surfaceContainerHighest;
+    final fgColor = isActive
+        ? theme.colorScheme.onPrimary
+        : theme.colorScheme.onSurface;
     return Material(
-      color: bgColor, borderRadius: BorderRadius.circular(12), elevation: isActive ? 2 : 0,
+      color: bgColor,
+      borderRadius: BorderRadius.circular(12),
+      elevation: isActive ? 2 : 0,
       child: InkWell(
-        onTap: holdKey == null ? onPressed ?? () => _sendSpecialKey(label) : () {},
+        onTap: holdKey == null
+            ? onPressed ?? () => _sendSpecialKey(label)
+            : () {},
         onTapDown: holdKey == null ? null : (_) => _startArrowHold(holdKey),
         onTapUp: holdKey == null ? null : (_) => _stopArrowRepeat(holdKey),
         onTapCancel: holdKey == null ? null : () => _stopArrowRepeat(holdKey),
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          constraints: BoxConstraints(minWidth: compact ? 44 : 56, minHeight: 44),
-          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16, vertical: 10),
+          constraints: BoxConstraints(
+            minWidth: compact ? 44 : 56,
+            minHeight: 44,
+          ),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 16,
+            vertical: 10,
+          ),
           child: Center(
             child: icon != null
                 ? Icon(icon, size: 18, color: fgColor, semanticLabel: label)
-                : Text(label, style: TextStyle(fontSize: compact ? 13 : 14, fontWeight: FontWeight.w600, color: fgColor)),
+                : Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: compact ? 13 : 14,
+                      fontWeight: FontWeight.w600,
+                      color: fgColor,
+                    ),
+                  ),
           ),
         ),
       ),
@@ -912,30 +1147,30 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 }
 
 TerminalTheme _hideTerminalCursor(TerminalTheme theme) => TerminalTheme(
-      cursor: Colors.transparent,
-      selection: theme.selection,
-      foreground: theme.foreground,
-      background: theme.background,
-      black: theme.black,
-      white: theme.white,
-      red: theme.red,
-      green: theme.green,
-      yellow: theme.yellow,
-      blue: theme.blue,
-      magenta: theme.magenta,
-      cyan: theme.cyan,
-      brightBlack: theme.brightBlack,
-      brightRed: theme.brightRed,
-      brightGreen: theme.brightGreen,
-      brightYellow: theme.brightYellow,
-      brightBlue: theme.brightBlue,
-      brightMagenta: theme.brightMagenta,
-      brightCyan: theme.brightCyan,
-      brightWhite: theme.brightWhite,
-      searchHitBackground: theme.searchHitBackground,
-      searchHitBackgroundCurrent: theme.searchHitBackgroundCurrent,
-      searchHitForeground: theme.searchHitForeground,
-    );
+  cursor: Colors.transparent,
+  selection: theme.selection,
+  foreground: theme.foreground,
+  background: theme.background,
+  black: theme.black,
+  white: theme.white,
+  red: theme.red,
+  green: theme.green,
+  yellow: theme.yellow,
+  blue: theme.blue,
+  magenta: theme.magenta,
+  cyan: theme.cyan,
+  brightBlack: theme.brightBlack,
+  brightRed: theme.brightRed,
+  brightGreen: theme.brightGreen,
+  brightYellow: theme.brightYellow,
+  brightBlue: theme.brightBlue,
+  brightMagenta: theme.brightMagenta,
+  brightCyan: theme.brightCyan,
+  brightWhite: theme.brightWhite,
+  searchHitBackground: theme.searchHitBackground,
+  searchHitBackgroundCurrent: theme.searchHitBackgroundCurrent,
+  searchHitForeground: theme.searchHitForeground,
+);
 
 class _LineCursorPainter extends CustomPainter {
   _LineCursorPainter({
@@ -960,7 +1195,8 @@ class _LineCursorPainter extends CustomPainter {
     final stackRenderObject = stackKey.currentContext?.findRenderObject();
     if (cursorRect == null ||
         stackRenderObject is! RenderBox ||
-        !stackRenderObject.hasSize) return;
+        !stackRenderObject.hasSize)
+      return;
 
     final cursorOffset = stackRenderObject.globalToLocal(cursorRect.topLeft);
     final paint = Paint()

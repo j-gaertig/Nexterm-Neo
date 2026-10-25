@@ -3,11 +3,14 @@ import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { IdentityContext } from "@/common/contexts/IdentityContext.jsx";
 import { AIContext } from "@/common/contexts/AIContext.jsx";
 import { useKeymaps, matchesKeybind, isMac } from "@/common/contexts/KeymapContext.jsx";
-import { useTerminalFontReady } from "@/common/hooks/useTerminalFontReady.js";
 import { Terminal as Xterm } from "@xterm/xterm";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
 import { FitAddon } from "@xterm/addon-fit";
+import { ImageAddon } from "@xterm/addon-image";
 import { attachOsc52 } from "@/common/utils/osc52.js";
+import { ensureTerminalFontsLoaded } from "@/common/utils/terminalFonts.js";
+import { createTerminalGraphicsResolver } from "@/common/utils/terminalGraphics.js";
+import { createRemoteImageFetcher } from "@/common/utils/terminalImageFetch.js";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/common/components/ContextMenu";
 import AIAssistant from "./components/AIAssistant";
 import CommandSuggestion from "./components/CommandSuggestion";
@@ -53,7 +56,6 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     copyPasteBehaviorRef.current = copyPasteBehavior;
     const effectiveFont = (isShared && session.fontFamily) ? session.fontFamily : selectedFont;
     const effectiveFontSize = (isShared && session.fontSize) ? session.fontSize : fontSize;
-    const fontReady = useTerminalFontReady(effectiveFont, effectiveFontSize);
     const hintForeground = (theme === "light" && selectedTheme === "light") ? "#000000" : getCurrentTheme().foreground;
 
     useEffect(() => {
@@ -417,17 +419,25 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
     };
 
     useEffect(() => {
-        if (!fontReady) return;
         if (!sessionToken && !isShared) return;
         if (getSessionError?.(session.id)) return;
 
         let isCleaningUp = false;
+        let term;
+        let cleanup = () => {};
         setConnectionError(null);
+
+        const initialise = async () => {
+        // xterm measures its cell box during open(). Waiting here prevents a
+        // fallback-font measurement from breaking box drawing, Nerd Font
+        // glyph widths, and image cell calculations.
+        await ensureTerminalFontsLoaded(effectiveFont, effectiveFontSize);
+        if (isCleaningUp) return;
 
         const terminalTheme = getCurrentTheme();
         const isLightTerminalTheme = selectedTheme === "light";
 
-        const term = new Xterm({
+        term = new Xterm({
             cursorBlink: cursorBlink,
             cursorStyle: cursorStyle,
             fontSize: clampFontSize(effectiveFontSize + zoomOffsetRef.current),
@@ -459,8 +469,14 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
         const fitAddon = new FitAddon();
         term.loadAddon(fitAddon);
+        term.loadAddon(new ImageAddon());
         term.open(ref.current);
         const osc52Disposable = attachOsc52(term, !isShared);
+
+        const graphicsResolver = createTerminalGraphicsResolver({
+            fetchImage: createRemoteImageFetcher({ sessionToken, sessionId: session.id, isShared }),
+            onError: (error) => console.warn("Terminal graphics:", error.message),
+        });
 
         const computePasswordHintPosition = () => {
             const cell = term._core?._renderService?.dimensions?.css?.cell;
@@ -498,7 +514,7 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
 
         window.addEventListener("resize", handleResize);
         const resizeObserver = new ResizeObserver(() => {
-            if (ws.readyState === ws.OPEN) handleResize();
+            if (wsRef.current?.readyState === WebSocket.OPEN) handleResize();
         });
         resizeObserver.observe(ref.current);
 
@@ -671,19 +687,24 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
                     }
                 });
             } else {
-                term.write(data, () => trackPasswordPrompt(data));
+                void graphicsResolver.push(data).then((output) => {
+                    if (isCleaningUp || !output) return;
+                    term.write(output, () => trackPasswordPrompt(output));
 
-                if (progressParserRef.current && updateProgress) {
-                    const progress = progressParserRef.current.parseData(data);
-                    if (progress !== null) {
-                        updateProgress(session.id, progress);
-                    } else if (!progressParserRef.current.isTrackingProgress()) {
-                        const currentProgress = progressParserRef.current.getProgress();
-                        if (currentProgress === 0) {
-                            updateProgress(session.id, 0);
+                    if (progressParserRef.current && updateProgress) {
+                        const progress = progressParserRef.current.parseData(output);
+                        if (progress !== null) {
+                            updateProgress(session.id, progress);
+                        } else if (!progressParserRef.current.isTrackingProgress()) {
+                            const currentProgress = progressParserRef.current.getProgress();
+                            if (currentProgress === 0) {
+                                updateProgress(session.id, 0);
+                            }
                         }
                     }
-                }
+                }).catch((error) => {
+                    if (!isCleaningUp) console.warn("Terminal graphics processing failed:", error);
+                });
             }
         };
 
@@ -862,8 +883,9 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             return true;
         });
 
-        return () => {
+        cleanup = () => {
             isCleaningUp = true;
+            graphicsResolver.dispose();
             passwordPromptRef.current = null;
             passwordHintIndexRef.current = -1;
             promptLineRef.current = "";
@@ -890,7 +912,19 @@ const XtermRenderer = ({ session, disconnectFromServer, reconnectSession, reconn
             termRef.current = null;
             wsRef.current = null;
         };
-    }, [fontReady, sessionToken, effectiveFont, effectiveFontSize, cursorStyle, cursorBlink, selectedTheme, isShared]);
+        };
+
+        void initialise().catch((error) => {
+            if (isCleaningUp) return;
+            console.error("Failed to initialise terminal:", error);
+            setConnectionError(error?.message || t("common.errors.connection.error"));
+        });
+
+        return () => {
+            isCleaningUp = true;
+            cleanup();
+        };
+    }, [sessionToken, effectiveFont, effectiveFontSize, cursorStyle, cursorBlink, selectedTheme, isShared]);
 
     return (
         <div className="xterm-container" onMouseDownCapture={handleMouseDown} onContextMenuCapture={handleContextMenu}>

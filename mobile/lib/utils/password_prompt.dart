@@ -1,4 +1,4 @@
-import 'package:xterm/xterm.dart';
+import 'package:kterm/kterm.dart';
 
 // Port of `client/src/common/utils/passwordPrompt.js` (web).
 //

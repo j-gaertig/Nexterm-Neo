@@ -1,14 +1,25 @@
 /**
  * Terminal font helpers.
  *
- * xterm measures the cell box while the terminal is opened. If the selected
- * webfont has not loaded yet, it keeps the fallback monospace metrics for the
- * lifetime of the terminal, which makes rows taller and leaves gaps around
- * block and box drawing glyphs. Callers should wait for this helper before
- * opening a terminal.
+ * All bundled terminal fonts are Nerd Font Mono variants. The default stack
+ * deliberately starts with JetBrains Mono so every glyph used by fastfetch
+ * (Powerline, Material Design icons, etc.) is available without relying on a
+ * system font. Font metrics are monospace, therefore falling through to the
+ * other bundled families only affects glyph coverage, not cell widths.
  */
 
-export const DEFAULT_TERMINAL_FONT = "'JetBrains Mono', monospace";
+export const NERD_FONT_STACK =
+    "'JetBrains Mono', 'Fira Code', 'Hack', 'Source Code Pro', 'Inconsolata', 'Ubuntu Mono', 'Roboto Mono', monospace";
+
+export const TERMINAL_FONT_OPTIONS = [
+    { name: "JetBrains Mono", family: "JetBrains Mono" },
+    { name: "Fira Code", family: "Fira Code" },
+    { name: "Source Code Pro", family: "Source Code Pro" },
+    { name: "Inconsolata", family: "Inconsolata" },
+    { name: "Ubuntu Mono", family: "Ubuntu Mono" },
+    { name: "Roboto Mono", family: "Roboto Mono" },
+    { name: "Hack", family: "Hack" },
+];
 
 const fontLoads = new Map();
 
@@ -29,9 +40,13 @@ const fontKey = (family, fontSize) => `${family}|${fontSize}`;
 /**
  * Wait until the first family in a terminal font stack has loaded.
  *
- * The wait is bounded so a missing or blocked font never keeps a terminal from
- * opening. Failed loads are not cached, which allows a later retry after the
- * font stylesheet becomes available.
+ * xterm.js measures the cell box when the terminal is opened. Opening before
+ * the font has loaded leaves every cell at the fallback metrics, which shifts
+ * box-drawing characters and breaks cursor/password-hint positioning. Callers
+ * that open a terminal should await this first.
+ *
+ * The wait is bounded: a missing/blocked font must never keep a session from
+ * opening. `document.fonts` is unavailable in some test environments.
  */
 export const ensureTerminalFontsLoaded = async (fontFamily, fontSize = 16) => {
     if (typeof document === "undefined" || !document.fonts?.load) return false;
@@ -50,6 +65,8 @@ export const ensureTerminalFontsLoaded = async (fontFamily, fontSize = 16) => {
     try {
         const faces = await Promise.race([fontLoads.get(key), timeout]);
         if (Array.isArray(faces) && faces.length === 0) {
+            // A failed/unknown family still resolves; don't cache the negative
+            // result forever so a later stylesheet load can succeed.
             fontLoads.delete(key);
         }
         return Array.isArray(faces) && faces.length > 0;
@@ -60,5 +77,7 @@ export const ensureTerminalFontsLoaded = async (fontFamily, fontSize = 16) => {
 
 /** Start loading the default terminal font as soon as the app boots. */
 export const preloadTerminalFonts = () => {
-    void ensureTerminalFontsLoaded(DEFAULT_TERMINAL_FONT, 16);
+    void ensureTerminalFontsLoaded(NERD_FONT_STACK, 16);
 };
+
+export const getFirstTerminalFontFamily = firstFontFamily;
