@@ -12,6 +12,7 @@ import '../utils/ai_manager.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
+import '../utils/tab_fade_switcher.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
 import 'monitoring_screen.dart';
@@ -48,11 +49,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   int _selectedIndex = 0;
   final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
-  late final _fadeController = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 200),
-    value: 1.0,
-  );
+  late final _tabSwitcher = TabFadeSwitcher(vsync: this);
 
   @override
   void initState() {
@@ -63,17 +60,19 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
-    _fadeController.dispose();
+    _tabSwitcher.dispose();
     super.dispose();
   }
 
   void _switchTab(int index) {
     if (index == _selectedIndex) return;
-    _fadeController.reverse().then((_) {
-      if (!mounted) return;
-      setState(() => _selectedIndex = index);
-      _fadeController.forward();
-    });
+    _tabSwitcher.switchTab(
+      canApply: () => mounted && !(index == 1 && !_hasSessions),
+      apply: () {
+        if (!mounted) return;
+        setState(() => _selectedIndex = index);
+      },
+    );
   }
 
   void _onSessionsChanged() {
@@ -93,7 +92,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
       _dismissedAttentionSessionIds.clear();
     }
     setState(() {});
-    _fadeController.value = 1.0;
+    _tabSwitcher.resetFadeIfIdle();
   }
 
   AppSession? get _attentionSession {
@@ -153,7 +152,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
 
     final monitoringIndex = hasSessions ? 2 : 1;
     final pageStack = FadeTransition(
-      opacity: _fadeController,
+      opacity: _tabSwitcher.opacity,
       child: IndexedStack(index: _selectedIndex, children: pages),
     );
 

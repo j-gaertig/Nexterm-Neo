@@ -190,7 +190,8 @@ Server-Kontextmenü → **Run Script** öffnet das Auswahl-Sheet:
 ### 4.2 Ausführung
 
 Nach dem Start – ohne blockierenden Start-Dialog – öffnet sich die Script-Session direkt im
-Sessions-Tab:
+Sessions-Tab. Der Tab-Wechsel wird auch dann abgeschlossen, wenn Session-Updates den laufenden
+Fade zurücksetzen; die Session bleibt dadurch nicht unsichtbar im Hintergrund.
 
 - Read-only-Terminal mit Theme und Schriftgröße aus `TerminalSettings`; Terminal-Daten werden
   inklusive Grafikverarbeitung gerendert.
@@ -255,6 +256,7 @@ Sessions-Tab:
 | Dialoge, Back-Schutz, Stop-Bestätigung, gestapelte Bestätigungsaktionen, Inline-Copy, große Schrift, kleine Displays | `mobile/test/screens/widgets/script_sheets_test.dart` |
 | Auswahl-Sheet: flache Liste, Kompatibilitätsfilter, Suche, Identity-Initialen, Fehler/Retry, Tastatur | `mobile/test/screens/widgets/run_script_sheet_test.dart` |
 | Session-Pill: gemessene Größe und Safe-Area-Clamping | `mobile/test/screens/active_sessions_screen_test.dart` |
+| Tab-Wechsel trotz abgebrochenem Fade (Session öffnet sichtbar) | `mobile/test/utils/tab_fade_switcher_test.dart` |
 | Execution Dock in allen Phasen, aktiver Step, Close session, große Schrift | `mobile/test/screens/widgets/script_execution_dock_test.dart` |
 | Tabellenhöhe und ziehbarer horizontaler Scrollbalken | `mobile/test/screens/widgets/script_sheets_test.dart` |
 | Cache, OS-Erkennung und Filter-Defaults | `mobile/test/services/script_manager_test.dart` |
@@ -265,7 +267,7 @@ Sessions-Tab:
 
 Verifikationsstand:
 
-- `flutter test`: 198 Tests erfolgreich.
+- `flutter test`: 201 Tests erfolgreich.
 - `node --test server/tests/*.test.js`: 87 Tests erfolgreich.
 - `flutter analyze`: keine Befunde in den Script-Dateien; verbleibende Hinweise sind bestehende,
   unabhängige Warnungen/Infos.
