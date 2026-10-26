@@ -34,7 +34,10 @@ sealed class ScriptEvent {
       case 'step':
         final number = (json['number'] as num?)?.toInt();
         if (number == null) return null;
-        return ScriptStepEvent(number: number, description: (json['description'] ?? '').toString());
+        return ScriptStepEvent(
+          number: number,
+          description: (json['description'] ?? '').toString(),
+        );
       case 'prompt':
         return _parsePrompt(json);
       case 'confirm':
@@ -47,22 +50,41 @@ sealed class ScriptEvent {
       case 'info':
       case 'success':
         return ScriptNoticeEvent(
-          kind: switch (type) { 'warning' => ScriptNoticeKind.warning, 'info' => ScriptNoticeKind.info, _ => ScriptNoticeKind.success },
+          kind: switch (type) {
+            'warning' => ScriptNoticeKind.warning,
+            'info' => ScriptNoticeKind.info,
+            _ => ScriptNoticeKind.success,
+          },
           message: (json['message'] ?? '').toString(),
         );
       case 'progress':
         final percentage = (json['percentage'] as num?)?.toInt();
         if (percentage == null) return null;
-        return ScriptProgressEvent(percentage: percentage, message: (json['message'] ?? '').toString());
+        return ScriptProgressEvent(
+          percentage: percentage.clamp(0, 100),
+          message: (json['message'] ?? '').toString(),
+        );
       case 'summary':
-        return ScriptSummaryEvent(title: (json['title'] ?? '').toString(), data: _stringList(json['data']));
+        return ScriptSummaryEvent(
+          title: (json['title'] ?? '').toString(),
+          data: _stringList(json['data']),
+        );
       case 'table':
-        return ScriptTableEvent(title: (json['title'] ?? '').toString(), data: _stringList(json['data']));
+        return ScriptTableEvent(
+          title: (json['title'] ?? '').toString(),
+          data: _stringList(json['data']),
+        );
       case 'msgbox':
-        return ScriptMessageBoxEvent(title: (json['title'] ?? '').toString(), message: (json['message'] ?? '').toString());
+        return ScriptMessageBoxEvent(
+          title: (json['title'] ?? '').toString(),
+          message: (json['message'] ?? '').toString(),
+        );
       case 'script_end':
         final exitCode = (json['exitCode'] as num?)?.toInt() ?? 1;
-        return ScriptEndEvent(exitCode: exitCode, success: json['success'] == true || exitCode == 0);
+        return ScriptEndEvent(
+          exitCode: exitCode,
+          success: json['success'] == true || exitCode == 0,
+        );
       case 'script_error':
         return const ScriptErrorEvent();
       default:
@@ -136,6 +158,7 @@ class ScriptProgressEvent extends ScriptEvent {
 
 class ScriptSummaryEvent extends ScriptEvent {
   final String title;
+
   /// Flat list of alternating key/value entries (web `parseDataToKeyValue`).
   final List<String> data;
   const ScriptSummaryEvent({required this.title, required this.data});
@@ -143,6 +166,7 @@ class ScriptSummaryEvent extends ScriptEvent {
 
 class ScriptTableEvent extends ScriptEvent {
   final String title;
+
   /// First entry holds the CSV headers, the rest are CSV row strings
   /// (web `parseDataToTable`).
   final List<String> data;
@@ -197,8 +221,9 @@ class ScriptStreamParser {
     while (index < buffer.length) {
       if (candidateStart >= 0) {
         final end = buffer.indexOf(scriptMagic, candidateStart);
-        final segment =
-            end < 0 ? buffer.substring(candidateStart) : buffer.substring(candidateStart, end);
+        final segment = end < 0
+            ? buffer.substring(candidateStart)
+            : buffer.substring(candidateStart, end);
 
         final event = ScriptEvent.parse(segment);
         final consumed = event != null || _isParseableJson(segment);

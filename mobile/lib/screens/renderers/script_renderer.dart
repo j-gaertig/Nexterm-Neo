@@ -3,36 +3,47 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:kterm/kterm.dart';
-import 'package:web_socket_channel/io.dart';
 
+import '../../services/script_connection.dart';
 import '../../services/session_manager.dart';
-import '../../utils/app_icons.dart';
+import '../../utils/api_exception.dart';
 import '../../utils/script_protocol.dart';
 import '../../utils/terminal_font.dart';
 import '../../utils/terminal_graphics.dart';
 import '../../utils/terminal_image_fetch.dart';
+import '../../utils/terminal_settings.dart';
+import 'script_execution_controller.dart';
+import '../widgets/script/script_execution_dock.dart';
 import '../widgets/script/script_message_sheet.dart';
-import '../widgets/script/script_overlay.dart';
 import '../widgets/script/script_prompt_sheet.dart';
+import '../widgets/script/script_sheet_result.dart';
+import '../widgets/script/script_sheet_shell.dart';
 import '../widgets/script/script_summary_sheet.dart';
 import '../widgets/script/script_table_sheet.dart';
-import '../widgets/script/script_sheet_result.dart';
 
-/// Renders a script execution session on `/ws/term`. Mirrors the web
-/// `ScriptRenderer`: raw terminal output streams into a terminal behind the
-/// overlay, `\x1F` control messages drive the step/progress overlay and the
-/// modal sheets. No auto-reconnect — script sessions are never retried
-/// (web `ReconnectPolicy`).
+/// Renders a script execution session on `/ws/term`. Raw terminal output
+/// streams into a read-only terminal using the user's terminal theme and font
+/// settings; `\x1F` control messages drive the execution dock and modal
+/// prompts. Reconnects are always manual, matching the web `ReconnectPolicy`.
 class ScriptRenderer extends StatefulWidget {
   final AppSession session;
   final String token;
   final SessionManager sessionManager;
+  final TerminalSettings terminalSettings;
+
+  /// True only while this session is both the active session and the sessions
+  /// tab is visible. Prompts for background scripts stay queued and are
+  /// surfaced through the navigation attention banner instead of opening a
+  /// modal over another tab.
+  final bool isVisible;
 
   const ScriptRenderer({
     super.key,
     required this.session,
     required this.token,
     required this.sessionManager,
+    required this.terminalSettings,
+    required this.isVisible,
   });
 
   @override
@@ -41,31 +52,29 @@ class ScriptRenderer extends StatefulWidget {
 
 class _ScriptRendererState extends State<ScriptRenderer> {
   Terminal get _terminal => widget.session.terminal!;
-  IOWebSocketChannel? get _channel => widget.session.termChannel;
 
   late final ScriptStreamParser _parser;
   late final TerminalGraphicsProcessor _graphics;
+  late final ScriptExecutionController _controller;
 
-  String _scriptName = '';
-  List<String?> _steps = const ['Initializing...'];
-  int _currentStep = 1;
-  int? _failedStep;
-  bool _isCompleted = false;
-  int? _currentProgress;
-  String? _errorMessage;
-
-  /// One modal sheet at a time; further prompts queue (web `promptQueue`).
-  ScriptSheetRequest? _activeSheet;
-  final List<ScriptSheetRequest> _sheetQueue = [];
+  ScriptConnection? _connection;
+  ScriptConnection? _failedConnection;
+  bool _connected = false;
+  bool _closing = false;
   bool _sheetShowing = false;
   VoidCallback? _popActiveSheet;
-
-  bool _connected = false;
+  ScriptSheetRequest? _activeSheetRequest;
+  int _sheetGeneration = 0;
 
   @override
   void initState() {
     super.initState();
-    _scriptName = widget.session.scriptName ?? 'Script';
+    _controller = ScriptExecutionController(
+      scriptName: widget.session.scriptName ?? 'Script',
+    );
+    _controller.addListener(_syncRuntimeState);
+    _syncRuntimeState();
+
     _graphics = TerminalGraphicsProcessor(
       fetchImage: (path) => fetchRemoteTerminalImage(
         token: widget.token,
@@ -91,348 +100,497 @@ class _ScriptRendererState extends State<ScriptRenderer> {
               debugPrint('Script terminal graphics processing failed: $error');
             });
       },
-      onEvent: (event) => _handleEvent(event),
+      onEvent: _handleEvent,
     );
-    _terminal.onResize = (w, h, _, __) {
+    _terminal.onResize = (width, height, _, __) {
       if (mounted && _connected) {
-        _channel?.sink.add('\x01$w,$h');
+        _connection?.send('\x01$width,$height');
       }
     };
-    _subscribe();
+    widget.terminalSettings.addListener(_onSettingsChanged);
+    _attachConnection();
   }
 
-  void _subscribe() {
-    if (widget.session.termSubscription != null) {
-      _connected = widget.session.isConnected;
-      return;
-    }
-    widget.session.termSubscription = _channel?.stream.listen(
-      (data) {
+  @override
+  void didUpdateWidget(covariant ScriptRenderer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isVisible != widget.isVisible) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        if (data is String) {
-          _parser.processChunk(data);
-        } else if (data is List<int>) {
-          // Server sends text frames; byte frames are still decoded.
-          _parser.processChunk(utf8.decode(data, allowMalformed: true));
+        if (widget.isVisible) {
+          _presentNextSheetIfAllowed();
+        } else {
+          _dismissActiveSheet();
         }
-      },
-      onDone: _onChannelClosed,
-      onError: (error) {
-        if (!mounted) return;
-        setState(() {
-          _connected = false;
-          _errorMessage = 'Script error: $error';
-          _failedStep ??= _currentStep;
-        });
-        widget.session.isConnected = false;
-      },
-    );
-    setState(() => _connected = true);
-    widget.session.isConnected = true;
-
-    // Size handshake, like `TerminalRenderer._setupTerminal`.
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted && _channel != null) {
-        _channel?.sink.add(
-          '\x01${_terminal.viewWidth > 0 ? _terminal.viewWidth : 80},${_terminal.viewHeight > 0 ? _terminal.viewHeight : 30}',
-        );
-      }
-    });
+      });
+    }
+    if (oldWidget.terminalSettings != widget.terminalSettings) {
+      oldWidget.terminalSettings.removeListener(_onSettingsChanged);
+      widget.terminalSettings.addListener(_onSettingsChanged);
+    }
   }
 
   @override
   void dispose() {
+    widget.terminalSettings.removeListener(_onSettingsChanged);
+    _controller.removeListener(_syncRuntimeState);
+    _controller.dispose();
     _graphics.dispose();
     _parser.discardPending();
     _terminal.onResize = null;
-    if (_sheetShowing && _popActiveSheet != null) {
-      final pop = _popActiveSheet;
-      _popActiveSheet = null;
-      _sheetShowing = false;
-      pop?.call();
+    widget.session.termSubscription?.cancel();
+
+    _sheetGeneration++;
+    final pop = _popActiveSheet;
+    _popActiveSheet = null;
+    _activeSheetRequest = null;
+    _sheetShowing = false;
+    if (pop != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => pop());
     }
     super.dispose();
   }
 
-  void _onChannelClosed() {
-    if (!mounted) return;
-    widget.session.isConnected = false;
-    final code = _channel?.closeCode ?? 0;
-    final reason = _channel?.closeReason ?? '';
-    setState(() {
-      _connected = false;
-      if (code >= 4000 && reason.isNotEmpty) {
-        _errorMessage = reason;
-        _failedStep ??= _currentStep;
-        _isCompleted = true;
-      } else if (code != 1000 && code != 1005 && !_isCompleted) {
-        _errorMessage = 'Script closed unexpectedly';
-        _failedStep ??= _currentStep;
-        _isCompleted = true;
-      } else {
-        _isCompleted = true;
-      }
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _syncRuntimeState() {
+    widget.sessionManager.updateScriptRuntime(
+      widget.session.sessionId,
+      _controller.toRuntimeState(),
+    );
+  }
+
+  // --- WebSocket lifecycle -------------------------------------------------
+
+  Future<void> _attachConnection() async {
+    _parser.discardPending();
+    final connection = widget.session.scriptConnection;
+    if (connection == null) {
+      _controller.markDisconnected(
+        message: 'No script connection is available.',
+      );
+      _dismissActiveSheet();
+      return;
+    }
+
+    await widget.session.termSubscription?.cancel();
+    widget.session.termSubscription = null;
+
+    if (!mounted || !identical(widget.session.scriptConnection, connection)) {
+      return;
+    }
+
+    _connection = connection;
+    _failedConnection = null;
+    _connected = false;
+
+    final subscription = connection.stream.listen(
+      (data) {
+        if (!mounted || !identical(_connection, connection)) return;
+        if (data is String) {
+          _parser.processChunk(data);
+        } else if (data is List<int>) {
+          _parser.processChunk(utf8.decode(data, allowMalformed: true));
+        }
+      },
+      onDone: () => _handleConnectionClosed(connection),
+      onError: (Object error) => _handleConnectionFailure(connection, error),
+      cancelOnError: false,
+    );
+    widget.session.termSubscription = subscription;
+
+    try {
+      await connection.markReady();
+    } catch (error) {
+      _handleConnectionFailure(connection, error);
+      return;
+    }
+
+    if (!mounted ||
+        !identical(_connection, connection) ||
+        connection.isClosed) {
+      return;
+    }
+
+    _connected = true;
+    widget.session.isConnected = true;
+    widget.session.error = null;
+    _controller.markConnected();
+    if (_controller.cancelRequested) {
+      _sendControl('input_cancelled');
+    }
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted || !identical(_connection, connection)) return;
+      connection.send(
+        '\x01${_terminal.viewWidth > 0 ? _terminal.viewWidth : 80},'
+        '${_terminal.viewHeight > 0 ? _terminal.viewHeight : 30}',
+      );
     });
   }
 
-  // --- control message handling -------------------------------------------
+  void _handleConnectionClosed(ScriptConnection connection) {
+    if (!mounted || !identical(_connection, connection)) return;
+    final code = connection.closeCode ?? 0;
+    final reason = connection.closeReason?.trim() ?? '';
+    final message = (code >= 4000 && reason.isNotEmpty)
+        ? reason
+        : (code == 1000 || code == 1005 || code == 0
+              ? 'The server closed the script connection.'
+              : 'Connection to the script was lost.');
+    _handleConnectionFailure(connection, message);
+  }
+
+  void _handleConnectionFailure(ScriptConnection connection, Object error) {
+    if (!mounted || !identical(_connection, connection)) return;
+    if (identical(_failedConnection, connection)) return;
+    _failedConnection = connection;
+    _connected = false;
+    widget.session.isConnected = false;
+    final subscription = widget.session.termSubscription;
+    widget.session.termSubscription = null;
+    if (subscription != null) unawaited(subscription.cancel());
+    if (identical(_connection, connection)) _connection = null;
+    connection.markClosed();
+    unawaited(connection.close());
+
+    final message = error is String
+        ? error
+        : friendlyApiError(
+            error,
+            fallback: 'Connection to the script was lost.',
+          );
+    widget.session.error = message;
+    _controller.markDisconnected(message: message);
+    // Prompts are no longer answerable, but an open summary/table/msgbox is
+    // still readable and may contain the script's final result.
+    if (_activeSheetRequest?.isPrompt != false) _dismissActiveSheet();
+  }
+
+  // --- Protocol events -----------------------------------------------------
 
   void _handleEvent(ScriptEvent event) {
-    if (!mounted) return; // Late stream events after session close.
-    switch (event) {
-      case ScriptStartEvent(:final name):
-        setState(() => _scriptName = name.isNotEmpty ? name : _scriptName);
-      case ScriptStepEvent(:final number, :final description):
-        setState(() {
-          final steps = List<String?>.of(_steps);
-          if (steps.length <= number) {
-            while (steps.length < number) {
-              steps.add(null);
-            }
-            steps.add(description);
-          }
-          _steps = steps;
-          _currentStep = number + 1;
-          _currentProgress = null;
-        });
-      case ScriptPromptEvent():
-      case ScriptSummaryEvent():
-      case ScriptTableEvent():
-      case ScriptMessageBoxEvent():
-        _queueOrShowSheet(_requestFor(event));
-      case ScriptNoticeEvent(:final kind, :final message):
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message, style: const TextStyle(color: Colors.white)),
-            backgroundColor: switch (kind) {
-              ScriptNoticeKind.warning => Colors.orange.shade800,
-              ScriptNoticeKind.info => Theme.of(context).colorScheme.secondary,
-              ScriptNoticeKind.success => Colors.green.shade700,
-            },
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      case ScriptProgressEvent(:final percentage):
-        setState(() => _currentProgress = percentage);
-      case ScriptEndEvent(:final success):
-        setState(() {
-          _isCompleted = true;
-          _failedStep = success ? null : _currentStep;
-        });
-      case ScriptErrorEvent():
-        setState(() => _failedStep ??= _currentStep);
-    }
-  }
+    if (!mounted) return;
+    _controller.handleEvent(event);
 
-  ScriptSheetRequest _requestFor(ScriptEvent event) => switch (event) {
-    ScriptPromptEvent prompt => ScriptSheetRequest(prompt: prompt),
-    ScriptSummaryEvent summary => ScriptSheetRequest(summary: summary),
-    ScriptTableEvent table => ScriptSheetRequest(table: table),
-    ScriptMessageBoxEvent messageBox => ScriptSheetRequest(
-      messageBox: messageBox,
-    ),
-    _ => const ScriptSheetRequest(),
-  };
-
-  // --- sheets --------------------------------------------------------------
-
-  void _queueOrShowSheet(ScriptSheetRequest request) {
-    if (_activeSheet != null) {
-      _sheetQueue.add(request);
+    if (event is ScriptPromptEvent ||
+        event is ScriptSummaryEvent ||
+        event is ScriptTableEvent ||
+        event is ScriptMessageBoxEvent) {
+      _presentNextSheetIfAllowed();
       return;
     }
-    _activeSheet = request;
-    _presentActiveSheet();
+
+    if (event is ScriptEndEvent || event is ScriptErrorEvent) {
+      // Prompts can no longer be answered. Informational sheets stay open so
+      // a final summary/table/msgbox is not destroyed by the end marker.
+      if (_activeSheetRequest?.isPrompt == true) {
+        _dismissActiveSheet();
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _presentNextSheetIfAllowed(),
+        );
+      } else {
+        _presentNextSheetIfAllowed();
+      }
+    }
   }
 
-  void _presentActiveSheet() {
-    if (!mounted || _sheetShowing || _activeSheet == null) return;
+  // --- Sheets --------------------------------------------------------------
+
+  ScriptSheetContext get _sheetContext {
+    final controller = _controller;
+    final stepLabel =
+        controller.stepCount > 0 && controller.currentStepNumber > 0
+        ? 'Step ${controller.currentStepNumber} of ${controller.stepCount}'
+        : null;
+    return ScriptSheetContext(
+      scriptName: controller.scriptName,
+      serverName: widget.session.server.name,
+      stepLabel: stepLabel,
+    );
+  }
+
+  void _presentNextSheetIfAllowed() {
+    if (!mounted || !widget.isVisible || _sheetShowing || _closing) return;
+    final pending = _controller.pendingSheets;
+    if (pending.isEmpty) return;
+    _presentSheet(pending.first);
+  }
+
+  void _presentSheet(ScriptSheetRequest request) {
     _sheetShowing = true;
-    final request = _activeSheet!;
+    _activeSheetRequest = request;
+    final generation = ++_sheetGeneration;
+    final navigator = Navigator.of(context);
+    final baseRoute = ModalRoute.of(context);
+    final sheetContext = _sheetContext;
+
     Future<ScriptSheetResult?> future;
     if (request.prompt != null) {
-      future = showScriptPromptSheet(context, request.prompt!);
+      future = showScriptPromptSheet(
+        context,
+        request.prompt!,
+        contextInfo: sheetContext,
+      );
     } else if (request.summary != null) {
-      future = showScriptSummarySheet(context, request.summary!);
+      future = showScriptSummarySheet(
+        context,
+        request.summary!,
+        contextInfo: sheetContext,
+      );
     } else if (request.table != null) {
-      future = showScriptTableSheet(context, request.table!);
+      future = showScriptTableSheet(
+        context,
+        request.table!,
+        contextInfo: sheetContext,
+      );
     } else if (request.messageBox != null) {
-      future = showScriptMessageSheet(context, request.messageBox!);
+      future = showScriptMessageSheet(
+        context,
+        request.messageBox!,
+        contextInfo: sheetContext,
+      );
     } else {
       _sheetShowing = false;
-      _activeSheet = null;
-      _showNextSheet();
+      _controller.removeSheet(request);
+      _presentNextSheetIfAllowed();
       return;
     }
-    _popActiveSheet = () => Navigator.of(context, rootNavigator: true).pop();
-    future.then((result) {
-      _popActiveSheet = null;
-      _sheetShowing = false;
-      if (mounted) {
-        _handleSheetResult(request, result);
+
+    _popActiveSheet = () {
+      if (!navigator.mounted) return;
+      if (baseRoute == null) {
+        if (navigator.canPop()) navigator.pop();
+        return;
       }
-      _activeSheet = null;
-      _showNextSheet();
+      // Pop any route stacked above the sheet (for example the stop
+      // confirmation) and then the sheet itself.
+      navigator.popUntil((route) => route == baseRoute || route.isFirst);
+    };
+
+    future.then((result) {
+      if (!mounted || generation != _sheetGeneration) return;
+      _popActiveSheet = null;
+      _activeSheetRequest = null;
+      _sheetShowing = false;
+      if (result != null) {
+        _handleSheetResult(request, result);
+        _controller.removeSheet(request);
+      }
+      // A `null` result means the sheet was dismissed programmatically
+      // (session became invisible or the script ended). Keep the request
+      // queued in the latter case; the controller clears it on end/disconnect.
+      _presentNextSheetIfAllowed();
     });
   }
 
-  void _showNextSheet() {
-    if (!mounted) return;
-    if (_sheetQueue.isEmpty) return;
-    setState(() => _activeSheet = _sheetQueue.removeAt(0));
-    _presentActiveSheet();
+  void _dismissActiveSheet() {
+    final pop = _popActiveSheet;
+    if (pop == null) return;
+    _sheetGeneration++;
+    _popActiveSheet = null;
+    _activeSheetRequest = null;
+    _sheetShowing = false;
+    pop();
   }
 
   void _handleSheetResult(
     ScriptSheetRequest request,
-    ScriptSheetResult? result,
+    ScriptSheetResult result,
   ) {
-    if (result == null) return; // Dismissed programmatically (e.g. cancel).
     switch (result) {
       case ScriptInputResult(:final value) when request.prompt != null:
+        if (_controller.isTerminal) break;
         _sendControl('input_response', {
           'variable': request.prompt!.variable,
           'value': value,
         });
-      case ScriptClosedResult() when request.summary != null:
+      case ScriptClosedResult()
+          when request.summary != null && !_controller.isTerminal:
         _sendControl('input_response', {
           'variable': 'NEXTERM_SUMMARY_RESULT',
           'value': 'closed',
         });
-      case ScriptClosedResult() when request.table != null:
+      case ScriptClosedResult()
+          when request.table != null && !_controller.isTerminal:
         _sendControl('input_response', {
           'variable': 'NEXTERM_TABLE_RESULT',
           'value': 'closed',
         });
-      case ScriptClosedResult() when request.messageBox != null:
+      case ScriptClosedResult()
+          when request.messageBox != null && !_controller.isTerminal:
         _sendControl('input_response', {
           'variable': 'NEXTERM_MSGBOX_RESULT',
           'value': 'closed',
         });
       case ScriptCancelledResult():
+        if (_controller.isTerminal) break;
+        _controller.markCancelling();
         _sendControl('input_cancelled');
       case _:
         break;
     }
   }
 
-  void _sendControl(String type, [Map<String, dynamic> payload = const {}]) {
-    _channel?.sink.add(scriptMagic + jsonEncode({'type': type, ...payload}));
+  bool _sendControl(String type, [Map<String, dynamic> payload = const {}]) {
+    final connection = _connection;
+    if (connection == null) {
+      _controller.markDisconnected(
+        message: 'The script connection is not available.',
+      );
+      _dismissActiveSheet();
+      return false;
+    }
+    if (!connection.isReady) {
+      _handleConnectionFailure(
+        connection,
+        'The script connection is not ready.',
+      );
+      return false;
+    }
+    final sent = connection.send(
+      scriptMagic + jsonEncode({'type': type, ...payload}),
+    );
+    if (!sent) {
+      _handleConnectionFailure(
+        connection,
+        'Could not send a response to the script.',
+      );
+    }
+    return sent;
   }
 
-  // --- overlay actions -----------------------------------------------------
+  // --- Actions -------------------------------------------------------------
 
-  void _cancelFromOverlay() {
+  Future<void> _stopFromDock() async {
+    if (!_controller.canStop) return;
+    final stop = await confirmStopScript(context);
+    if (!mounted || !stop) return;
+    _controller.markCancelling();
+    _dismissActiveSheet();
     _sendControl('input_cancelled');
-    if (_sheetShowing && _activeSheet?.isPrompt == true) {
-      // Mirrors web `handleCancel`: closes the open input dialog without
-      // sending a response from the dialog itself.
-      _popActiveSheet?.call();
-    }
   }
 
   Future<void> _closeSession() async {
-    await widget.sessionManager.closeSession(
-      widget.session.sessionId,
-      widget.token,
-    );
+    if (_closing) return;
+    if (widget.session.isScriptRunning) {
+      final close = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Close script session?'),
+          content: const Text(
+            'The running script will be interrupted and the session will be removed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep running'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Close session'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || close != true) return;
+    }
+
+    setState(() => _closing = true);
+    try {
+      await widget.sessionManager.closeSession(
+        widget.session.sessionId,
+        widget.token,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _closing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            friendlyApiError(
+              error,
+              fallback: 'Could not close the script session.',
+            ),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
-  // --- step visuals (port of web `getTypeByIndex`) --------------------------
-
-  StepVisual _visualForStep(int index) {
-    final failedStep = _failedStep;
-    if (failedStep != null && index == failedStep - 1) return StepVisual.error;
-    if (failedStep != null && index > failedStep - 1) return StepVisual.skip;
-    if (index < _currentStep - 1) return StepVisual.success;
-    if (index == _currentStep - 1) {
-      if (_isCompleted && index == _steps.length - 1) return StepVisual.success;
-      return _currentProgress != null
-          ? StepVisual.progress
-          : StepVisual.loading;
+  Future<void> _reconnect() async {
+    if (!_controller.isDisconnected) return;
+    _controller.resetForReconnect();
+    _dismissActiveSheet();
+    final reconnecting = await widget.sessionManager.reconnectScriptSession(
+      token: widget.token,
+      session: widget.session,
+    );
+    if (!mounted) return;
+    if (!reconnecting) {
+      _controller.markDisconnected(
+        message: 'Could not reconnect to the script session.',
+      );
+      return;
     }
-    return StepVisual.pending;
+    _connection = null;
+    await _attachConnection();
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: Container(
-            color: TerminalThemes.defaultTheme.background,
-            child: TerminalView(
-              _terminal,
-              readOnly: true,
-              autofocus: false,
-              textStyle: TerminalStyle(
-                fontSize: 13,
-                fontFamily: terminalNerdFontFamily,
-                fontFamilyFallback: terminalNerdFontFallback,
-                height: 1.2,
+    final theme = widget.terminalSettings.colorTheme;
+    return ColoredBox(
+      color: theme.background,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SafeArea(
+              bottom: false,
+              child: TerminalView(
+                _terminal,
+                readOnly: true,
+                autofocus: false,
+                theme: theme.theme,
+                textStyle: TerminalStyle(
+                  fontSize: widget.terminalSettings.fontSize,
+                  fontFamily: terminalNerdFontFamily,
+                  fontFamilyFallback: terminalNerdFontFallback,
+                  height: 1.2,
+                ),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 148),
               ),
-              padding: const EdgeInsets.fromLTRB(8, 24, 8, 8),
             ),
           ),
-        ),
-        if (_errorMessage != null)
           Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Material(
-              color: cs.errorContainer,
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        AppIcons.alertCircle,
-                        size: 18,
-                        color: cs.onErrorContainer,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: cs.onErrorContainer,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: SafeArea(
+              top: false,
+              child: IgnorePointer(
+                ignoring: _closing,
+                child: ScriptExecutionDock(
+                  controller: _controller,
+                  serverName: widget.session.server.name,
+                  onStop: _stopFromDock,
+                  onClose: _closeSession,
+                  onReconnect: _reconnect,
                 ),
               ),
             ),
           ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 16,
-          child: SafeArea(
-            top: false,
-            child: ScriptOverlay(
-              scriptName: _scriptName,
-              steps: _steps,
-              failedStep: _failedStep,
-              isCompleted: _isCompleted,
-              currentStep: _currentStep,
-              currentProgress: _currentProgress,
-              visualForStep: _visualForStep,
-              onCancel: _cancelFromOverlay,
-              onClose: _isCompleted ? _closeSession : null,
+          if (_closing)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Colors.black26,
+                child: Center(child: CircularProgressIndicator()),
+              ),
             ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

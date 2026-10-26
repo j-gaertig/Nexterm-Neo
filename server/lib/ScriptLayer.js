@@ -1,4 +1,4 @@
-const { transformScript, getScriptCommands, processNextermLine, checkSudoPrompt, stripAnsi } = require("../utils/scriptUtils");
+const { transformScript, getScriptCommands, processNextermLine, checkSudoPrompt, findNextermCommand, stripAnsi } = require("../utils/scriptUtils");
 const SessionManager = require("./SessionManager");
 const logger = require("../utils/logger");
 const { createDecodedTextStream } = require("../utils/terminalStream");
@@ -12,6 +12,9 @@ const MSG = {
 };
 
 const DIALOG_TYPES = new Set([MSG.PROMPT, MSG.CONFIRM, MSG.SUMMARY, MSG.TABLE, MSG.MSGBOX]);
+const INFORMATIONAL_DIALOG_TYPES = new Set([MSG.SUMMARY, MSG.TABLE, MSG.MSGBOX]);
+const MAX_REPLAY_EVENTS = 500;
+const CANCEL_END_GRACE_MS = 3000;
 
 class ScriptLayer {
     constructor(stream, ws, script, sessionId) {
@@ -20,31 +23,43 @@ class ScriptLayer {
         this.script = script;
         this.step = 1;
         this.pending = null;
+        this.pendingDialog = null;
         this.buffer = "";
         this.running = false;
         this.handlers = new Set();
         this.events = [];
         this.commandQueue = [];
         this.commandIndex = 0;
+        this.writeTimer = null;
+        this.cancelEndTimer = null;
+        this.uploadCancelled = false;
         this.suppressOutput = true;
+        this.ending = false;
         this.decoder = createDecodedTextStream((text) => this.processOutput(text));
         this.onData = this.onData.bind(this);
         this.onClose = this.onClose.bind(this);
     }
 
-    broadcast(type, payload = {}) {
-        const msg = SCRIPT_MAGIC + JSON.stringify({ type, ...payload });
-        if (!DIALOG_TYPES.has(type)) {
-            this.events.push(msg);
+    rememberEvent(type, payload = {}) {
+        const msg = SCRIPT_MAGIC + JSON.stringify({ ...payload, type });
+        this.events.push(msg);
+        if (this.events.length > MAX_REPLAY_EVENTS) {
+            this.events.splice(0, this.events.length - MAX_REPLAY_EVENTS);
         }
+    }
+
+    broadcast(type, payload = {}) {
+        const msg = SCRIPT_MAGIC + JSON.stringify({ ...payload, type });
+        if (!DIALOG_TYPES.has(type)) this.rememberEvent(type, payload);
         const session = SessionManager.get(this.sessionId);
         if (session) for (const ws of session.connectedWs) ws.readyState === ws.OPEN && ws.send(msg);
     }
 
     replayEvents(ws) {
         for (const msg of this.events) ws.readyState === ws.OPEN && ws.send(msg);
-        if (this.pending) {
-            const msg = SCRIPT_MAGIC + JSON.stringify({ type: MSG.PROMPT, inputType: this.pending.inputType || this.pending.type, ...this.pending });
+        if (this.pendingDialog) {
+            const { type, payload } = this.pendingDialog;
+            const msg = SCRIPT_MAGIC + JSON.stringify({ ...payload, type });
             ws.readyState === ws.OPEN && ws.send(msg);
         }
     }
@@ -70,41 +85,102 @@ class ScriptLayer {
     }
 
     writeNextCommand() {
+        if (!this.running || this.uploadCancelled) return;
         if (this.commandIndex < this.commandQueue.length) {
             const cmd = this.commandQueue[this.commandIndex++];
             this.stream.write(cmd + "\r");
             
             if (this.commandIndex < this.commandQueue.length) {
-                setTimeout(() => this.writeNextCommand(), 50);
+                this.writeTimer = setTimeout(() => {
+                    this.writeTimer = null;
+                    this.writeNextCommand();
+                }, 50);
             }
         }
     }
 
-    onData(data) { this.decoder.write(data); }
+    clearWriteTimer() {
+        if (this.writeTimer) {
+            clearTimeout(this.writeTimer);
+            this.writeTimer = null;
+        }
+    }
+
+    onData(data) {
+        if (this.running) this.decoder.write(data);
+    }
 
     processOutput(output) {
-        const sudo = checkSudoPrompt(output);
-        if (sudo) { this.pending = sudo; this.broadcast(MSG.PROMPT, { inputType: "password", ...sudo }); return; }
+        if (!this.running) return;
         this.buffer += output;
         const lines = this.buffer.split("\n");
         this.buffer = lines.pop() || "";
-        lines.forEach(l => this.processLine(l));
+
+        for (const line of lines) {
+            if (!this.running) {
+                this.buffer = "";
+                return;
+            }
+            if (!this.suppressOutput) {
+                // Protocol lines may legitimately contain words like
+                // "password:"; never classify them as sudo prompts.
+                const command = processNextermLine(line);
+                if (command) {
+                    this.handleCommand(command);
+                    continue;
+                }
+                const sudo = checkSudoPrompt(line);
+                if (sudo) {
+                    this.showSudoPrompt(sudo);
+                    return;
+                }
+            }
+            this.processLine(line);
+        }
+
+        if (!this.running) {
+            this.buffer = "";
+            return;
+        }
+        if (!this.suppressOutput && !findNextermCommand(this.buffer)) {
+            // A partial NEXTERM directive may be split across chunks. Wait for
+            // its newline instead of mistaking "Password:" for a sudo prompt.
+            const sudo = checkSudoPrompt(this.buffer);
+            if (sudo) this.showSudoPrompt(sudo);
+        }
+    }
+
+    showSudoPrompt(sudo) {
+        const payload = { inputType: "password", ...sudo };
+        this.pending = payload;
+        this.pendingDialog = { type: MSG.PROMPT, payload };
+        this.buffer = "";
+        this.broadcast(MSG.PROMPT, payload);
     }
 
     processLine(line) {
         if (this.suppressOutput) {
-            const clean = stripAnsi(line).trim();
-            if (clean === "NEXTERM_READY") {
+            if (stripAnsi(line).trim() === "NEXTERM_READY") {
                 this.suppressOutput = false;
                 return;
             }
+            const hidden = processNextermLine(line);
+            if (hidden?.type === "end") this.handleEnd(hidden.exitCode);
+            return;
         }
         const cmd = processNextermLine(line);
-        if (!cmd) return;
+        if (cmd) this.handleCommand(cmd);
+    }
+
+    handleCommand(cmd) {
         switch (cmd.type) {
             case "input": case "select":
                 this.pending = cmd;
-                this.broadcast(MSG.PROMPT, { inputType: cmd.type, variable: cmd.variable, prompt: cmd.prompt, default: cmd.default, options: cmd.options });
+                this.pendingDialog = {
+                    type: MSG.PROMPT,
+                    payload: { inputType: cmd.type, variable: cmd.variable, prompt: cmd.prompt, default: cmd.default, options: cmd.options },
+                };
+                this.broadcast(MSG.PROMPT, this.pendingDialog.payload);
                 break;
             case "step": this.broadcast(MSG.STEP, { number: this.step++, description: cmd.description }); break;
             case "warning": this.broadcast(MSG.WARNING, { message: cmd.message }); break;
@@ -112,27 +188,32 @@ class ScriptLayer {
             case "success": this.broadcast(MSG.SUCCESS, { message: cmd.message }); break;
             case "confirm":
                 this.pending = { variable: "NEXTERM_CONFIRM_RESULT", prompt: cmd.message, inputType: "confirm" };
+                this.pendingDialog = { type: MSG.CONFIRM, payload: this.pending };
                 this.broadcast(MSG.CONFIRM, this.pending);
                 break;
             case "progress": this.broadcast(MSG.PROGRESS, { percentage: cmd.percentage, message: cmd.message || "" }); break;
             case "summary":
                 this.pending = { variable: "NEXTERM_SUMMARY_RESULT", inputType: "summary" };
-                this.broadcast(MSG.SUMMARY, { title: cmd.title, data: cmd.data });
+                this.pendingDialog = { type: MSG.SUMMARY, payload: { title: cmd.title, data: cmd.data } };
+                this.broadcast(MSG.SUMMARY, this.pendingDialog.payload);
                 break;
             case "table":
                 this.pending = { variable: "NEXTERM_TABLE_RESULT", inputType: "table" };
-                this.broadcast(MSG.TABLE, { title: cmd.title, data: cmd.data });
+                this.pendingDialog = { type: MSG.TABLE, payload: { title: cmd.title, data: cmd.data } };
+                this.broadcast(MSG.TABLE, this.pendingDialog.payload);
                 break;
             case "msgbox":
                 this.pending = { variable: "NEXTERM_MSGBOX_RESULT", inputType: "msgbox" };
-                this.broadcast(MSG.MSGBOX, { title: cmd.title, message: cmd.message });
+                this.pendingDialog = { type: MSG.MSGBOX, payload: { title: cmd.title, message: cmd.message } };
+                this.broadcast(MSG.MSGBOX, this.pendingDialog.payload);
                 break;
             case "end": this.handleEnd(cmd.exitCode); break;
         }
     }
 
-    createMessageHandler(ws) {
+    createMessageHandler(ws, canWrite = () => true) {
         const handler = (msg) => {
+            if (!this.running || !canWrite()) return;
             const str = msg.toString();
             if (!str.startsWith(SCRIPT_MAGIC)) return;
             try {
@@ -140,9 +221,28 @@ class ScriptLayer {
                 if (data.type === MSG.INPUT_RESPONSE && this.pending) {
                     this.stream.write((data.value || this.pending.default || "") + "\r");
                     this.pending = null;
+                    this.pendingDialog = null;
                 } else if (data.type === MSG.INPUT_CANCELLED) {
-                    this.stream.write("\x03");
+                    const uploadIncomplete = this.commandIndex < this.commandQueue.length;
+                    this.uploadCancelled = true;
+                    this.clearWriteTimer();
                     this.pending = null;
+                    this.pendingDialog = null;
+                    this.stream.write("\x03");
+                    if (this.suppressOutput || uploadIncomplete) {
+                        // The script never reached READY, so the remote wrapper
+                        // cannot emit a reliable end marker.
+                        this.handleEnd(130);
+                    } else {
+                        // Give the remote wrapper a chance to report its real
+                        // exit code, but never leave the UI stuck if Ctrl-C is
+                        // ignored or the shell discards the pending line.
+                        if (this.cancelEndTimer) clearTimeout(this.cancelEndTimer);
+                        this.cancelEndTimer = setTimeout(
+                            () => this.handleEnd(130),
+                            CANCEL_END_GRACE_MS,
+                        );
+                    }
                 }
             } catch (e) {}
         };
@@ -158,25 +258,51 @@ class ScriptLayer {
         }
     }
 
-    handleEnd(exitCode) {
-        if (!this.running) return;
-        this.running = false;
+    handleEnd(exitCode, { flushBuffer = false } = {}) {
+        if (!this.running || this.ending) return;
+        this.ending = true;
         this.decoder.end();
-        if (this.buffer.trim()) this.processLine(this.buffer);
+        this.running = false;
+        this.clearWriteTimer();
+        if (this.cancelEndTimer) {
+            clearTimeout(this.cancelEndTimer);
+            this.cancelEndTimer = null;
+        }
+        if (flushBuffer && this.buffer.trim()) {
+            const finalCommand = processNextermLine(this.buffer);
+            if (finalCommand?.type === "end") exitCode = finalCommand.exitCode;
+            else this.processLine(this.buffer);
+        }
+        // A final summary/table/msgbox is informational and remains readable.
+        // Remember it before the end marker so a reconnect can replay the
+        // result in the same order the live client saw it.
+        if (INFORMATIONAL_DIALOG_TYPES.has(this.pendingDialog?.type)) {
+            this.rememberEvent(this.pendingDialog.type, this.pendingDialog.payload);
+        }
         this.buffer = "";
+        this.pending = null;
+        this.pendingDialog = null;
         this.broadcast(MSG.SCRIPT_END, { exitCode, success: exitCode === 0 });
         logger.info("Script completed", { sessionId: this.sessionId, exitCode });
         this.stream.removeListener("data", this.onData);
+        this.stream.removeListener("close", this.onClose);
     }
 
-    onClose(code) { if (this.running) this.handleEnd(code); }
+    onClose(code) { this.handleEnd(code, { flushBuffer: true }); }
 
     destroy() {
+        this.clearWriteTimer();
+        if (this.cancelEndTimer) {
+            clearTimeout(this.cancelEndTimer);
+            this.cancelEndTimer = null;
+        }
         this.stream.removeListener("data", this.onData);
         this.stream.removeListener("close", this.onClose);
         for (const { ws, handler } of this.handlers) ws.removeListener("message", handler);
         this.handlers.clear();
         this.running = false;
+        this.pending = null;
+        this.pendingDialog = null;
     }
 }
 

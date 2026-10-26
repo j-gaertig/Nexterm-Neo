@@ -63,8 +63,8 @@ const handleSession = (ws, ctx, isShared) => {
 
     const { msgHandler, dataHandler, endData } = bindHandlers(ws, conn, sessionId, entry?.config, isShared, canWrite);
 
-    if (conn.scriptLayer) {
-        conn.scriptLayer.createMessageHandler(ws);
+    if (conn.scriptLayer && (!isShared || canWrite())) {
+        conn.scriptLayer.createMessageHandler(ws, canWrite);
     }
 
     if (!isShared) {

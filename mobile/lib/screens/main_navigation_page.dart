@@ -46,6 +46,7 @@ class MainNavigationPage extends StatefulWidget {
 class _MainNavigationPageState extends State<MainNavigationPage>
     with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
+  final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   late final _fadeController = AnimationController(
     vsync: this,
@@ -78,15 +79,31 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   void _onSessionsChanged() {
     if (!mounted) return;
 
+    _dismissedAttentionSessionIds.removeWhere(
+      (id) =>
+          !(widget.sessionManager.getSession(id)?.scriptNeedsInput ?? false),
+    );
+
     if (!widget.sessionManager.hasActiveSessions) {
       if (_selectedIndex == 1) {
         _selectedIndex = 0;
       } else if (_selectedIndex > 1) {
         _selectedIndex -= 1;
       }
+      _dismissedAttentionSessionIds.clear();
     }
     setState(() {});
     _fadeController.value = 1.0;
+  }
+
+  AppSession? get _attentionSession {
+    for (final session in widget.sessionManager.sessions) {
+      if (session.scriptNeedsInput &&
+          !_dismissedAttentionSessionIds.contains(session.sessionId)) {
+        return session;
+      }
+    }
+    return null;
   }
 
   bool get _hasSessions => widget.sessionManager.hasActiveSessions;
@@ -94,6 +111,12 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   @override
   Widget build(BuildContext context) {
     final hasSessions = _hasSessions;
+    final isOnSessionsTab = hasSessions && _selectedIndex == 1;
+    final attentionSession = _attentionSession;
+    final activeSessionId = widget.sessionManager.activeSessionId;
+    final showAttentionBanner =
+        attentionSession != null &&
+        !(isOnSessionsTab && activeSessionId == attentionSession.sessionId);
 
     final List<Widget> pages = [
       ServersScreen(
@@ -114,6 +137,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
           terminalSettings: widget.terminalSettings,
           sftpSettings: widget.sftpSettings,
           onExitFullscreen: () => _switchTab(0),
+          isVisible: isOnSessionsTab,
         ),
       MonitoringScreen(key: _monitoringKey, authManager: widget.authManager),
       SettingsScreen(
@@ -127,8 +151,11 @@ class _MainNavigationPageState extends State<MainNavigationPage>
 
     if (_selectedIndex >= pages.length) _selectedIndex = 0;
 
-    final isOnSessionsTab = hasSessions && _selectedIndex == 1;
     final monitoringIndex = hasSessions ? 2 : 1;
+    final pageStack = FadeTransition(
+      opacity: _fadeController,
+      child: IndexedStack(index: _selectedIndex, children: pages),
+    );
 
     return PopScope(
       canPop: false,
@@ -153,12 +180,39 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         SystemNavigator.pop();
       },
       child: Scaffold(
-        body: FadeTransition(
-          opacity: _fadeController,
-          child: IndexedStack(
-            index: _selectedIndex,
-            children: pages,
-          ),
+        body: Column(
+          children: [
+            if (showAttentionBanner)
+              _ScriptAttentionBanner(
+                session: attentionSession,
+                waitingCount: widget.sessionManager.waitingInputCount,
+                onOpen: () {
+                  setState(
+                    () => _dismissedAttentionSessionIds.remove(
+                      attentionSession.sessionId,
+                    ),
+                  );
+                  widget.sessionManager.setActive(attentionSession.sessionId);
+                  if (!isOnSessionsTab) _switchTab(1);
+                },
+                onDismiss: () {
+                  setState(
+                    () => _dismissedAttentionSessionIds.add(
+                      attentionSession.sessionId,
+                    ),
+                  );
+                },
+              ),
+            Expanded(
+              child: showAttentionBanner
+                  ? MediaQuery.removePadding(
+                      context: context,
+                      removeTop: true,
+                      child: pageStack,
+                    )
+                  : pageStack,
+            ),
+          ],
         ),
         bottomNavigationBar: isOnSessionsTab
             ? null
@@ -174,6 +228,8 @@ class _MainNavigationPageState extends State<MainNavigationPage>
       return materialNavigationBar;
     }
 
+    final sessionCount = widget.sessionManager.sessionCount;
+    final waitingCount = widget.sessionManager.waitingInputCount;
     return NativeGlassNavBar(
       currentIndex: _selectedIndex,
       onTap: (index) => _switchTab(index),
@@ -182,7 +238,11 @@ class _MainNavigationPageState extends State<MainNavigationPage>
       tabs: [
         const NativeGlassNavBarItem(label: 'Servers', symbol: 'network'),
         if (hasSessions)
-          const NativeGlassNavBarItem(label: 'Sessions', symbol: 'display'),
+          NativeGlassNavBarItem(
+            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
+            symbol: 'display',
+            badgeValue: waitingCount > 0 ? '!' : '$sessionCount',
+          ),
         const NativeGlassNavBarItem(label: 'Monitoring', symbol: 'chart.bar'),
         const NativeGlassNavBarItem(label: 'Settings', symbol: 'gear'),
       ],
@@ -191,6 +251,9 @@ class _MainNavigationPageState extends State<MainNavigationPage>
 
   Widget _buildMaterialNavigationBar(bool hasSessions) {
     final sessionCount = widget.sessionManager.sessionCount;
+    final waitingCount = widget.sessionManager.waitingInputCount;
+    final cs = Theme.of(context).colorScheme;
+    final badgeColor = waitingCount > 0 ? cs.error : null;
     return NavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: (index) => _switchTab(index),
@@ -203,14 +266,16 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         if (hasSessions)
           NavigationDestination(
             icon: Badge(
-              label: Text('$sessionCount'),
+              label: Text(waitingCount > 0 ? '!' : '$sessionCount'),
+              backgroundColor: badgeColor,
               child: Icon(AppIcons.monitorMultiple),
             ),
             selectedIcon: Badge(
-              label: Text('$sessionCount'),
+              label: Text(waitingCount > 0 ? '!' : '$sessionCount'),
+              backgroundColor: badgeColor,
               child: Icon(AppIcons.monitorMultiple),
             ),
-            label: 'Sessions',
+            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
           ),
         NavigationDestination(
           icon: Icon(AppIcons.chartBoxOutline),
@@ -223,6 +288,77 @@ class _MainNavigationPageState extends State<MainNavigationPage>
           label: 'Settings',
         ),
       ],
+    );
+  }
+}
+
+class _ScriptAttentionBanner extends StatelessWidget {
+  final AppSession session;
+  final int waitingCount;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  const _ScriptAttentionBanner({
+    required this.session,
+    required this.waitingCount,
+    required this.onOpen,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final name = session.scriptName ?? 'Script';
+    final more = waitingCount > 1 ? ' ${waitingCount - 1} more waiting.' : '';
+
+    return Material(
+      color: cs.tertiaryContainer,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          child: Row(
+            children: [
+              Icon(
+                AppIcons.alertCircle,
+                size: 20,
+                color: cs.onTertiaryContainer,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '$name on ${session.server.name} is waiting for input.$more',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.3,
+                    color: cs.onTertiaryContainer,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: onOpen,
+                style: TextButton.styleFrom(
+                  foregroundColor: cs.onTertiaryContainer,
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: const Text('Open'),
+              ),
+              IconButton(
+                onPressed: onDismiss,
+                tooltip: 'Dismiss',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  AppIcons.close,
+                  size: 18,
+                  color: cs.onTertiaryContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

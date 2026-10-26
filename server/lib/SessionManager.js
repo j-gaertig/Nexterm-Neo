@@ -144,12 +144,17 @@ module.exports.initRecording = async (sessionId, organizationId, cols = 80, rows
     const enabled = await isRecordingEnabled(organizationId);
     if (!enabled) return false;
 
-    const castPath = getRecordingPath(session.auditLogId, "cast", false);
+    // isRecordingEnabled may hit the database. If the session was removed in
+    // the meantime, do not leave an unfinalized recording stream behind.
+    const activeSession = module.exports.get(sessionId);
+    if (!activeSession || activeSession._removing) return false;
+
+    const castPath = getRecordingPath(activeSession.auditLogId, "cast", false);
     const stream = fs.createWriteStream(castPath, { flags: "w" });
     const startTime = Date.now();
     stream.write(JSON.stringify({ version: 2, width: cols, height: rows, timestamp: Math.floor(startTime / 1000), env: { SHELL: "/bin/bash", TERM: "xterm-256color" } }) + "\n");
-    session.recording = { stream, startTime, path: castPath, cols, rows };
-    logger.info("Recording started", { sessionId, auditLogId: session.auditLogId });
+    activeSession.recording = { stream, startTime, path: castPath, cols, rows };
+    logger.info("Recording started", { sessionId, auditLogId: activeSession.auditLogId });
     return true;
 };
 
@@ -401,6 +406,7 @@ const cleanupConnection = async (conn, sessionId) => {
     if (CONTROL_PLANE_TYPES.has(conn.type)) {
         try { await require("./controlPlane/ControlPlaneServer").closeSessionAndWait(sessionId); } catch {}
     }
+    try { conn.scriptLayer?.destroy(); } catch {}
     for (const s of [conn.dataSocket, conn.socket]) {
         if (!s) continue;
         try { s.removeAllListeners(); } catch {}
