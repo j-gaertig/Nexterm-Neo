@@ -95,22 +95,40 @@ class ScriptSummarySheet extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
                   'No summary data available',
-                  style: TextStyle(fontSize: 13, color: cs.outline),
+                  style: TextStyle(fontSize: 13.5, color: cs.outline),
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var i = 0; i < pairs.length; i++) ...[
-                    _SummaryRow(pair: pairs[i], isUrl: _isUrl(pairs[i].value)),
-                    if (i != pairs.length - 1)
-                      Divider(height: 1, color: cs.outlineVariant),
+            : Container(
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerLow,
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.7),
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < pairs.length; i++) ...[
+                      _SummaryRow(
+                        pair: pairs[i],
+                        isUrl: _isUrl(pairs[i].value),
+                      ),
+                      if (i != pairs.length - 1)
+                        Divider(
+                          height: 1,
+                          indent: 14,
+                          endIndent: 14,
+                          color: cs.outlineVariant.withValues(alpha: 0.7),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
       ),
     );
@@ -150,7 +168,7 @@ class _SummaryRow extends StatelessWidget {
         : Text(pair.value, style: valueStyle);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: stacked
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -96,8 +96,7 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       },
       child: ScriptSheetShell(
         title: title,
-        bodyIsScrollable: false,
-        wholeSheetScrollable: true,
+        bodyIsScrollable: true,
         footer: _footer(cs),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -151,15 +150,15 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       fillColor: cs.surfaceContainerHigh,
       isDense: true,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: cs.primary, width: 1.5),
       ),
     ),
@@ -176,38 +175,30 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Select one option to continue',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: cs.outline,
-          ),
-        ),
-        const SizedBox(height: 8),
         for (var i = 0; i < options.length; i++) ...[
           OutlinedButton(
             onPressed: _stopping ? null : () => _submit(options[i]),
             style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
               alignment: Alignment.centerLeft,
               side: BorderSide(color: cs.outlineVariant),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: Row(
               children: [
                 Container(
                   constraints: const BoxConstraints(
-                    minWidth: 24,
-                    minHeight: 24,
+                    minWidth: 26,
+                    minHeight: 26,
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${i + 1}',
@@ -220,12 +211,15 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(options[i], style: const TextStyle(fontSize: 14)),
+                  child: Text(
+                    options[i],
+                    style: const TextStyle(fontSize: 14, height: 1.3),
+                  ),
                 ),
               ],
             ),
           ),
-          if (i != options.length - 1) const SizedBox(height: 6),
+          if (i != options.length - 1) const SizedBox(height: 8),
         ],
       ],
     );
@@ -235,11 +229,11 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
     ),
     child: Text(
       'Choose Yes to continue or No to answer negatively. Both answers keep the script running.',
-      style: TextStyle(fontSize: 12, height: 1.35, color: cs.onSurfaceVariant),
+      style: TextStyle(fontSize: 12, height: 1.4, color: cs.onSurfaceVariant),
     ),
   );
 
@@ -253,7 +247,7 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       style: TextButton.styleFrom(
         foregroundColor: cs.error,
         minimumSize: const Size.fromHeight(48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       child: const Text('Stop script'),
     );

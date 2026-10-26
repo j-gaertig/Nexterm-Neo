@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -15,10 +14,9 @@ import '../../../utils/app_icons.dart';
 /// `(scriptId, scriptName, identityId)` or `null` when cancelled.
 ///
 /// All scripts available to the server are listed in one flat list. The
-/// optional compatibility filter is controlled by the icon button next to the
-/// search field. When the server has several identities, the identity picker
-/// lives in the same row so the footer can stay focused on the single action
-/// that matters: running the selected script.
+/// optional compatibility filter and the identity picker live in the search
+/// row so the footer stays focused on the single action that matters: running
+/// the selected script.
 Future<RunScriptSelection?> showRunScriptSheet(
   BuildContext context,
   Server server,
@@ -83,6 +81,8 @@ class RunScriptSheet extends StatefulWidget {
 }
 
 class _RunScriptSheetState extends State<RunScriptSheet> {
+  static const double _controlSize = 48;
+
   final _searchController = TextEditingController();
   Object? _loadError;
   String _query = '';
@@ -106,6 +106,15 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     if (_osLoading) return 'Detecting operating system';
     if (!_osKnown) return 'Operating system unknown';
     return _compatibleOnly ? 'Show all scripts' : 'Compatible only';
+  }
+
+  int? get _effectiveIdentityId =>
+      _selectedIdentityId ?? widget.server.identities?.firstOrNull;
+
+  String? get _selectedIdentityLabel {
+    final id = _effectiveIdentityId;
+    if (id == null || !_identities.containsKey(id)) return null;
+    return _identityLabel(id);
   }
 
   @override
@@ -248,8 +257,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
       RunScriptSelection(
         scriptId: script.id,
         scriptName: script.name,
-        identityId:
-            _selectedIdentityId ?? widget.server.identities?.firstOrNull,
+        identityId: _effectiveIdentityId,
       ),
     );
   }
@@ -257,17 +265,13 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     final media = MediaQuery.of(context);
     final availableHeight = math.max(
       0.0,
       media.size.height - media.viewInsets.bottom,
     );
-    // The keyboard padding and the sheet height are additive. Keep the sheet
-    // inside the space above the keyboard and drop non-essential chrome when
-    // that space gets tight (small phones with a keyboard open).
-    final sheetHeight = math.min(media.size.height * 0.9, availableHeight);
-    final compact = availableHeight < 380;
+    final sheetHeight = math.min(media.size.height * 0.92, availableHeight);
+    final tight = availableHeight < 420;
 
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
@@ -278,110 +282,143 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (!compact) ...[
-                Center(
-                  child: Container(
-                    margin: const EdgeInsets.only(top: 12, bottom: 4),
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: cs.outlineVariant,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Run Script',
-                              style: tt.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              widget.server.name,
-                              style: TextStyle(fontSize: 12, color: cs.outline),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        tooltip: 'Close',
-                        icon: const Icon(AppIcons.close, size: 20),
-                      ),
-                    ],
-                  ),
-                ),
-              ] else
-                const SizedBox(height: 6),
+              _header(cs, tight: tight),
+              _searchRow(cs, tight: tight),
+              Divider(height: 1, color: cs.outlineVariant),
               if (widget.manager.isLoading)
                 const LinearProgressIndicator(minHeight: 2),
-              Padding(
-                padding: EdgeInsets.fromLTRB(20, compact ? 0 : 6, 20, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        onChanged: (value) => setState(() => _query = value),
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          hintText: 'Search scripts...',
-                          prefixIcon: const Icon(AppIcons.magnify, size: 20),
-                          suffixIcon: _query.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: 'Clear search',
-                                  icon: const Icon(AppIcons.close, size: 18),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() => _query = '');
-                                  },
-                                ),
-                          filled: true,
-                          fillColor: cs.surfaceContainerHigh,
-                          isDense: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: cs.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _compatibilityButton(cs),
-                    if (_needsIdentitySelection) ...[
-                      const SizedBox(width: 8),
-                      _identityButton(cs),
-                    ],
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: cs.outlineVariant),
               Expanded(child: _buildBody(cs)),
-              _footer(cs, compact: compact),
+              _footer(cs),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _header(ColorScheme cs, {required bool tight}) {
+    final tt = Theme.of(context).textTheme;
+    final identity = _selectedIdentityLabel;
+    final subtitle = identity == null
+        ? widget.server.name
+        : '${widget.server.name} · $identity';
+
+    return Column(
+      children: [
+        Center(
+          child: Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 2),
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.outlineVariant,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, tight ? 2 : 8, 8, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Run Script',
+                      style: tt.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (!tight)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 1),
+                        child: Text(
+                          subtitle,
+                          style: TextStyle(fontSize: 12, color: cs.outline),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                tooltip: 'Close',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(AppIcons.close, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _searchRow(ColorScheme cs, {required bool tight}) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, tight ? 4 : 8, 16, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) => setState(() => _query = value),
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'Search',
+                prefixIcon: const Icon(AppIcons.magnify, size: 19),
+                prefixIconConstraints: const BoxConstraints(
+                  minWidth: 42,
+                  minHeight: 42,
+                ),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(AppIcons.close, size: 18),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                      ),
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 42,
+                  minHeight: 42,
+                ),
+                filled: true,
+                fillColor: cs.surfaceContainerHigh,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 13,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide(color: cs.primary, width: 1.5),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _compatibilityButton(cs),
+          if (_needsIdentitySelection) ...[
+            const SizedBox(width: 8),
+            _identityButton(cs),
+          ],
+        ],
       ),
     );
   }
@@ -405,16 +442,16 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
         label: _compatibilityTooltip,
         child: Material(
           color: background,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: enabled ? _toggleCompatibilityFilter : null,
             child: SizedBox.square(
-              dimension: 48,
+              dimension: _controlSize,
               child: Center(
                 child: _osLoading
                     ? SizedBox.square(
-                        dimension: 18,
+                        dimension: 17,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: foreground,
@@ -431,52 +468,114 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
 
   Widget _identityButton(ColorScheme cs) {
     final wanted = widget.server.identities ?? const <int>[];
-    final selectedIdentity = _selectedIdentityId ?? wanted.firstOrNull;
+    final selectedIdentity = _effectiveIdentityId;
+    final label = _identities.containsKey(selectedIdentity)
+        ? _identityLabel(selectedIdentity!)
+        : null;
+    final tooltip = label == null ? 'Run as identity' : 'Run as $label';
 
     return PopupMenuButton<int>(
-      tooltip: 'Run as identity',
+      tooltip: tooltip,
       initialValue: selectedIdentity,
       onSelected: (value) => setState(() => _selectedIdentityId = value),
       itemBuilder: (context) => [
         for (final id in wanted)
           PopupMenuItem(
             value: id,
-            child: Text(
-              _identityLabel(id),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: id == selectedIdentity
-                    ? FontWeight.w700
-                    : FontWeight.w400,
-                color: id == selectedIdentity ? cs.primary : cs.onSurface,
-              ),
+            child: _identityMenuItem(
+              cs,
+              id: id,
+              selected: id == selectedIdentity,
             ),
           ),
       ],
-      child: SizedBox.square(
-        dimension: 48,
-        child: Material(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              const Icon(AppIcons.account, size: 20),
-              if (_identitiesLoading)
-                const Positioned(
-                  right: 7,
-                  bottom: 7,
-                  child: SizedBox.square(
-                    dimension: 10,
-                    child: CircularProgressIndicator(strokeWidth: 1.6),
+      child: Semantics(
+        button: true,
+        label: tooltip,
+        child: SizedBox.square(
+          dimension: _controlSize,
+          child: Material(
+            color: cs.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(14),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                if (label == null)
+                  const Icon(AppIcons.account, size: 20)
+                else
+                  Padding(
+                    padding: const EdgeInsets.all(9),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _initials(label),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSurface,
+                        ),
+                      ),
+                    ),
                   ),
+                if (_identitiesLoading)
+                  Positioned(
+                    right: 7,
+                    bottom: 7,
+                    child: SizedBox.square(
+                      dimension: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.6,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _identityMenuItem(
+    ColorScheme cs, {
+    required int id,
+    required bool selected,
+  }) {
+    final identity = _identities[id];
+    final username = identity?.username.trim() ?? '';
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _identityLabel(id),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color: selected ? cs.primary : cs.onSurface,
+                ),
+              ),
+              if (username.isNotEmpty)
+                Text(
+                  username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11.5, color: cs.outline),
                 ),
             ],
           ),
         ),
-      ),
+        if (selected) ...[
+          const SizedBox(width: 10),
+          Icon(AppIcons.check, size: 17, color: cs.primary),
+        ],
+      ],
     );
   }
 
@@ -486,7 +585,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     }
     if (_loadError != null) {
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -532,7 +631,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
           hasAny && _compatibilityFilterActive && _query.isEmpty;
 
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -545,7 +644,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                           : 'No scripts match your search'),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),
@@ -581,7 +680,8 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
       itemCount: scripts.length,
       itemBuilder: (context, index) => _scriptTile(scripts[index], cs),
     );
@@ -592,10 +692,10 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     final description = script.description?.trim() ?? '';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Material(
-        color: selected ? cs.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(12),
+        color: selected ? cs.primaryContainer : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
         clipBehavior: Clip.antiAlias,
         child: Semantics(
           selected: selected,
@@ -614,7 +714,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
-                      color: selected ? cs.onPrimary : cs.onSurface,
+                      color: selected ? cs.onPrimaryContainer : cs.onSurface,
                     ),
                   ),
                   if (description.isNotEmpty) ...[
@@ -627,7 +727,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                         fontSize: 12,
                         height: 1.3,
                         color: selected
-                            ? cs.onPrimary.withValues(alpha: 0.78)
+                            ? cs.onPrimaryContainer.withValues(alpha: 0.76)
                             : cs.outline,
                       ),
                     ),
@@ -641,7 +741,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     );
   }
 
-  Widget _footer(ColorScheme cs, {required bool compact}) {
+  Widget _footer(ColorScheme cs) {
     final selected = _selectedScript;
 
     return Container(
@@ -649,21 +749,20 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
         color: cs.surface,
         border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
-      padding: EdgeInsets.fromLTRB(20, compact ? 8 : 10, 20, compact ? 8 : 12),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: FilledButton(
         key: const ValueKey('run-script-button'),
         onPressed: selected == null ? null : _submit,
         style: FilledButton.styleFrom(
-          minimumSize: Size.fromHeight(compact ? 46 : 52),
+          minimumSize: const Size.fromHeight(50),
+          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
+          disabledBackgroundColor: cs.surfaceContainerHighest,
+          disabledForegroundColor: cs.outline,
         ),
-        child: const Text(
-          'Run',
-          maxLines: 1,
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        child: const Text('Run', maxLines: 1),
       ),
     );
   }
@@ -674,5 +773,21 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     if (identity.name.trim().isNotEmpty) return identity.name;
     if (identity.username.trim().isNotEmpty) return identity.username;
     return 'Identity #$id';
+  }
+
+  String _initials(String label) {
+    final parts = label
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) {
+      final part = parts.first;
+      return part.substring(0, math.min(2, part.length)).toUpperCase();
+    }
+    final first = String.fromCharCode(parts.first.runes.first);
+    final last = String.fromCharCode(parts.last.runes.first);
+    return '$first$last'.toUpperCase();
   }
 }

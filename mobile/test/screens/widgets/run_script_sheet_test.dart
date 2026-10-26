@@ -262,15 +262,19 @@ void main() {
       );
       await _pumpSheet(tester);
 
-      expect(find.byTooltip('Run as identity'), findsOneWidget);
-      expect(find.text('Deploy admin'), findsNothing);
+      expect(find.byTooltip('Run as Deploy admin'), findsOneWidget);
+      expect(find.text('DA'), findsOneWidget);
+      expect(find.textContaining('Deploy admin'), findsOneWidget);
       expect(find.text('Run as identity'), findsNothing);
 
-      await tester.tap(find.byTooltip('Run as identity'));
+      await tester.tap(find.byTooltip('Run as Deploy admin'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Deploy bot').last);
       await _settleUi(tester);
+
+      expect(find.byTooltip('Run as Deploy bot'), findsOneWidget);
+      expect(find.text('DB'), findsOneWidget);
 
       await tester.tap(find.text('Ubuntu deploy'));
       await tester.pump();
@@ -321,7 +325,7 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('Run Script'), findsOneWidget);
-      expect(find.text('Search scripts...'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
       expect(find.text('Select a script to run'), findsNothing);
       expect(tester.widget<FilledButton>(_runButton).onPressed, isNull);
     });
@@ -343,8 +347,8 @@ void main() {
       await _pumpSheet(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Run Script'), findsNothing);
-      expect(find.text('Search scripts...'), findsOneWidget);
+      expect(find.text('Run Script'), findsOneWidget);
+      expect(find.text('Search'), findsOneWidget);
       expect(find.text('Select a script to run'), findsNothing);
       expect(tester.widget<FilledButton>(_runButton).onPressed, isNull);
     });
@@ -374,12 +378,16 @@ void main() {
       await _pumpSheet(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.byTooltip('Run as identity'), findsOneWidget);
+      expect(find.byTooltip('Run as Deploy admin'), findsOneWidget);
+      expect(find.text('DA'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Run as identity'));
+      await tester.tap(find.byTooltip('Run as Deploy admin'));
       await _settleUi(tester);
       await tester.tap(find.text('Deploy bot').last);
       await _settleUi(tester);
+
+      expect(find.byTooltip('Run as Deploy bot'), findsOneWidget);
+      expect(find.text('DB'), findsOneWidget);
 
       await tester.scrollUntilVisible(
         find.text('Ubuntu deploy'),

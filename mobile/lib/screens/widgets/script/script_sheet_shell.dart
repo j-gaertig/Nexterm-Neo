@@ -36,6 +36,10 @@ class ScriptSheetShell extends StatelessWidget {
     );
     final compact = available < 320;
     final edge = compact ? 12.0 : 20.0;
+    // A pinned footer keeps the primary action visible. Only when the sheet is
+    // extremely short (keyboard plus huge text) do we fall back to scrolling
+    // the whole sheet so header and footer cannot overflow each other.
+    final useWholeSheet = wholeSheetScrollable || available < 300;
 
     final header = <Widget>[
       Center(
@@ -80,10 +84,11 @@ class ScriptSheetShell extends StatelessWidget {
 
     final body = bodyIsScrollable
         ? SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(edge, 2, edge, 4),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.fromLTRB(edge, 4, edge, 6),
             child: child,
           )
-        : Padding(padding: EdgeInsets.fromLTRB(edge, 2, edge, 4), child: child);
+        : Padding(padding: EdgeInsets.fromLTRB(edge, 4, edge, 6), child: child);
 
     return Padding(
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
@@ -91,8 +96,10 @@ class ScriptSheetShell extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: available),
         child: SafeArea(
           top: false,
-          child: wholeSheetScrollable
+          child: useWholeSheet
               ? SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -155,7 +162,7 @@ ButtonStyle _actionStyle() => ButtonStyle(
     EdgeInsets.symmetric(vertical: 14, horizontal: 14),
   ),
   shape: WidgetStatePropertyAll(
-    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
   ),
 );
 
@@ -202,29 +209,86 @@ FilledButton scriptSheetPrimaryButton({
   );
 }
 
-/// Common "Stop script" confirmation. Returns true when the user really wants
-/// to interrupt the running script.
-Future<bool> confirmStopScript(BuildContext context) async {
+/// Confirmation dialog with the same full-width action stack used by the
+/// script sheets. Long labels and large text therefore never squeeze the
+/// destructive action into a cramped overflow row.
+Future<bool> showScriptConfirmationDialog(
+  BuildContext context, {
+  required String title,
+  required String body,
+  required String confirmLabel,
+  required String cancelLabel,
+  bool destructive = false,
+}) async {
   final result = await showDialog<bool>(
     context: context,
-    builder: (dialogContext) => AlertDialog(
-      title: const Text('Stop script?'),
-      content: const Text(
-        'The script and its remote commands will be interrupted. This cannot be undone.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialogContext, false),
-          child: const Text('Keep running'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialogContext, true),
-          child: const Text('Stop script'),
-        ),
-      ],
-    ),
+    builder: (dialogContext) {
+      final cs = Theme.of(dialogContext).colorScheme;
+      return AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+        actions: [
+          SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                OutlinedButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    side: BorderSide(color: cs.outlineVariant),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    cancelLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: destructive ? cs.error : null,
+                    foregroundColor: destructive ? cs.onError : null,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    confirmLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    },
   );
   return result ?? false;
+}
+
+/// Common "Stop script" confirmation. Returns true when the user really wants
+/// to interrupt the running script.
+Future<bool> confirmStopScript(BuildContext context) {
+  return showScriptConfirmationDialog(
+    context,
+    title: 'Stop script?',
+    body:
+        'The script and its remote commands will be interrupted. This cannot be undone.',
+    confirmLabel: 'Stop script',
+    cancelLabel: 'Keep running',
+    destructive: true,
+  );
 }
 
 /// Copy action with inline success feedback. A root-level snackbar would be

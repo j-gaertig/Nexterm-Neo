@@ -444,26 +444,16 @@ class _ScriptRendererState extends State<ScriptRenderer> {
   Future<void> _closeSession() async {
     if (_closing) return;
     if (widget.session.isScriptRunning) {
-      final close = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Close script session?'),
-          content: const Text(
+      final close = await showScriptConfirmationDialog(
+        context,
+        title: 'Close script session?',
+        body:
             'The running script will be interrupted and the session will be removed.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Keep running'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Close session'),
-            ),
-          ],
-        ),
+        confirmLabel: 'Close session',
+        cancelLabel: 'Keep running',
+        destructive: true,
       );
-      if (!mounted || close != true) return;
+      if (!mounted || !close) return;
     }
 
     setState(() => _closing = true);

@@ -44,6 +44,7 @@ Future<void> _expand(WidgetTester tester) async {
   // waiting for the indeterminate progress indicator while a script runs.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 400));
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 void main() {
@@ -60,7 +61,7 @@ void main() {
 
       expect(find.text('Deploy app'), findsOneWidget);
       expect(find.text('Connecting to script…'), findsOneWidget);
-      expect(find.text('STEPS'), findsNothing);
+      expect(find.text('Steps'), findsNothing);
     });
 
     testWidgets('expands when the whole header is tapped', (tester) async {
@@ -75,7 +76,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 400));
 
-      expect(find.text('STEPS'), findsOneWidget);
+      expect(find.text('Steps'), findsOneWidget);
       expect(find.text('Less'), findsOneWidget);
     });
 
@@ -105,7 +106,7 @@ void main() {
       expect(find.text('Restart service'), findsOneWidget);
       expect(find.text('50%'), findsOneWidget);
       expect(find.text('Halfway · Step 2 of 2'), findsOneWidget);
-      expect(find.text('NOTICES'), findsOneWidget);
+      expect(find.text('Notices'), findsOneWidget);
       expect(find.text('Disk almost full'), findsOneWidget);
     });
 
@@ -224,6 +225,56 @@ void main() {
       expect(find.text('Stopped'), findsOneWidget);
       expect(find.textContaining('exited with code'), findsNothing);
       expect(find.text('Close'), findsOneWidget);
+    });
+
+    testWidgets('reveals the active step when details open', (tester) async {
+      tester.view.physicalSize = const Size(390, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final controller = ScriptExecutionController(scriptName: 'Deploy');
+      addTearDown(controller.dispose);
+      controller.markConnected();
+      for (var i = 1; i <= 9; i++) {
+        controller.handleEvent(
+          ScriptStepEvent(number: i, description: 'Step number $i'),
+        );
+      }
+
+      await _pumpDock(tester, controller: controller);
+      await _expand(tester);
+
+      expect(find.text('Step number 9').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('can close the session while connecting', (tester) async {
+      final controller = ScriptExecutionController(scriptName: 'Deploy');
+      addTearDown(controller.dispose);
+      var closed = 0;
+
+      await _pumpDock(tester, controller: controller, onClose: () => closed++);
+      await _expand(tester);
+
+      await tester.tap(find.text('Close session'));
+      await tester.pump();
+
+      expect(closed, 1);
+    });
+
+    testWidgets('offers reconnect and close when disconnected', (tester) async {
+      final controller = ScriptExecutionController(scriptName: 'Deploy');
+      addTearDown(controller.dispose);
+      controller.markDisconnected(message: 'Network lost');
+      var closed = 0;
+
+      await _pumpDock(tester, controller: controller, onClose: () => closed++);
+      await _expand(tester);
+
+      expect(find.text('Reconnect'), findsOneWidget);
+      await tester.tap(find.text('Close session'));
+      await tester.pump();
+
+      expect(closed, 1);
     });
 
     testWidgets('adapts to large text and a narrow screen', (tester) async {

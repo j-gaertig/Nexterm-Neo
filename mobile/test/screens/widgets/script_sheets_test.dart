@@ -178,6 +178,16 @@ void main() {
       await tester.binding.handlePopRoute();
       await _settleUi(tester);
       expect(find.text('Stop script?'), findsOneWidget);
+      expect(
+        tester
+            .getSize(find.widgetWithText(OutlinedButton, 'Keep running'))
+            .height,
+        greaterThanOrEqualTo(48),
+      );
+      expect(
+        tester.getSize(find.widgetWithText(FilledButton, 'Stop script')).height,
+        greaterThanOrEqualTo(48),
+      );
 
       await tester.tap(find.text('Keep running'));
       await _settleUi(tester);
@@ -196,6 +206,38 @@ void main() {
 
       expect(await result, isA<ScriptCancelledResult>());
       expect(find.text('Input required'), findsNothing);
+    });
+
+    testWidgets('stop confirmation fits a small screen at 200% text', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 480);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _pumpHost(tester, 2);
+      showScriptPromptSheet(hostContext, _prompt());
+      await _pumpSheet(tester);
+
+      await tester.tap(find.text('Stop script'));
+      await _settleUi(tester);
+
+      expect(find.text('Stop script?'), findsOneWidget);
+      expect(find.text('Keep running').hitTestable(), findsOneWidget);
+      expect(
+        find
+            .descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text('Stop script'),
+            )
+            .hitTestable(),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Keep running'));
+      await _settleUi(tester);
+      expect(find.text('Stop script?'), findsNothing);
     });
 
     testWidgets('stops from the footer after confirmation', (tester) async {
@@ -405,6 +447,39 @@ void main() {
       await tester.tap(find.text('Close'));
       await _settleUi(tester);
       expect(await result, isA<ScriptClosedResult>());
+    });
+
+    testWidgets('shows a draggable scrollbar for wide tables', (tester) async {
+      await _pumpHost(tester, 1);
+      showScriptTableSheet(
+        hostContext,
+        const ScriptTableEvent(
+          title: 'Wide table',
+          data: [
+            'Name,Status,Version,Region,Latency,Duration',
+            'api-gateway,healthy,2.18.3,eu-central-1,23ms,1.2s',
+            'worker-queue,healthy,2.18.3,eu-central-1,18ms,0.8s',
+            'billing-service,degraded,2.17.9,eu-west-1,182ms,9.4s',
+          ],
+        ),
+      );
+      await _pumpSheet(tester);
+
+      final scrollbar = find.byKey(
+        const ValueKey('script-table-horizontal-scrollbar'),
+      );
+      expect(scrollbar, findsOneWidget);
+
+      final horizontal = tester
+          .stateList<ScrollableState>(find.byType(Scrollable))
+          .firstWhere((state) => state.position.axis == Axis.horizontal);
+      expect(horizontal.position.maxScrollExtent, greaterThan(0));
+
+      await tester.drag(scrollbar, const Offset(120, 0));
+      await tester.pump();
+
+      expect(horizontal.position.pixels, greaterThan(0));
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('shows an empty state without data', (tester) async {

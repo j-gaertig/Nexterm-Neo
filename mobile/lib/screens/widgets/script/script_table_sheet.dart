@@ -88,7 +88,7 @@ class ScriptTableSheet extends StatelessWidget {
             ? Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: cs.outlineVariant),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: _ScrollableScriptTable(table: table, embedded: embedded),
@@ -97,7 +97,7 @@ class ScriptTableSheet extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
                   'No table data available',
@@ -219,22 +219,31 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
   }
 
   Widget _horizontalTable({
+    required ColorScheme cs,
     required Widget child,
     required double width,
-    required bool showThumb,
+    required double viewportWidth,
+    required bool showIndicator,
   }) {
-    return Scrollbar(
+    final table = SingleChildScrollView(
       controller: _horizontalController,
-      thumbVisibility: showThumb,
-      thickness: 4,
-      radius: const Radius.circular(2),
-      notificationPredicate: (notification) =>
-          notification.metrics.axis == Axis.horizontal,
-      child: SingleChildScrollView(
-        controller: _horizontalController,
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(width: width, child: child),
-      ),
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(width: width, child: child),
+    );
+    if (!showIndicator) return table;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Flexible(child: table),
+        _HorizontalScrollIndicator(
+          controller: _horizontalController,
+          viewportWidth: viewportWidth,
+          contentWidth: width,
+          color: cs.outline,
+          trackColor: cs.outlineVariant.withValues(alpha: 0.55),
+        ),
+      ],
     );
   }
 
@@ -249,10 +258,13 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = math.max(totalWidth, constraints.maxWidth);
+        final canScrollHorizontally = totalWidth > constraints.maxWidth + 0.5;
         if (widget.embedded) {
           return _horizontalTable(
+            cs: cs,
             width: width,
-            showThumb: false,
+            viewportWidth: constraints.maxWidth,
+            showIndicator: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -265,34 +277,157 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
           );
         }
 
-        final height = constraints.maxHeight.isFinite
-            ? math.max(0.0, constraints.maxHeight)
-            : 360.0;
-        return _horizontalTable(
-          width: width,
-          showThumb: true,
-          child: SizedBox(
-            height: height,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _headerRow(cs, headers, widths),
-                Expanded(
-                  child: Scrollbar(
-                    controller: _verticalController,
-                    child: ListView.builder(
-                      controller: _verticalController,
-                      itemCount: rows.length,
-                      itemBuilder: (context, index) =>
-                          _dataRow(cs, headers, rows[index], widths, index),
-                    ),
+        final table = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _headerRow(cs, headers, widths),
+            Flexible(
+              child: Scrollbar(
+                controller: _verticalController,
+                child: SingleChildScrollView(
+                  controller: _verticalController,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < rows.length; i++)
+                        _dataRow(cs, headers, rows[i], widths, i),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
+        );
+
+        return _horizontalTable(
+          cs: cs,
+          width: width,
+          viewportWidth: constraints.maxWidth,
+          showIndicator: canScrollHorizontally,
+          child: table,
         );
       },
+    );
+  }
+}
+
+/// A compact, always-visible horizontal scrollbar for the wide data table.
+///
+/// Flutter's overlay scrollbar is easy to miss in a bottom sheet and can be
+/// clipped by the table border. This version also supports dragging and tapping
+/// the track, so the hidden columns are discoverable without guessing.
+class _HorizontalScrollIndicator extends StatelessWidget {
+  final ScrollController controller;
+  final double viewportWidth;
+  final double contentWidth;
+  final Color color;
+  final Color trackColor;
+
+  const _HorizontalScrollIndicator({
+    required this.controller,
+    required this.viewportWidth,
+    required this.contentWidth,
+    required this.color,
+    required this.trackColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('script-table-horizontal-scrollbar'),
+      height: 14,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trackWidth = constraints.maxWidth - 16;
+          if (trackWidth <= 0 || contentWidth <= viewportWidth) {
+            return const SizedBox.shrink();
+          }
+          return AnimatedBuilder(
+            animation: controller,
+            builder: (context, _) {
+              final position = controller.hasClients
+                  ? controller.position
+                  : null;
+              final hasMetrics =
+                  position != null &&
+                  position.hasViewportDimension &&
+                  position.hasContentDimensions;
+              final viewport = hasMetrics
+                  ? position.viewportDimension
+                  : viewportWidth;
+              final maxExtent = hasMetrics
+                  ? position.maxScrollExtent
+                  : math.max(0.0, contentWidth - viewportWidth);
+              final offset = hasMetrics ? position.pixels : 0.0;
+              final thumbWidth = math
+                  .max(32.0, trackWidth * (viewport / contentWidth))
+                  .clamp(32.0, trackWidth)
+                  .toDouble();
+              final travel = math.max(0.0, trackWidth - thumbWidth);
+              final left = maxExtent <= 0
+                  ? 0.0
+                  : travel * (offset / maxExtent).clamp(0.0, 1.0);
+
+              void jumpTo(double fraction) {
+                if (!controller.hasClients || maxExtent <= 0) return;
+                controller.jumpTo(maxExtent * fraction.clamp(0.0, 1.0));
+              }
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) {
+                  if (travel <= 0) return;
+                  jumpTo(
+                    (details.localPosition.dx - 8 - thumbWidth / 2) / travel,
+                  );
+                },
+                onHorizontalDragUpdate: (details) {
+                  if (travel <= 0) return;
+                  final currentOffset =
+                      controller.hasClients &&
+                          controller.position.hasContentDimensions
+                      ? controller.offset
+                      : 0.0;
+                  jumpTo(currentOffset / maxExtent + details.delta.dx / travel);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        top: 6,
+                        height: 2,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: trackColor,
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: left,
+                        top: 4,
+                        width: thumbWidth,
+                        height: 6,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

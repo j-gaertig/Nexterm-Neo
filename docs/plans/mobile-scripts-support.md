@@ -175,14 +175,17 @@ Server-Kontextmenü → **Run Script** öffnet das Auswahl-Sheet:
 - Source-Scripts und Scripts anderer Organisationen werden korrekt berücksichtigt; geheime
   Scripts werden nicht angeboten.
 - Bei mehreren Server-Identitäten erscheint die Identity-Auswahl als quadratischer Button in
-  derselben Zeile wie Suche und Filter. Die Auswahl bleibt beim Filtern und Suchen erhalten.
-  Der Footer enthält ausschließlich den **Run**-Button; der ausgewählte Eintrag wird nur durch
-  seine gefüllte Zeile markiert, nicht durch einen Haken oder eine zweite Textzeile.
+  derselben Zeile wie Suche und Filter. Der Button zeigt die Initialen der aktiven Identity
+  (z. B. `DA`); der volle Name steht im Header-Untertitel und im Tooltip. Die Auswahl bleibt beim
+  Filtern und Suchen erhalten. Der Footer enthält ausschließlich den **Run**-Button; der
+  ausgewählte Eintrag wird nur durch seine gefüllte Zeile markiert, nicht durch einen Haken oder
+  eine zweite Textzeile.
 - Leerer Zustand nennt den reinen Ausführungsumfang und verweist für die Verwaltung auf den
   Web-Client.
-- Auf kleinen Displays mit großer Schrift und geöffneter Tastatur wird das Sheet kompakt:
-  Titel und Drag-Handle entfallen, Suche, Kompatibilitätsfilter, Identity-Button, Liste und
-  **Run** bleiben nutzbar. Die Höhe bleibt oberhalb der Tastatur.
+- Auf kleinen Displays mit großer Schrift und geöffneter Tastatur wird das Sheet kompakt: Der
+  Titel und der Schließen-Button bleiben sichtbar, nur der Server-/Identity-Untertitel entfällt.
+  Suche, Kompatibilitätsfilter, Identity-Button, Liste und **Run** bleiben nutzbar; die Höhe
+  bleibt oberhalb der Tastatur.
 
 ### 4.2 Ausführung
 
@@ -195,11 +198,14 @@ Sessions-Tab:
   - kollabiert: Script-/Server-Name, Status, aktueller Step und die neueste Notice,
   - expandiert: nummerierte Step-Liste (erledigt/aktiv/fehlgeschlagen), Progress, Notices und
     Aktionen. Die komplette Kopfzeile öffnet den Dock; zusätzlich gibt es einen gut sichtbaren
-    **Details**-Text. Es gibt keine Status-/Step-Icons im Dock.
+    **Details**-Text mit funktionalem Chevron. Der aktive Step wird beim Aufklappen und bei
+    jedem Step-Wechsel automatisch in den sichtbaren Bereich gescrollt. Es gibt keine
+    Status-/Step-Icons im Dock.
 - Aktionen sind auf schmalen Displays und bei großer Schrift als volle, gestapelte Buttons
   umgesetzt: **Stop** (Bestätigung, dann `input_cancelled`), **Reconnect** (nur im
-  Disconnected-Zustand), **Close** (Bestätigung bei laufendem Script; die Session wird erst
-  serverseitig geschlossen, dann lokal entfernt).
+  Disconnected-Zustand) sowie **Close** für beendete Scripts. Während ein Script läuft,
+  verbindet oder aufgetrennt ist, gibt es zusätzlich **Close session**; bei laufenden Scripts
+  mit Bestätigung. Die Session wird erst serverseitig geschlossen, dann lokal entfernt.
 - **Cancelled** ist ein eigener Zustand: Ein vom Benutzer gestopptes Script wird als
   `Stopped`/`cancelled` dargestellt, nicht als Fehler. Exit-Code und Error-Text bleiben leer.
   Der Cancel-Intent überlebt einen manuellen Reconnect; replayed Steps/Prompts können ihn
@@ -211,13 +217,14 @@ Sessions-Tab:
 
 - Ergebnis-Dialoge sind mobile Bottom-Sheets mit 20-px-Radius, Grabber und `SafeArea`. Titel
   enthalten weder dekorative Icons noch Script-/Server-/Step-Untertitel.
-- Aktionen in den Script-Sheets sind grundsätzlich volle, gestapelte Buttons mit mindestens
-  48 px Höhe und einzeiligen Labels. Copy-/CSV-Buttons sind dadurch auch bei großer Schrift
-  vollständig lesbar.
-- Tabellen haben Innenabstand, einen gerundeten Rahmen und einen sichtbaren horizontalen
-  Scrollbalken. Auf großen Screens bleibt der Header beim vertikalen Scrollen stehen; bei sehr
-  großer Schrift scrollt das gesamte Sheet, damit nichts abgeschnitten wird. Zeilen-/Spalten-
-  Zähler werden nicht angezeigt.
+- Aktionen in den Script-Sheets und Bestätigungsdialogen sind grundsätzlich volle, gestapelte
+  Buttons mit mindestens 48 px Höhe und einzeiligen Labels. Copy-/CSV-Buttons sind dadurch auch
+  bei großer Schrift vollständig lesbar.
+- Tabellen folgen in der Höhe ihrem Inhalt bis zu einer Obergrenze und füllen den Sheet-Rahmen
+  nicht mit leerem Raum. Sie haben Innenabstand, einen gerundeten Rahmen und einen sichtbaren,
+  ziehbaren horizontalen Scrollbalken. Auf großen Screens bleibt der Header beim vertikalen
+  Scrollen stehen; bei sehr großer Schrift scrollt das gesamte Sheet, damit nichts abgeschnitten
+  wird. Zeilen-/Spalten-Zähler werden nicht angezeigt.
 - Es ist immer nur ein Sheet geöffnet; weitere Prompts warten in der Controller-Queue.
 - System-Back und programmatisches Schließen sind gegen stille Dismissals abgesichert.
   Ein Generationstoken verwirft Futures bereits programmatisch geschlossener Sheets.
@@ -245,10 +252,11 @@ Sessions-Tab:
 | Bereich | Datei |
 |---|---|
 | Protokoll-/Controller-Zustand, Prompt-Queue, Cancel, Reconnect-Reset | `mobile/test/screens/renderers/script_execution_controller_test.dart` |
-| Dialoge, Back-Schutz, Stop-Bestätigung, Inline-Copy, große Schrift, kleine Displays | `mobile/test/screens/widgets/script_sheets_test.dart` |
-| Auswahl-Sheet: flache Liste, Kompatibilitätsfilter, Suche, Identities, Fehler/Retry, Tastatur | `mobile/test/screens/widgets/run_script_sheet_test.dart` |
+| Dialoge, Back-Schutz, Stop-Bestätigung, gestapelte Bestätigungsaktionen, Inline-Copy, große Schrift, kleine Displays | `mobile/test/screens/widgets/script_sheets_test.dart` |
+| Auswahl-Sheet: flache Liste, Kompatibilitätsfilter, Suche, Identity-Initialen, Fehler/Retry, Tastatur | `mobile/test/screens/widgets/run_script_sheet_test.dart` |
 | Session-Pill: gemessene Größe und Safe-Area-Clamping | `mobile/test/screens/active_sessions_screen_test.dart` |
-| Execution Dock in allen Phasen | `mobile/test/screens/widgets/script_execution_dock_test.dart` |
+| Execution Dock in allen Phasen, aktiver Step, Close session, große Schrift | `mobile/test/screens/widgets/script_execution_dock_test.dart` |
+| Tabellenhöhe und ziehbarer horizontaler Scrollbalken | `mobile/test/screens/widgets/script_sheets_test.dart` |
 | Cache, OS-Erkennung und Filter-Defaults | `mobile/test/services/script_manager_test.dart` |
 | Runtime-Spiegelung und Session-Lifecycle | `mobile/test/services/session_manager_script_test.dart` |
 | CSV-Parsing | `mobile/test/utils/script_csv_test.dart` |
@@ -257,7 +265,7 @@ Sessions-Tab:
 
 Verifikationsstand:
 
-- `flutter test`: 193 Tests erfolgreich.
+- `flutter test`: 198 Tests erfolgreich.
 - `node --test server/tests/*.test.js`: 87 Tests erfolgreich.
 - `flutter analyze`: keine Befunde in den Script-Dateien; verbleibende Hinweise sind bestehende,
   unabhängige Warnungen/Infos.
