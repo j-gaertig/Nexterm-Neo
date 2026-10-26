@@ -267,7 +267,7 @@ Fade zurücksetzen; die Session bleibt dadurch nicht unsichtbar im Hintergrund.
 
 Verifikationsstand:
 
-- `flutter test`: 201 Tests erfolgreich.
+- `flutter test`: 212 Tests erfolgreich.
 - `node --test server/tests/*.test.js`: 87 Tests erfolgreich.
 - `flutter analyze`: keine Befunde in den Script-Dateien; verbleibende Hinweise sind bestehende,
   unabhängige Warnungen/Infos.
