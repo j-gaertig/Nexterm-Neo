@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_icons.dart';
 import 'package:native_glass_navbar/native_glass_navbar.dart';
+import '../services/screen_lock_service.dart';
 import '../services/session_manager.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/snippet_manager.dart';
 import '../utils/ai_manager.dart';
+import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
@@ -27,6 +29,8 @@ class MainNavigationPage extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
+  final ScreenLockSettings screenLockSettings;
+  final ScreenLockService screenLockService;
 
   const MainNavigationPage({
     super.key,
@@ -38,6 +42,8 @@ class MainNavigationPage extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
+    required this.screenLockSettings,
+    required this.screenLockService,
   });
 
   @override
@@ -145,6 +151,8 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         terminalSettings: widget.terminalSettings,
         sftpSettings: widget.sftpSettings,
         serverViewSettings: widget.serverViewSettings,
+        screenLockSettings: widget.screenLockSettings,
+        screenLockService: widget.screenLockService,
       ),
     ];
 
