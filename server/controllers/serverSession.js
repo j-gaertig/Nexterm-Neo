@@ -12,9 +12,16 @@ const { getOrganizationAuditSettingsInternal, createAuditLog, AUDIT_ACTIONS, RES
 const { resolveIdentity } = require("../utils/identityResolver");
 const { Permission } = require("../permissions/registry");
 const Organization = require('../models/Organization');
+const OrganizationMember = require("../models/OrganizationMember");
+const { getScript } = require("./script");
 const logger = require("../utils/logger");
 const stateBroadcaster = require("../lib/StateBroadcaster");
 const reconnectOperations = new Map();
+const {
+    getSessionAccessError,
+    getSessionShareError,
+    getScriptConnectionError,
+} = require("../lib/sessionAuthorization");
 
 const ENTRY_TYPE_TO_AUDIT_ACTION = {
     'ssh': AUDIT_ACTIONS.SSH_CONNECT,
@@ -87,6 +94,9 @@ const createSession = async ({
         return { code: 404, message: "Entry not found" };
     }
 
+    const scriptConnectionError = getScriptConnectionError(entry, type, scriptId);
+    if (scriptConnectionError) return scriptConnectionError;
+
     const requiredPermission = getRequiredConnectPermission(entry, type, scriptId);
     const accessResult = await validateEntryAccess(accountId, entry, "Access denied", requiredPermission);
     if (!accessResult.valid) {
@@ -120,6 +130,14 @@ const createSession = async ({
         }
     }
 
+    let scriptName = null;
+    if (scriptId) {
+        const memberships = await OrganizationMember.findAll({ where: { accountId, status: "active" } });
+        const script = await getScript(accountId, scriptId, null, memberships.map(m => m.organizationId));
+        if (script?.code) return { code: script.code, message: script.message };
+        scriptName = script.name;
+    }
+
     const result = await resolveIdentity(entry, identityId, directIdentity, accountId);
     const identity = result?.identity !== undefined ? result.identity : result;
 
@@ -150,6 +168,7 @@ const createSession = async ({
         directIdentity: directIdentity || null,
         displayDpi,
         scriptId: scriptId || null,
+        scriptName,
         startPath: startPath || null,
         renderer,
     };
@@ -173,7 +192,8 @@ const createSession = async ({
     }
 
     createConnectionForSession(session.sessionId, accountId)
-        .then(() => {
+        .then((result) => {
+            if (result?.cancelled) return;
             logger.info("Session connection established", { sessionId: session.sessionId, entryId, type: entry.type });
         })
         .catch((error) => {
@@ -284,7 +304,9 @@ const getSessions = async (accountId, tabId = null, browserId = null) => {
     });
 };
 
-const hibernateSession = (sessionId) => {
+const hibernateSession = (accountId, sessionId) => {
+    const { error } = validateSessionOwnership(accountId, sessionId);
+    if (error) return error;
     const success = SessionManager.hibernate(sessionId);
     if (success) {
         return { message: "Session hibernated" };
@@ -292,7 +314,9 @@ const hibernateSession = (sessionId) => {
     return { code: 404, message: "Session not found" };
 };
 
-const resumeSession = (sessionId, tabId = null, browserId = null) => {
+const resumeSession = (accountId, sessionId, tabId = null, browserId = null) => {
+    const { error } = validateSessionOwnership(accountId, sessionId);
+    if (error) return error;
     const success = SessionManager.resume(sessionId, tabId, browserId);
     if (success) {
         return { message: "Session resumed" };
@@ -300,7 +324,9 @@ const resumeSession = (sessionId, tabId = null, browserId = null) => {
     return { code: 404, message: "Session not found" };
 };
 
-const deleteSession = (sessionId) => {
+const deleteSession = (accountId, sessionId) => {
+    const { error } = validateSessionOwnership(accountId, sessionId);
+    if (error) return error;
     const success = SessionManager.remove(sessionId);
     if (success) {
         return { message: "Session deleted" };
@@ -351,6 +377,7 @@ const getSession = async (accountId, sessionId) => {
         organizationId: entry.organizationId || null,
         organizationName,
         scriptId: session.configuration.scriptId || undefined,
+        scriptName: session.configuration.scriptName || undefined,
         shareId: session.shareId || null,
         shareWritable: session.shareWritable || false,
     };
@@ -358,14 +385,15 @@ const getSession = async (accountId, sessionId) => {
 
 const validateSessionOwnership = (accountId, sessionId) => {
     const session = SessionManager.get(sessionId);
-    if (!session) return { error: { code: 404, message: "Session not found" } };
-    if (session.accountId !== accountId) return { error: { code: 403, message: "Access denied" } };
-    return { session };
+    const error = getSessionAccessError(session, accountId);
+    return error ? { error } : { session };
 };
 
 const startSharing = (accountId, sessionId, writable = false) => {
-    const { error } = validateSessionOwnership(accountId, sessionId);
+    const { session, error } = validateSessionOwnership(accountId, sessionId);
     if (error) return error;
+    const shareError = getSessionShareError(session);
+    if (shareError) return shareError;
     return { shareId: SessionManager.startSharing(sessionId, writable), writable };
 };
 

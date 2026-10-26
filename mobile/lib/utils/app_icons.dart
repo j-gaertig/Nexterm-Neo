@@ -50,6 +50,8 @@ class AppIcons {
   static const IconData downloadOutline = LucideIcons.download;
   static const IconData dragHorizontalVariant = LucideIcons.gripHorizontal;
   static const IconData exitToApp = LucideIcons.logOut;
+  static const IconData eyeOutline = LucideIcons.eye;
+  static const IconData eyeOffOutline = LucideIcons.eyeOff;
   static const IconData fileCodeOutline = LucideIcons.fileCode;
   static const IconData fileCogOutline = LucideIcons.fileCog;
   static const IconData fileDocumentOutline = LucideIcons.fileText;
@@ -62,6 +64,7 @@ class AppIcons {
   static const IconData filePdfBox = LucideIcons.fileType;
   static const IconData fileUploadOutline = LucideIcons.fileUp;
   static const IconData fileVideoOutline = LucideIcons.fileVideo;
+  static const IconData filterVariant = LucideIcons.filter;
   static const IconData fitToScreen = LucideIcons.maximize;
   static const IconData flashOff = LucideIcons.zapOff;
   static const IconData flashOn = LucideIcons.zap;

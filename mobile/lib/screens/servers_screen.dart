@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../utils/app_icons.dart';
 import '../models/server.dart';
 import '../models/server_folder.dart';
+import '../services/script_manager.dart';
 import '../services/server_service.dart';
 import '../services/session_manager.dart';
+import '../utils/api_exception.dart';
 import '../utils/auth_manager.dart';
 import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
@@ -43,6 +45,7 @@ class _ServersScreenState extends State<ServersScreen> {
   bool _hasText = false;
   final Set<int> _selectedTags = {};
   List<Tag> _allTags = [];
+  late final ScriptManager _scriptManager;
 
   String _folderKey(ServerFolder folder) {
     final id = folder.id;
@@ -68,6 +71,7 @@ class _ServersScreenState extends State<ServersScreen> {
     super.initState();
     _hasText = _search.text.isNotEmpty;
     _search.addListener(_onSearch);
+    _scriptManager = ScriptManager();
     _initStateManager();
   }
 
@@ -76,6 +80,7 @@ class _ServersScreenState extends State<ServersScreen> {
     _debounce?.cancel();
     _search.removeListener(_onSearch);
     _search.dispose();
+    _scriptManager.dispose();
     super.dispose();
   }
 
@@ -802,12 +807,38 @@ class _ServersScreenState extends State<ServersScreen> {
     );
   }
 
-  Future<void> _initiateConnection(Server server,
-      {ConnectionType type = ConnectionType.terminal, Map<String, dynamic>? directIdentity, RunScriptSelection? script}) async {
+  ServerFolder? _organizationForServer(Server server) {
+    final id = _serverIdInt(server.id);
+    if (id == null) return null;
+    return _findOrganizationForServer(id, folders);
+  }
+
+  int? _organizationIdFromFolder(ServerFolder? folder) {
+    if (folder == null) return null;
+    final direct = folder.organizationId;
+    if (direct is int) return direct;
+    if (direct != null) {
+      final parsed = int.tryParse(direct.toString());
+      if (parsed != null) return parsed;
+    }
+    final match = RegExp(r'(\d+)$').firstMatch(folder.id.toString());
+    return match != null ? int.tryParse(match.group(1)!) : null;
+  }
+
+  Future<void> _initiateConnection(
+    Server server, {
+    ConnectionType type = ConnectionType.terminal,
+    Map<String, dynamic>? directIdentity,
+    RunScriptSelection? script,
+  }) async {
     if (server.disabled) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${server.name} is disabled'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
@@ -834,22 +865,42 @@ class _ServersScreenState extends State<ServersScreen> {
         switch (type) {
           case ConnectionType.guacamole:
             await widget.sessionManager.createGuacSession(
-              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+              token: token,
+              server: server,
+              directIdentity: directIdentity,
+              connectionReason: connectionReason,
+            );
           case ConnectionType.terminal:
             await widget.sessionManager.createTerminalSession(
-              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+              token: token,
+              server: server,
+              directIdentity: directIdentity,
+              connectionReason: connectionReason,
+            );
           case ConnectionType.sftp:
             await widget.sessionManager.createSftpSession(
-              token: token, server: server, directIdentity: directIdentity, connectionReason: connectionReason);
+              token: token,
+              server: server,
+              directIdentity: directIdentity,
+              connectionReason: connectionReason,
+            );
         }
       }
       if (mounted) widget.onSwitchToSessions?.call();
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString().toLowerCase().contains('disabled')
+      final raw = e.toString();
+      final msg = raw.toLowerCase().contains('disabled')
           ? '${server.name} is disabled'
-          : 'Failed to connect: $e';
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating));
+          : friendlyApiError(
+              e,
+              fallback: script != null
+                  ? 'Failed to start the script on ${server.name}.'
+                  : 'Failed to connect to ${server.name}.',
+            );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      );
     }
   }
 
@@ -857,26 +908,47 @@ class _ServersScreenState extends State<ServersScreen> {
   /// script (mirrors the web `runScript` → `initiateConnection({scriptId})`).
   Future<void> _runScript(Server server) async {
     if (server.disabled) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${server.name} is disabled'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     if (server.isStopped) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} is ${server.isPve ? "not running" : "offline"}'),
-        behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${server.name} is ${server.isPve ? "not running" : "offline"}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     final token = widget.authManager.sessionToken;
     if (token == null) return;
     if (server.identities == null || server.identities!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} has no identity configured for script execution'),
-        behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${server.name} has no identity configured for script execution',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
-    final selection = await showRunScriptSheet(context, server, token);
+    final organization = _organizationForServer(server);
+    final selection = await showRunScriptSheet(
+      context,
+      server,
+      token,
+      manager: _scriptManager,
+      organizationId: _organizationIdFromFolder(organization),
+    );
     if (selection == null || !mounted) return;
 
     await _initiateConnection(server, script: selection);

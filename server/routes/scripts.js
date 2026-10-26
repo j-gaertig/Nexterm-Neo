@@ -57,7 +57,9 @@ app.get("/", async (req, res) => {
  */
 app.get("/all", async (req, res) => {
     try {
-        const memberships = await OrganizationMember.findAll({ where: { accountId: req.user.id } });
+        const memberships = await OrganizationMember.findAll({
+            where: { accountId: req.user.id, status: "active" },
+        });
         const organizationIds = memberships.map(m => m.organizationId);
         
         res.json(await listAllAccessibleScripts(req.user.id, organizationIds));

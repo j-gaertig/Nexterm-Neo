@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/api_client.dart';
+import '../utils/api_exception.dart';
 
 class ConnectionService {
   static String? _deviceId;
@@ -11,24 +12,36 @@ class ConnectionService {
     final prefs = await SharedPreferences.getInstance();
     _deviceId = prefs.getString('nexterm_device_id');
     if (_deviceId == null) {
-      _deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}_${_randomString(9)}';
+      _deviceId =
+          'device_${DateTime.now().millisecondsSinceEpoch}_${_randomString(9)}';
       await prefs.setString('nexterm_device_id', _deviceId!);
     }
     return _deviceId!;
   }
 
-  static String _getAppInstanceId() =>
-      _appInstanceId ??= 'app_${DateTime.now().millisecondsSinceEpoch}_${_randomString(9)}';
+  static String _getAppInstanceId() => _appInstanceId ??=
+      'app_${DateTime.now().millisecondsSinceEpoch}_${_randomString(9)}';
 
   static String _randomString(int length) {
     const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
     final now = DateTime.now().millisecondsSinceEpoch;
-    return String.fromCharCodes(List.generate(length, (i) => chars.codeUnitAt((now + i * 37) % chars.length)));
+    return String.fromCharCodes(
+      List.generate(
+        length,
+        (i) => chars.codeUnitAt((now + i * 37) % chars.length),
+      ),
+    );
   }
 
   static Future<ConnectionSession> createSession({
-    required String token, required int entryId, int? identityId, String? connectionReason, String? type,
-    Map<String, dynamic>? directIdentity, String? startPath, int? scriptId,
+    required String token,
+    required int entryId,
+    int? identityId,
+    String? connectionReason,
+    String? type,
+    Map<String, dynamic>? directIdentity,
+    String? startPath,
+    int? scriptId,
   }) async {
     final body = <String, dynamic>{
       'entryId': entryId,
@@ -42,21 +55,49 @@ class ConnectionService {
       if (scriptId != null) 'scriptId': scriptId,
     };
 
-    final response = await ApiClient.post('/connections', body: body, token: token);
+    final response = await ApiClient.post(
+      '/connections',
+      body: body,
+      token: token,
+    );
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = json.decode(response.body);
-      return ConnectionSession(sessionId: data['sessionId'] as String, entryId: entryId, identityId: identityId);
+      return ConnectionSession(
+        sessionId: data['sessionId'] as String,
+        entryId: entryId,
+        identityId: identityId,
+      );
     }
-    throw Exception('Failed to create session: ${response.statusCode} - ${response.body}');
+    throw ApiException.fromResponse(
+      response,
+      fallback: 'Could not start the connection (HTTP ${response.statusCode})',
+    );
   }
 
-  static Future<void> deleteSession({required String token, required String sessionId}) async {
-    try {
-      await ApiClient.delete('/connections/$sessionId', token: token);
-    } catch (_) {}
+  /// Deletes a session on the server. A 404 means the session is already gone
+  /// (for example after a server restart) and is treated as success; every
+  /// other failure is surfaced so the caller can keep the local session alive.
+  static Future<void> deleteSession({
+    required String token,
+    required String sessionId,
+  }) async {
+    final response = await ApiClient.delete(
+      '/connections/$sessionId',
+      token: token,
+    );
+    if (response.statusCode == 404 ||
+        (response.statusCode >= 200 && response.statusCode < 300)) {
+      return;
+    }
+    throw ApiException.fromResponse(
+      response,
+      fallback: 'Could not close the session (HTTP ${response.statusCode})',
+    );
   }
 
-  static Future<List<Map<String, dynamic>>> listSessions({required String token}) async {
+  static Future<List<Map<String, dynamic>>> listSessions({
+    required String token,
+  }) async {
     final browserId = await _getDeviceId();
     final tabId = _getAppInstanceId();
     final response = await ApiClient.get(
@@ -70,8 +111,14 @@ class ConnectionService {
     throw Exception('Failed to list sessions: ${response.statusCode}');
   }
 
-  static Future<void> hibernateSession({required String token, required String sessionId}) async {
-    final response = await ApiClient.post('/connections/$sessionId/hibernate', token: token);
+  static Future<void> hibernateSession({
+    required String token,
+    required String sessionId,
+  }) async {
+    final response = await ApiClient.post(
+      '/connections/$sessionId/hibernate',
+      token: token,
+    );
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Failed to hibernate session: ${response.statusCode}');
     }
@@ -98,11 +145,16 @@ class ConnectionService {
       token: token,
     );
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to paste password: ${response.statusCode} - ${response.body}');
+      throw Exception(
+        'Failed to paste password: ${response.statusCode} - ${response.body}',
+      );
     }
   }
 
-  static Future<void> resumeSession({required String token, required String sessionId}) async {
+  static Future<void> resumeSession({
+    required String token,
+    required String sessionId,
+  }) async {
     final response = await ApiClient.post(
       '/connections/$sessionId/resume',
       body: {'tabId': _getAppInstanceId(), 'browserId': await _getDeviceId()},
@@ -119,5 +171,9 @@ class ConnectionSession {
   final int entryId;
   final int? identityId;
 
-  const ConnectionSession({required this.sessionId, required this.entryId, this.identityId});
+  const ConnectionSession({
+    required this.sessionId,
+    required this.entryId,
+    this.identityId,
+  });
 }

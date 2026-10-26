@@ -30,7 +30,17 @@ class ScriptSheetRequest {
   final ScriptTableEvent? table;
   final ScriptMessageBoxEvent? messageBox;
 
-  const ScriptSheetRequest({this.prompt, this.summary, this.table, this.messageBox});
+  const ScriptSheetRequest({
+    this.prompt,
+    this.summary,
+    this.table,
+    this.messageBox,
+  });
 
   bool get isPrompt => prompt != null;
+  bool get isSummary => summary != null;
+  bool get isTable => table != null;
+  bool get isMessageBox => messageBox != null;
+  bool get isInformational =>
+      summary != null || table != null || messageBox != null;
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../models/script.dart';
 import '../utils/api_client.dart';
+import '../utils/api_exception.dart';
 
 /// Loads scripts for execution. Mirrors the web `ScriptContext`, which merges
 /// `/scripts/all` (personal + organization memberships) with the source-synced
@@ -17,7 +18,10 @@ class ScriptService {
           .map(Script.fromJson)
           .toList();
     }
-    throw Exception('Failed to load scripts: ${response.statusCode}');
+    throw ApiException.fromResponse(
+      response,
+      fallback: 'Could not load scripts (HTTP ${response.statusCode})',
+    );
   }
 
   static Future<List<Script>> getScripts(String token) =>

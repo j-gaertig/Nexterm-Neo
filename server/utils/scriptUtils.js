@@ -30,7 +30,7 @@ const checkSudoPrompt = (output) => {
     const sudoRequired = /sudo:\s*a (password|terminal) is required/i.test(text);
     if (!promptHit && !sudoRequired) return null;
     const m = text.match(/\[sudo\]\s+(?:password\s+for|passwort\s+f\u00fcr)\s+([^:]+):/i);
-    return { variable: "SUDO_PASSWORD", prompt: `Enter sudo password for ${m?.[1] || "user"}`, default: "", isSudoPassword: true, type: "password" };
+    return { variable: "SUDO_PASSWORD", prompt: `Enter sudo password for ${m?.[1] || "user"}`, default: "", isSudoPassword: true };
 };
 
 const transformWindowsDataDirective = (type, title, data) => {

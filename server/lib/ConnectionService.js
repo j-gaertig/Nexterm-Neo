@@ -119,9 +119,10 @@ const createConnectionForSession = async (sessionId, accountId) => {
 
     let script = null;
     if (scriptId) {
-        const memberships = await OrganizationMember.findAll({ where: { accountId } });
+        if (type || protocol !== "ssh") throw new Error("Scripts can only be executed on SSH connections");
+        const memberships = await OrganizationMember.findAll({ where: { accountId, status: "active" } });
         script = await getScript(accountId, scriptId, null, memberships.map(m => m.organizationId));
-        if (!script) throw new Error("Script not found");
+        if (!script || script.code) throw new Error(script?.message || "Script not found");
     }
 
     if (type === "web") return prepareWebSession(sessionId, entry, identity, organizationId);
@@ -270,8 +271,12 @@ const createSSHConnectionForSession = async (sessionId, entry, identity, organiz
         const openSsh = () => openEngineSession(
             sessionId, SessionType.SSH, host, port, params, jumpHosts, entry.config?.engineId
         );
-
+        const sessionGone = () => session._removing || SessionManager.get(sessionId) !== session;
         let dataSocket;
+        const discardAttempt = () => {
+            try { dataSocket?.destroy(); } catch {}
+            try { controlPlane.closeSession(sessionId, entry.config?.engineId || null); } catch {}
+        };
         try {
             if (getPreOrder(entry) === "remote-first") {
                 dataSocket = await openSsh();
@@ -290,7 +295,19 @@ const createSSHConnectionForSession = async (sessionId, entry, identity, organiz
             throw err;
         }
 
+        // The session can be deleted while the SSH setup is still in flight.
+        // Do not open the script wrapper or attach an orphaned connection.
+        if (sessionGone()) {
+            discardAttempt();
+            return { success: false, cancelled: true };
+        }
+
         await SessionManager.initRecording(sessionId, organizationId);
+
+        if (sessionGone()) {
+            discardAttempt();
+            return { success: false, cancelled: true };
+        }
 
         const logStream = createDecodedTextStream((text) => SessionManager.appendLog(sessionId, text));
         dataSocket.on("data", logStream.write);
@@ -314,13 +331,19 @@ const createSSHConnectionForSession = async (sessionId, entry, identity, organiz
             scriptLayer.start();
         }
 
-        SessionManager.setConnection(sessionId, {
+        const attached = SessionManager.setConnection(sessionId, {
             dataSocket,
             sessionId,
             type: "ssh",
             auditLogId: session.auditLogId,
             scriptLayer,
         });
+        if (!attached) {
+            scriptLayer?.destroy();
+            logStream.end();
+            discardAttempt();
+            return { success: false, cancelled: true };
+        }
 
         if (!script && session.configuration.startPath) {
             let raw = String(session.configuration.startPath);

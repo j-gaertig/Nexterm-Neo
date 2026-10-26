@@ -1,7 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import '../utils/app_icons.dart';
 
 import '../services/session_manager.dart';
+import '../models/script_runtime.dart';
+import '../utils/api_exception.dart';
 import '../utils/auth_manager.dart';
 import '../utils/ai_manager.dart';
 import '../utils/snippet_manager.dart';
@@ -12,6 +16,23 @@ import 'renderers/sftp_renderer.dart';
 import 'renderers/terminal_renderer.dart';
 import 'renderers/script_renderer.dart';
 
+/// Keeps the floating session pill inside the measured screen minus the safe
+/// insets. The pill size is measured because action buttons and text scaling
+/// can make it wider/taller than the old fixed 160x48 assumption.
+@visibleForTesting
+Offset clampSessionPillOffset(
+  Offset position, {
+  required Size pillSize,
+  required Size screen,
+  required EdgeInsets padding,
+}) {
+  final minX = padding.left;
+  final maxX = math.max(minX, screen.width - padding.right - pillSize.width);
+  final minY = padding.top + 4;
+  final maxY = math.max(minY, screen.height - padding.bottom - pillSize.height);
+  return Offset(position.dx.clamp(minX, maxX), position.dy.clamp(minY, maxY));
+}
+
 class ActiveSessionsScreen extends StatefulWidget {
   final SessionManager sessionManager;
   final AuthManager authManager;
@@ -20,6 +41,11 @@ class ActiveSessionsScreen extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final VoidCallback? onExitFullscreen;
+
+  /// Whether the sessions tab is currently visible. Script prompts are only
+  /// presented for the active, visible session; background prompts are surfaced
+  /// through the navigation attention banner.
+  final bool isVisible;
 
   const ActiveSessionsScreen({
     super.key,
@@ -30,6 +56,7 @@ class ActiveSessionsScreen extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     this.onExitFullscreen,
+    this.isVisible = false,
   });
 
   @override
@@ -37,9 +64,25 @@ class ActiveSessionsScreen extends StatefulWidget {
 }
 
 class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
+  static const Size _fallbackPillSize = Size(160, 48);
+
   double? _pillX;
   double _pillY = 0;
+  final GlobalKey _pillKey = GlobalKey();
+  Size _pillSize = Size.zero;
   final ValueNotifier<bool> _closingAll = ValueNotifier(false);
+
+  Size get _effectivePillSize =>
+      _pillSize.isEmpty ? _fallbackPillSize : _pillSize;
+
+  void _schedulePillMeasurement() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = _pillKey.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.hasSize || box.size == _pillSize) return;
+      setState(() => _pillSize = box.size);
+    });
+  }
 
   @override
   void initState() {
@@ -60,11 +103,55 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _closeSession(String sessionId) async {
+  Future<bool> _closeSession(
+    String sessionId, {
+    BuildContext? dialogContext,
+  }) async {
     final token = widget.authManager.sessionToken;
-    if (token == null) return;
+    if (token == null) return false;
+    final session = widget.sessionManager.getSession(sessionId);
+    if (session == null) return true;
+
+    if (session.isScriptRunning) {
+      final close = await showDialog<bool>(
+        context: dialogContext ?? context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Close running script?'),
+          content: Text(
+            '${session.scriptName ?? 'This script'} is still running and will be interrupted.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep running'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Close session'),
+            ),
+          ],
+        ),
+      );
+      if (close != true) return false;
+    }
+
     FocusManager.instance.primaryFocus?.unfocus();
-    await widget.sessionManager.closeSession(sessionId, token);
+    try {
+      await widget.sessionManager.closeSession(sessionId, token);
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyApiError(error, fallback: 'Could not close the session.'),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
   }
 
   Future<void> _closeAllSessions(BuildContext sheetContext) async {
@@ -73,13 +160,20 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     final token = widget.authManager.sessionToken;
     if (token == null || sm.sessions.isEmpty) return;
     final count = sm.sessions.length;
+    final runningScripts = sm.sessions
+        .where((session) => session.isScriptRunning)
+        .length;
     final confirmed = await showDialog<bool>(
       context: sheetContext,
       builder: (dialogCtx) {
         final cs = Theme.of(dialogCtx).colorScheme;
         return AlertDialog(
           title: const Text('Close all sessions?'),
-          content: Text('Close $count sessions? This cannot be undone.'),
+          content: Text(
+            runningScripts > 0
+                ? 'Close $count sessions? $runningScripts running ${runningScripts == 1 ? 'script' : 'scripts'} will be interrupted. This cannot be undone.'
+                : 'Close $count sessions? This cannot be undone.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogCtx, false),
@@ -105,9 +199,12 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
       await sm.closeAll(token);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
           content: Text('Failed to close sessions'),
-          behavior: SnackBarBehavior.floating));
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } finally {
       if (mounted) _closingAll.value = false;
     }
@@ -139,8 +236,8 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
             },
             onClose: (id) async {
               if (closing) return;
-              await _closeSession(id);
-              if (sm.sessions.isEmpty && ctx.mounted) {
+              final closed = await _closeSession(id, dialogContext: ctx);
+              if (closed && sm.sessions.isEmpty && ctx.mounted) {
                 Navigator.pop(ctx);
               }
             },
@@ -169,13 +266,23 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     if (sessions.isEmpty) {
       return Scaffold(
         body: Center(
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(AppIcons.monitorOff, size: 48, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text('No active sessions',
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                AppIcons.monitorOff,
+                size: 48,
+                color: Theme.of(context).colorScheme.outline,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No active sessions',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.outline)),
-          ]),
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -183,124 +290,211 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     final activeIndex = sessions.indexWhere((s) => s.sessionId == activeId);
 
     return Scaffold(
-      body: LayoutBuilder(builder: (context, constraints) {
-        final safeTop = MediaQuery.of(context).padding.top;
-        _pillX ??= (constraints.maxWidth / 2) - 80;
-        _pillY = _pillY.clamp(safeTop + 4, constraints.maxHeight - 48);
-        _pillX = _pillX!.clamp(0.0, constraints.maxWidth - 160);
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final padding = MediaQuery.of(context).padding;
+          final pillSize = _effectivePillSize;
+          _schedulePillMeasurement();
+          _pillX ??= (constraints.maxWidth - pillSize.width) / 2;
+          final clamped = clampSessionPillOffset(
+            Offset(_pillX!, _pillY),
+            pillSize: pillSize,
+            screen: constraints.biggest,
+            padding: padding,
+          );
+          _pillX = clamped.dx;
+          _pillY = clamped.dy;
 
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: IndexedStack(
-                index: activeIndex >= 0 ? activeIndex : 0,
-                children: sessions.map((s) => _buildRenderer(s)).toList(),
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: IndexedStack(
+                  index: activeIndex >= 0 ? activeIndex : 0,
+                  children: sessions.map((s) => _buildRenderer(s)).toList(),
+                ),
               ),
-            ),
 
-            Positioned(
-              left: _pillX,
-              top: _pillY,
-              child: _buildDraggablePill(sessions, activeId, constraints),
-            ),
-          ],
-        );
-      }),
+              Positioned(
+                left: _pillX,
+                top: _pillY,
+                child: _buildDraggablePill(sessions, activeId, constraints),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   Widget _buildDraggablePill(
-      List<AppSession> sessions, String? activeId, BoxConstraints constraints) {
+    List<AppSession> sessions,
+    String? activeId,
+    BoxConstraints constraints,
+  ) {
     final cs = Theme.of(context).colorScheme;
-    final safeTop = MediaQuery.of(context).padding.top;
+    final padding = MediaQuery.of(context).padding;
     final active = sessions.firstWhere(
       (s) => s.sessionId == activeId,
       orElse: () => sessions.first,
     );
 
+    final pillSize = _effectivePillSize;
     return GestureDetector(
+      key: _pillKey,
       onPanUpdate: (d) {
         setState(() {
-          _pillX = (_pillX! + d.delta.dx).clamp(0.0, constraints.maxWidth - 160);
-          _pillY = (_pillY + d.delta.dy).clamp(safeTop + 4, constraints.maxHeight - 48);
+          final clamped = clampSessionPillOffset(
+            Offset(_pillX! + d.delta.dx, _pillY + d.delta.dy),
+            pillSize: pillSize,
+            screen: constraints.biggest,
+            padding: padding,
+          );
+          _pillX = clamped.dx;
+          _pillY = clamped.dy;
         });
       },
       child: Container(
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(22),
-          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))],
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          GestureDetector(
-            onTap: _showSessionSwitcher,
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_iconForSession(active), size: 14, color: cs.primary),
-                const SizedBox(width: 5),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 80),
-                  child: Text(
-                    active.isScriptSession ? (active.scriptName ?? 'Script') : active.server.name,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (sessions.length > 1) ...[
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: cs.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: _showSessionSwitcher,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(
+                          _iconForSession(active),
+                          size: 14,
+                          color: cs.primary,
+                        ),
+                        if (active.scriptNeedsInput)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                color: cs.error,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
-                    child: Text('${sessions.length}',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: cs.primary)),
-                  ),
-                ],
-                const SizedBox(width: 2),
-                Icon(AppIcons.chevronUp, size: 14, color: cs.outline),
-              ]),
-            ),
-          ),
-
-          if (active.showMenu != null || active.showSnippets != null) ...[
-            Container(width: 1, height: 22, color: cs.outlineVariant.withValues(alpha: 0.5)),
-
-            GestureDetector(
-              onTap: () {
-                if (active.showSnippets != null) {
-                  active.showSnippets!();
-                } else {
-                  active.showMenu?.call();
-                }
-              },
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                child: Icon(
-                  active.showSnippets != null ? AppIcons.codeBraces : AppIcons.toolbox,
-                  size: 16, color: cs.primary,
+                    const SizedBox(width: 5),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 80),
+                      child: Text(
+                        active.isScriptSession
+                            ? (active.scriptName ?? 'Script')
+                            : active.server.name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (sessions.length > 1) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${sessions.length}',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: cs.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 2),
+                    Icon(AppIcons.chevronUp, size: 14, color: cs.outline),
+                  ],
                 ),
               ),
             ),
-          ],
 
-          if (active.showAI != null && widget.aiManager.isAvailable) ...[
-            Container(width: 1, height: 22, color: cs.outlineVariant.withValues(alpha: 0.5)),
-
-            GestureDetector(
-              onTap: () => active.showAI?.call(),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                child: Icon(AppIcons.creation, size: 16, color: cs.primary),
+            if (active.showMenu != null || active.showSnippets != null) ...[
+              Container(
+                width: 1,
+                height: 22,
+                color: cs.outlineVariant.withValues(alpha: 0.5),
               ),
-            ),
+
+              GestureDetector(
+                onTap: () {
+                  if (active.showSnippets != null) {
+                    active.showSnippets!();
+                  } else {
+                    active.showMenu?.call();
+                  }
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  child: Icon(
+                    active.showSnippets != null
+                        ? AppIcons.codeBraces
+                        : AppIcons.toolbox,
+                    size: 16,
+                    color: cs.primary,
+                  ),
+                ),
+              ),
+            ],
+
+            if (active.showAI != null && widget.aiManager.isAvailable) ...[
+              Container(
+                width: 1,
+                height: 22,
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+              ),
+
+              GestureDetector(
+                onTap: () => active.showAI?.call(),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 7,
+                  ),
+                  child: Icon(AppIcons.creation, size: 16, color: cs.primary),
+                ),
+              ),
+            ],
           ],
-        ]),
+        ),
       ),
     );
   }
@@ -314,6 +508,10 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
         session: session,
         token: token,
         sessionManager: widget.sessionManager,
+        terminalSettings: widget.terminalSettings,
+        isVisible:
+            widget.isVisible &&
+            widget.sessionManager.activeSessionId == session.sessionId,
       );
     }
     switch (session.type) {
@@ -352,9 +550,12 @@ class _ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
 
   IconData _iconForType(ConnectionType type) {
     switch (type) {
-      case ConnectionType.guacamole: return AppIcons.monitorSmall;
-      case ConnectionType.terminal: return AppIcons.console;
-      case ConnectionType.sftp: return AppIcons.folderOutline;
+      case ConnectionType.guacamole:
+        return AppIcons.monitorSmall;
+      case ConnectionType.terminal:
+        return AppIcons.console;
+      case ConnectionType.sftp:
+        return AppIcons.folderOutline;
     }
   }
 }
@@ -387,7 +588,8 @@ class _SessionSwitcherSheet extends StatelessWidget {
         children: [
           Container(
             margin: const EdgeInsets.only(top: 12),
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             decoration: BoxDecoration(
               color: cs.outlineVariant,
               borderRadius: BorderRadius.circular(2),
@@ -395,15 +597,27 @@ class _SessionSwitcherSheet extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Row(children: [
-              Icon(AppIcons.layers, size: 20, color: cs.primary),
-              const SizedBox(width: 8),
-              Text('Sessions',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-              const Spacer(),
-              Text('${sessions.length}',
-                  style: TextStyle(fontSize: 13, color: cs.outline, fontWeight: FontWeight.w600)),
-            ]),
+            child: Row(
+              children: [
+                Icon(AppIcons.layers, size: 20, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Sessions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${sessions.length}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: cs.outline,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
           const Divider(height: 1),
           ConstrainedBox(
@@ -432,26 +646,32 @@ class _SessionSwitcherSheet extends StatelessWidget {
               dense: true,
               enabled: !isClosingAll,
               leading: Icon(AppIcons.exitToApp, size: 20, color: cs.outline),
-              title: Text('Back to servers',
-                  style: TextStyle(fontSize: 14, color: cs.onSurface)),
+              title: Text(
+                'Back to servers',
+                style: TextStyle(fontSize: 14, color: cs.onSurface),
+              ),
               onTap: onExitFullscreen,
               trailing: onCloseAll != null
                   ? (isClosingAll
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: cs.error,
-                          ),
-                        )
-                      : IconButton(
-                          icon: Icon(AppIcons.close, size: 20, color: cs.error),
-                          tooltip: 'Close all sessions',
-                          constraints: const BoxConstraints(),
-                          padding: const EdgeInsets.all(8),
-                          onPressed: onCloseAll,
-                        ))
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: cs.error,
+                            ),
+                          )
+                        : IconButton(
+                            icon: Icon(
+                              AppIcons.close,
+                              size: 20,
+                              color: cs.error,
+                            ),
+                            tooltip: 'Close all sessions',
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(8),
+                            onPressed: onCloseAll,
+                          ))
                   : null,
             ),
           ],
@@ -480,24 +700,56 @@ class _SessionTile extends StatelessWidget {
   IconData get _icon {
     if (session.isScriptSession) return AppIcons.codeBracesBox;
     switch (session.type) {
-      case ConnectionType.guacamole: return AppIcons.monitorSmall;
-      case ConnectionType.terminal: return AppIcons.console;
-      case ConnectionType.sftp: return AppIcons.folderOutline;
+      case ConnectionType.guacamole:
+        return AppIcons.monitorSmall;
+      case ConnectionType.terminal:
+        return AppIcons.console;
+      case ConnectionType.sftp:
+        return AppIcons.folderOutline;
     }
   }
 
   String get _typeLabel {
     if (session.isScriptSession) return 'Script';
     switch (session.type) {
-      case ConnectionType.guacamole: return 'Remote Desktop';
-      case ConnectionType.terminal: return 'Terminal';
-      case ConnectionType.sftp: return 'File Browser';
+      case ConnectionType.guacamole:
+        return 'Remote Desktop';
+      case ConnectionType.terminal:
+        return 'Terminal';
+      case ConnectionType.sftp:
+        return 'File Browser';
     }
+  }
+
+  String get _subtitle {
+    if (!session.isScriptSession) {
+      return '${session.server.name} · $_typeLabel';
+    }
+    final runtime = session.scriptRuntime;
+    final status = switch (runtime?.status) {
+      ScriptSessionStatus.connecting => 'Connecting',
+      ScriptSessionStatus.running => 'Running',
+      ScriptSessionStatus.waitingForInput => 'Waiting for input',
+      ScriptSessionStatus.cancelling => 'Stopping',
+      ScriptSessionStatus.cancelled => 'Stopped',
+      ScriptSessionStatus.completed => 'Completed',
+      ScriptSessionStatus.failed => 'Failed',
+      ScriptSessionStatus.disconnected => 'Disconnected',
+      null => 'Script',
+    };
+    final step =
+        runtime != null &&
+            runtime.stepCount > 0 &&
+            runtime.currentStepNumber > 0
+        ? ' · Step ${runtime.currentStepNumber} of ${runtime.stepCount}'
+        : '';
+    return '${session.server.name} · $status$step';
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final needsInput = session.scriptNeedsInput;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       decoration: BoxDecoration(
@@ -507,34 +759,70 @@ class _SessionTile extends StatelessWidget {
       child: ListTile(
         dense: true,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.only(left: 14, right: 6),
-        leading: Container(
-          width: 36, height: 36,
-          decoration: BoxDecoration(
-            color: (isActive ? cs.onPrimaryContainer : cs.primary).withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(_icon, size: 18,
-              color: isActive ? cs.onPrimaryContainer : cs.primary),
+        contentPadding: const EdgeInsets.only(left: 14, right: 4),
+        leading: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: (isActive ? cs.onPrimaryContainer : cs.primary)
+                    .withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                _icon,
+                size: 18,
+                color: isActive ? cs.onPrimaryContainer : cs.primary,
+              ),
+            ),
+            if (needsInput ||
+                session.scriptRuntime?.status == ScriptSessionStatus.failed ||
+                session.scriptRuntime?.status ==
+                    ScriptSessionStatus.disconnected)
+              Positioned(
+                right: -3,
+                top: -3,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: needsInput ? cs.tertiary : cs.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surface, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
         ),
-        title: Text(session.isScriptSession
-                ? (session.scriptName ?? 'Script')
-                : session.server.name,
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive ? cs.onPrimaryContainer : cs.onSurface),
-            overflow: TextOverflow.ellipsis),
-        subtitle: Text(_typeLabel,
-            style: TextStyle(fontSize: 11,
-                color: isActive ? cs.onPrimaryContainer.withValues(alpha: 0.7) : cs.outline)),
+        title: Text(
+          session.isScriptSession
+              ? (session.scriptName ?? 'Script')
+              : session.server.name,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            color: isActive ? cs.onPrimaryContainer : cs.onSurface,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          _subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            color: isActive
+                ? cs.onPrimaryContainer.withValues(alpha: 0.7)
+                : cs.outline,
+          ),
+        ),
         trailing: IconButton(
           icon: Icon(AppIcons.close, size: 16),
           onPressed: enabled ? onClose : null,
           color: isActive ? cs.onPrimaryContainer : cs.outline,
           tooltip: 'Close session',
-          constraints: const BoxConstraints(),
-          padding: const EdgeInsets.all(8),
         ),
         onTap: enabled ? onTap : null,
       ),

@@ -8,8 +8,10 @@ import 'package:web_socket_channel/io.dart';
 import 'package:kterm/kterm.dart';
 
 import '../models/server.dart';
+import '../models/script_runtime.dart';
 import '../utils/api_client.dart';
 import 'connection_service.dart';
+import 'script_connection.dart';
 
 enum ConnectionType { guacamole, terminal, sftp }
 
@@ -36,11 +38,27 @@ class AppSession {
   /// session renders the script runner instead of the plain terminal.
   int? scriptId;
 
-  /// Local script name for titles. Not stored server-side, so restored
-  /// script sessions fall back to a generic label.
+  /// Script name for titles. The server now persists it in the session
+  /// configuration, so restored script sessions keep their name.
   String? scriptName;
 
+  /// Live execution state used by the dock, pill, switcher, and navigation
+  /// attention banner. Owned by the renderer's controller and mirrored here so
+  /// background prompts can be discovered without renderer context.
+  ScriptRuntimeState? scriptRuntime;
+
   bool get isScriptSession => scriptId != null;
+  bool get scriptNeedsInput => scriptRuntime?.needsInput ?? false;
+
+  ScriptConnection? scriptConnection;
+
+  bool get isScriptRunning {
+    final status = scriptRuntime?.status;
+    return status == ScriptSessionStatus.connecting ||
+        status == ScriptSessionStatus.running ||
+        status == ScriptSessionStatus.waitingForInput ||
+        status == ScriptSessionStatus.cancelling;
+  }
 
   GuacClient? guacClient;
   GuacWebSocketTunnel? guacTunnel;
@@ -70,6 +88,8 @@ class AppSession {
     this.usedDirectIdentity = false,
     this.scriptId,
     this.scriptName,
+    this.scriptRuntime,
+    this.scriptConnection,
     this.guacClient,
     this.guacTunnel,
     this.terminal,
@@ -92,6 +112,21 @@ class SessionManager extends ChangeNotifier {
   AppSession? getSession(String id) => _sessions[id];
   bool get hasActiveSessions => _sessions.isNotEmpty;
 
+  int get waitingInputCount =>
+      _sessions.values.where((session) => session.scriptNeedsInput).length;
+
+  List<AppSession> get attentionSessions => _sessions.values
+      .where((session) => session.scriptNeedsInput)
+      .toList(growable: false);
+
+  void updateScriptRuntime(String sessionId, ScriptRuntimeState state) {
+    final session = _sessions[sessionId];
+    if (session == null || session.scriptRuntime == state) return;
+    session.scriptRuntime = state;
+    if (state.scriptName.isNotEmpty) session.scriptName = state.scriptName;
+    notifyListeners();
+  }
+
   Future<AppSession> createGuacSession({
     required String token,
     required Server server,
@@ -100,7 +135,9 @@ class SessionManager extends ChangeNotifier {
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true ? server.identities!.first : null);
+        : (server.identities?.isNotEmpty == true
+              ? server.identities!.first
+              : null);
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -110,7 +147,9 @@ class SessionManager extends ChangeNotifier {
       connectionReason: connectionReason,
     );
 
-    final tunnel = GuacWebSocketTunnel(ApiClient.buildWebSocketUrl('/ws/guac/'));
+    final tunnel = GuacWebSocketTunnel(
+      ApiClient.buildWebSocketUrl('/ws/guac/'),
+    );
     final client = GuacClient(tunnel);
 
     final session = AppSession(
@@ -136,7 +175,9 @@ class SessionManager extends ChangeNotifier {
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true ? server.identities!.first : null);
+        : (server.identities?.isNotEmpty == true
+              ? server.identities!.first
+              : null);
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -157,7 +198,9 @@ class SessionManager extends ChangeNotifier {
     };
 
     final channel = IOWebSocketChannel.connect(
-      Uri.parse(ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams)),
+      Uri.parse(
+        ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams),
+      ),
       headers: {'User-Agent': ApiClient.userAgent},
     );
 
@@ -198,16 +241,11 @@ class SessionManager extends ChangeNotifier {
 
     final terminal = Terminal(maxLines: 10000);
 
-    final queryParams = <String, String>{
-      'sessionToken': token,
-      'entryId': server.id.toString(),
-      'sessionId': cs.sessionId,
-      if (identityId != null) 'identityId': identityId.toString(),
-    };
-
-    final channel = IOWebSocketChannel.connect(
-      Uri.parse(ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams)),
-      headers: {'User-Agent': ApiClient.userAgent},
+    final connection = ScriptConnection.open(
+      token: token,
+      entryId: server.id,
+      sessionId: cs.sessionId,
+      identityId: identityId,
     );
 
     final session = AppSession(
@@ -215,10 +253,11 @@ class SessionManager extends ChangeNotifier {
       server: server,
       type: ConnectionType.terminal,
       terminal: terminal,
-      termChannel: channel,
+      scriptConnection: connection,
       identityId: identityId,
       scriptId: scriptId,
       scriptName: scriptName,
+      scriptRuntime: ScriptRuntimeState.initial(scriptName),
     );
 
     _sessions[session.sessionId] = session;
@@ -235,7 +274,9 @@ class SessionManager extends ChangeNotifier {
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true ? server.identities!.first : null);
+        : (server.identities?.isNotEmpty == true
+              ? server.identities!.first
+              : null);
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -252,7 +293,9 @@ class SessionManager extends ChangeNotifier {
     };
 
     final channel = IOWebSocketChannel.connect(
-      Uri.parse(ApiClient.buildWebSocketUrl('/ws/sftp', queryParams: queryParams)),
+      Uri.parse(
+        ApiClient.buildWebSocketUrl('/ws/sftp', queryParams: queryParams),
+      ),
       headers: {'User-Agent': ApiClient.userAgent},
     );
 
@@ -274,6 +317,15 @@ class SessionManager extends ChangeNotifier {
       _activeSessionId = sessionId;
       notifyListeners();
     }
+  }
+
+  @visibleForTesting
+  void seedSessionForTesting(AppSession session, {bool makeActive = true}) {
+    _sessions[session.sessionId] = session;
+    if (makeActive || _activeSessionId == null) {
+      _activeSessionId = session.sessionId;
+    }
+    notifyListeners();
   }
 
   Future<void> restoreSessions({required String token}) async {
@@ -317,7 +369,9 @@ class SessionManager extends ChangeNotifier {
         try {
           switch (type) {
             case ConnectionType.guacamole:
-              final tunnel = GuacWebSocketTunnel(ApiClient.buildWebSocketUrl('/ws/guac/'));
+              final tunnel = GuacWebSocketTunnel(
+                ApiClient.buildWebSocketUrl('/ws/guac/'),
+              );
               final client = GuacClient(tunnel);
               _sessions[sessionId] = AppSession(
                 sessionId: sessionId,
@@ -330,37 +384,60 @@ class SessionManager extends ChangeNotifier {
 
             case ConnectionType.terminal:
               final terminal = Terminal(maxLines: 10000);
-              final identityId = config['identityId'];
-              final queryParams = <String, String>{
-                'sessionToken': token,
-                'entryId': entryId.toString(),
-                'sessionId': sessionId,
-                if (identityId != null) 'identityId': identityId.toString(),
-              };
-              final channel = IOWebSocketChannel.connect(
-                Uri.parse(ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams)),
-                headers: {'User-Agent': ApiClient.userAgent},
-              );
-              _sessions[sessionId] = AppSession(
-                sessionId: sessionId,
-                server: server,
-                type: ConnectionType.terminal,
-                terminal: terminal,
-                termChannel: channel,
-                identityId: identityId is int
-                    ? identityId
-                    : int.tryParse(identityId?.toString() ?? ''),
-                scriptId: (config['scriptId'] as num?)?.toInt(),
-                // `scriptName` is client-side only on the web too; restored
-                // script sessions fall back to a generic label.
-                scriptName: config['scriptName']?.toString(),
-                // Known limitation: the session list strips ad-hoc
-                // `directIdentity` payloads, so a restored quick-connect
-                // session cannot be distinguished from a stored-identity one.
-                // Reconnect then falls back to the server identity (transport
-                // still resolves server-side); only hint prioritization may
-                // differ until the session is recreated.
-              );
+              final rawIdentityId = config['identityId'];
+              final identityId = rawIdentityId is int
+                  ? rawIdentityId
+                  : int.tryParse(rawIdentityId?.toString() ?? '');
+              final scriptId = (config['scriptId'] as num?)?.toInt();
+              final scriptName = config['scriptName']?.toString() ?? 'Script';
+              if (scriptId != null) {
+                _sessions[sessionId] = AppSession(
+                  sessionId: sessionId,
+                  server: server,
+                  type: ConnectionType.terminal,
+                  terminal: terminal,
+                  scriptConnection: ScriptConnection.open(
+                    token: token,
+                    entryId: entryId,
+                    sessionId: sessionId,
+                    identityId: identityId,
+                  ),
+                  identityId: identityId,
+                  scriptId: scriptId,
+                  scriptName: scriptName,
+                  scriptRuntime: ScriptRuntimeState.initial(scriptName),
+                );
+              } else {
+                final queryParams = <String, String>{
+                  'sessionToken': token,
+                  'entryId': entryId.toString(),
+                  'sessionId': sessionId,
+                  if (identityId != null) 'identityId': identityId.toString(),
+                };
+                final channel = IOWebSocketChannel.connect(
+                  Uri.parse(
+                    ApiClient.buildWebSocketUrl(
+                      '/ws/term',
+                      queryParams: queryParams,
+                    ),
+                  ),
+                  headers: {'User-Agent': ApiClient.userAgent},
+                );
+                _sessions[sessionId] = AppSession(
+                  sessionId: sessionId,
+                  server: server,
+                  type: ConnectionType.terminal,
+                  terminal: terminal,
+                  termChannel: channel,
+                  identityId: identityId,
+                  // Known limitation: the session list strips ad-hoc
+                  // `directIdentity` payloads, so a restored quick-connect
+                  // session cannot be distinguished from a stored-identity
+                  // one. Reconnect then falls back to the server identity
+                  // (transport still resolves server-side); only hint
+                  // prioritization may differ until the session is recreated.
+                );
+              }
               break;
 
             case ConnectionType.sftp:
@@ -369,7 +446,12 @@ class SessionManager extends ChangeNotifier {
                 'sessionId': sessionId,
               };
               final channel = IOWebSocketChannel.connect(
-                Uri.parse(ApiClient.buildWebSocketUrl('/ws/sftp', queryParams: queryParams)),
+                Uri.parse(
+                  ApiClient.buildWebSocketUrl(
+                    '/ws/sftp',
+                    queryParams: queryParams,
+                  ),
+                ),
                 headers: {'User-Agent': ApiClient.userAgent},
               );
               _sessions[sessionId] = AppSession(
@@ -394,12 +476,18 @@ class SessionManager extends ChangeNotifier {
     }
   }
 
-  ConnectionType _resolveConnectionType(Map<String, dynamic> config, Server server) {
+  ConnectionType _resolveConnectionType(
+    Map<String, dynamic> config,
+    Server server,
+  ) {
     final cfgType = config['type'] as String?;
     final renderer = config['renderer'] as String?;
     if (cfgType == 'sftp' || renderer == 'sftp') return ConnectionType.sftp;
     final protocol = server.protocol?.toLowerCase();
-    if (protocol == 'rdp' || protocol == 'vnc' || protocol == 'spice' || renderer == 'guac') {
+    if (protocol == 'rdp' ||
+        protocol == 'vnc' ||
+        protocol == 'spice' ||
+        renderer == 'guac') {
       return ConnectionType.guacamole;
     }
     return ConnectionType.terminal;
@@ -408,18 +496,33 @@ class SessionManager extends ChangeNotifier {
   void _disconnectSession(AppSession session) {
     switch (session.type) {
       case ConnectionType.guacamole:
-        try { session.guacClient?.disconnect(); } catch (_) {}
-        try { session.guacClient?.dispose(); } catch (_) {}
+        try {
+          session.guacClient?.disconnect();
+        } catch (_) {}
+        try {
+          session.guacClient?.dispose();
+        } catch (_) {}
         break;
       case ConnectionType.terminal:
-        try { session.termSubscription?.cancel(); } catch (_) {}
-        try { session.termChannel?.sink.close(); } catch (_) {}
+        try {
+          session.termSubscription?.cancel();
+        } catch (_) {}
+        try {
+          session.termChannel?.sink.close();
+        } catch (_) {}
+        if (session.scriptConnection != null) {
+          unawaited(session.scriptConnection!.close());
+        }
         session.terminal?.onOutput = null;
         session.terminal?.onResize = null;
         break;
       case ConnectionType.sftp:
-        try { session.sftpSubscription?.cancel(); } catch (_) {}
-        try { session.sftpChannel?.sink.close(); } catch (_) {}
+        try {
+          session.sftpSubscription?.cancel();
+        } catch (_) {}
+        try {
+          session.sftpChannel?.sink.close();
+        } catch (_) {}
         break;
     }
   }
@@ -428,15 +531,44 @@ class SessionManager extends ChangeNotifier {
     final session = _sessions[sessionId];
     if (session == null) return;
 
-    _disconnectSession(session);
-
+    // Delete server-side first: if the backend is unreachable, keep the local
+    // session (and its UI) alive instead of leaving an invisible zombie that
+    // reappears on the next restore.
     await ConnectionService.deleteSession(token: token, sessionId: sessionId);
+
+    _disconnectSession(session);
     _sessions.remove(sessionId);
 
     if (_activeSessionId == sessionId) {
       _activeSessionId = _sessions.isNotEmpty ? _sessions.keys.last : null;
     }
     notifyListeners();
+  }
+
+  Future<bool> reconnectScriptSession({
+    required String token,
+    required AppSession session,
+  }) async {
+    if (!session.isScriptSession) return false;
+    try {
+      try {
+        await session.termSubscription?.cancel();
+      } catch (_) {}
+      session.termSubscription = null;
+      await session.scriptConnection?.close();
+      session.scriptConnection = ScriptConnection.open(
+        token: token,
+        entryId: session.server.id,
+        sessionId: session.sessionId,
+        identityId: session.identityId,
+      );
+      session.isConnected = false;
+      session.error = null;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> reconnectTerminalSession({
@@ -446,16 +578,18 @@ class SessionManager extends ChangeNotifier {
     try {
       session.termSubscription?.cancel();
       session.termSubscription = null;
-      try { session.termChannel?.sink.close(); } catch (_) {}
+      try {
+        session.termChannel?.sink.close();
+      } catch (_) {}
 
       // Ad-hoc quick-connect sessions have no stored identity; reconnecting
       // with a server identity would silently switch credentials.
       final identityId = session.usedDirectIdentity
           ? null
           : (session.identityId ??
-              (session.server.identities?.isNotEmpty == true
-                  ? session.server.identities!.first
-                  : null));
+                (session.server.identities?.isNotEmpty == true
+                    ? session.server.identities!.first
+                    : null));
 
       final queryParams = <String, String>{
         'sessionToken': token,
@@ -465,7 +599,9 @@ class SessionManager extends ChangeNotifier {
       };
 
       final channel = IOWebSocketChannel.connect(
-        Uri.parse(ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams)),
+        Uri.parse(
+          ApiClient.buildWebSocketUrl('/ws/term', queryParams: queryParams),
+        ),
         headers: {'User-Agent': ApiClient.userAgent},
       );
 
@@ -485,7 +621,9 @@ class SessionManager extends ChangeNotifier {
     try {
       session.sftpSubscription?.cancel();
       session.sftpSubscription = null;
-      try { session.sftpChannel?.sink.close(); } catch (_) {}
+      try {
+        session.sftpChannel?.sink.close();
+      } catch (_) {}
 
       final queryParams = <String, String>{
         'sessionToken': token,
@@ -493,7 +631,9 @@ class SessionManager extends ChangeNotifier {
       };
 
       final channel = IOWebSocketChannel.connect(
-        Uri.parse(ApiClient.buildWebSocketUrl('/ws/sftp', queryParams: queryParams)),
+        Uri.parse(
+          ApiClient.buildWebSocketUrl('/ws/sftp', queryParams: queryParams),
+        ),
         headers: {'User-Agent': ApiClient.userAgent},
       );
 
@@ -511,7 +651,9 @@ class SessionManager extends ChangeNotifier {
   }) async {
     try {
       _disconnectSession(session);
-      final tunnel = GuacWebSocketTunnel(ApiClient.buildWebSocketUrl('/ws/guac/'));
+      final tunnel = GuacWebSocketTunnel(
+        ApiClient.buildWebSocketUrl('/ws/guac/'),
+      );
       final client = GuacClient(tunnel);
 
       session.guacTunnel = tunnel;
