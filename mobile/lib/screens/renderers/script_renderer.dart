@@ -298,19 +298,6 @@ class _ScriptRendererState extends State<ScriptRenderer> {
 
   // --- Sheets --------------------------------------------------------------
 
-  ScriptSheetContext get _sheetContext {
-    final controller = _controller;
-    final stepLabel =
-        controller.stepCount > 0 && controller.currentStepNumber > 0
-        ? 'Step ${controller.currentStepNumber} of ${controller.stepCount}'
-        : null;
-    return ScriptSheetContext(
-      scriptName: controller.scriptName,
-      serverName: widget.session.server.name,
-      stepLabel: stepLabel,
-    );
-  }
-
   void _presentNextSheetIfAllowed() {
     if (!mounted || !widget.isVisible || _sheetShowing || _closing) return;
     final pending = _controller.pendingSheets;
@@ -324,33 +311,15 @@ class _ScriptRendererState extends State<ScriptRenderer> {
     final generation = ++_sheetGeneration;
     final navigator = Navigator.of(context);
     final baseRoute = ModalRoute.of(context);
-    final sheetContext = _sheetContext;
-
     Future<ScriptSheetResult?> future;
     if (request.prompt != null) {
-      future = showScriptPromptSheet(
-        context,
-        request.prompt!,
-        contextInfo: sheetContext,
-      );
+      future = showScriptPromptSheet(context, request.prompt!);
     } else if (request.summary != null) {
-      future = showScriptSummarySheet(
-        context,
-        request.summary!,
-        contextInfo: sheetContext,
-      );
+      future = showScriptSummarySheet(context, request.summary!);
     } else if (request.table != null) {
-      future = showScriptTableSheet(
-        context,
-        request.table!,
-        contextInfo: sheetContext,
-      );
+      future = showScriptTableSheet(context, request.table!);
     } else if (request.messageBox != null) {
-      future = showScriptMessageSheet(
-        context,
-        request.messageBox!,
-        contextInfo: sheetContext,
-      );
+      future = showScriptMessageSheet(context, request.messageBox!);
     } else {
       _sheetShowing = false;
       _controller.removeSheet(request);

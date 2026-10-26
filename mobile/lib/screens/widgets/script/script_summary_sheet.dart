@@ -2,20 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import 'script_sheet_result.dart';
 import 'script_sheet_shell.dart';
 
 /// Key/value summary, mirroring the web `SummaryDialog`: pairs are parsed from
-/// the flat data list, URLs become tappable links, and values are copyable.
-/// Closing (button or system back) sends `input_response` with
-/// `value: "closed"` so the script never hangs on a dismissed sheet.
+/// the flat data list and URLs become tappable links. Closing (button or
+/// system back) sends `input_response` with `value: "closed"` so the script
+/// never hangs on a dismissed sheet.
 Future<ScriptSheetResult?> showScriptSummarySheet(
   BuildContext context,
-  ScriptSummaryEvent event, {
-  ScriptSheetContext? contextInfo,
-}) {
+  ScriptSummaryEvent event,
+) {
   return showModalBottomSheet<ScriptSheetResult>(
     context: context,
     isDismissible: false,
@@ -25,15 +23,14 @@ Future<ScriptSheetResult?> showScriptSummarySheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ScriptSummarySheet(event: event, contextInfo: contextInfo),
+    builder: (_) => ScriptSummarySheet(event: event),
   );
 }
 
 class ScriptSummarySheet extends StatelessWidget {
   final ScriptSummaryEvent event;
-  final ScriptSheetContext? contextInfo;
 
-  const ScriptSummarySheet({super.key, required this.event, this.contextInfo});
+  const ScriptSummarySheet({super.key, required this.event});
 
   List<MapEntry<String, String>> get _pairs {
     final pairs = <MapEntry<String, String>>[];
@@ -70,19 +67,15 @@ class ScriptSummarySheet extends StatelessWidget {
       },
       child: ScriptSheetShell(
         title: event.title.isEmpty ? 'Script Summary' : event.title,
-        icon: AppIcons.informationOutline,
-        contextInfo: contextInfo,
         footer: ScriptSheetActions(
           primary: scriptSheetPrimaryButton(
             label: 'Close',
-            icon: AppIcons.check,
             onPressed: () => _close(context),
           ),
           secondary: [
             if (pairs.isNotEmpty)
               ScriptCopyButton(
                 label: 'Copy all',
-                icon: AppIcons.contentCopy,
                 onCopy: () {
                   final text = pairs
                       .map((pair) => '${pair.key}: ${pair.value}')
@@ -113,13 +106,7 @@ class ScriptSummarySheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var i = 0; i < pairs.length; i++) ...[
-                    _SummaryRow(
-                      pair: pairs[i],
-                      isUrl: _isUrl(pairs[i].value),
-                      onCopy: () => Clipboard.setData(
-                        ClipboardData(text: pairs[i].value),
-                      ),
-                    ),
+                    _SummaryRow(pair: pairs[i], isUrl: _isUrl(pairs[i].value)),
                     if (i != pairs.length - 1)
                       Divider(height: 1, color: cs.outlineVariant),
                   ],
@@ -133,13 +120,8 @@ class ScriptSummarySheet extends StatelessWidget {
 class _SummaryRow extends StatelessWidget {
   final MapEntry<String, String> pair;
   final bool isUrl;
-  final Future<void> Function() onCopy;
 
-  const _SummaryRow({
-    required this.pair,
-    required this.isUrl,
-    required this.onCopy,
-  });
+  const _SummaryRow({required this.pair, required this.isUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -168,27 +150,19 @@ class _SummaryRow extends StatelessWidget {
         : Text(pair.value, style: valueStyle);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: stacked
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [key, const SizedBox(height: 3), value],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(width: 120, child: key),
-                      Expanded(child: value),
-                    ],
-                  ),
-          ),
-          ScriptCopyIconButton(onCopy: onCopy, tooltip: 'Copy ${pair.key}'),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: stacked
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [key, const SizedBox(height: 4), value],
+            )
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 120, child: key),
+                Expanded(child: value),
+              ],
+            ),
     );
   }
 }

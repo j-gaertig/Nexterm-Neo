@@ -39,7 +39,7 @@ Future<void> _pumpDock(
 }
 
 Future<void> _expand(WidgetTester tester) async {
-  await tester.tap(find.byTooltip('Expand details'));
+  await tester.tap(find.text('Details'));
   // The dock animates its height; stopping at a fixed duration also avoids
   // waiting for the indeterminate progress indicator while a script runs.
   await tester.pump();
@@ -61,6 +61,22 @@ void main() {
       expect(find.text('Deploy app'), findsOneWidget);
       expect(find.text('Connecting to script…'), findsOneWidget);
       expect(find.text('STEPS'), findsNothing);
+    });
+
+    testWidgets('expands when the whole header is tapped', (tester) async {
+      final controller = ScriptExecutionController(scriptName: 'Deploy app');
+      addTearDown(controller.dispose);
+      controller.handleEvent(
+        const ScriptStepEvent(number: 1, description: 'Upload files'),
+      );
+
+      await _pumpDock(tester, controller: controller);
+      await tester.tap(find.text('Deploy app'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.text('STEPS'), findsOneWidget);
+      expect(find.text('Less'), findsOneWidget);
     });
 
     testWidgets('expands to show steps, progress and notices', (tester) async {

@@ -44,23 +44,3 @@ class ScriptSheetRequest {
   bool get isInformational =>
       summary != null || table != null || messageBox != null;
 }
-
-/// Display-only context attached to a script sheet. The wire protocol carries
-/// the prompt data, not the script/server name, so the renderer passes this in
-/// separately to make the modal self-explanatory.
-class ScriptSheetContext {
-  final String? scriptName;
-  final String? serverName;
-  final String? stepLabel;
-
-  const ScriptSheetContext({this.scriptName, this.serverName, this.stepLabel});
-
-  String get description {
-    final parts = <String>[
-      if (scriptName != null && scriptName!.isNotEmpty) scriptName!,
-      if (serverName != null && serverName!.isNotEmpty) serverName!,
-      if (stepLabel != null && stepLabel!.isNotEmpty) stepLabel!,
-    ];
-    return parts.join(' · ');
-  }
-}

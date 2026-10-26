@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import 'script_sheet_result.dart';
 import 'script_sheet_shell.dart';
@@ -11,9 +10,8 @@ import 'script_sheet_shell.dart';
 /// `value: "closed"`.
 Future<ScriptSheetResult?> showScriptMessageSheet(
   BuildContext context,
-  ScriptMessageBoxEvent event, {
-  ScriptSheetContext? contextInfo,
-}) {
+  ScriptMessageBoxEvent event,
+) {
   return showModalBottomSheet<ScriptSheetResult>(
     context: context,
     isDismissible: false,
@@ -23,15 +21,14 @@ Future<ScriptSheetResult?> showScriptMessageSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ScriptMessageSheet(event: event, contextInfo: contextInfo),
+    builder: (_) => ScriptMessageSheet(event: event),
   );
 }
 
 class ScriptMessageSheet extends StatelessWidget {
   final ScriptMessageBoxEvent event;
-  final ScriptSheetContext? contextInfo;
 
-  const ScriptMessageSheet({super.key, required this.event, this.contextInfo});
+  const ScriptMessageSheet({super.key, required this.event});
 
   void _close(BuildContext context) {
     Navigator.pop(context, const ScriptClosedResult());
@@ -50,18 +47,14 @@ class ScriptMessageSheet extends StatelessWidget {
       },
       child: ScriptSheetShell(
         title: event.title.isEmpty ? 'Script Message' : event.title,
-        icon: AppIcons.alertCircleOutline,
-        contextInfo: contextInfo,
         footer: ScriptSheetActions(
           primary: scriptSheetPrimaryButton(
             label: 'OK',
-            icon: AppIcons.check,
             onPressed: () => _close(context),
           ),
           secondary: [
             ScriptCopyButton(
               label: 'Copy message',
-              icon: AppIcons.contentCopy,
               onCopy: () => Clipboard.setData(
                 ClipboardData(
                   text:

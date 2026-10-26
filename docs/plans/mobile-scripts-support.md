@@ -132,17 +132,17 @@ Routen waren nicht nötig.
 | `mobile/lib/utils/script_protocol.dart` | Frame-Splitter und Event-Modelle |
 | `mobile/lib/utils/script_csv.dart` | CSV-Parser für Table-Sheets (Quotes, Commas, Zeilenumbrüche) |
 | `mobile/lib/services/script_service.dart` | `GET /scripts/all` und `GET /scripts/sources` |
-| `mobile/lib/services/script_manager.dart` | Gecachte Script-Liste, Server-OS-Cache, Suche/Filter, Favoriten und Recents über `SharedPreferences` |
+| `mobile/lib/services/script_manager.dart` | Gecachte Script-Liste, Server-OS-Cache sowie Suche und optionaler Kompatibilitätsfilter |
 | `mobile/lib/services/script_connection.dart` | WS-Wrapper mit Connect-Timeout, Keep-Alive, Ready-/Closed-Guard und sicherem Senden |
 | `mobile/lib/screens/renderers/script_execution_controller.dart` | Reine, testbare Zustandsmaschine: Steps, Progress, Dialog-Queue, Cancelled-Zustand, Reconnect-Reset |
 | `mobile/lib/screens/renderers/script_renderer.dart` | WS-Lebenszyklus, Terminal, Sheets, Sichtbarkeit, manueller Reconnect, Session-Schließen |
-| `mobile/lib/screens/widgets/script/script_execution_dock.dart` | Kollabierbarer Status-Dock mit Steps, Progress, Notices und Aktionen |
-| `mobile/lib/screens/widgets/script/script_sheet_shell.dart` | Gemeinsames Sheet-Gerüst, responsive Aktionsleiste, Stop-Bestätigung, Inline-Copy-Feedback |
+| `mobile/lib/screens/widgets/script/script_execution_dock.dart` | Kollabierbarer Status-Dock mit nummerierten Steps, Progress, Notices und gestapelten Aktionen |
+| `mobile/lib/screens/widgets/script/script_sheet_shell.dart` | Gemeinsames Sheet-Gerüst, gestapelte Aktionsleiste, Stop-Bestätigung, Inline-Copy-Feedback |
 | `mobile/lib/screens/widgets/script/script_prompt_sheet.dart` | Input/Password/Select/Confirm inkl. Password-Reveal und Back-Schutz |
 | `mobile/lib/screens/widgets/script/script_summary_sheet.dart` | Key/Value-Summary mit Copy-Aktionen |
-| `mobile/lib/screens/widgets/script/script_table_sheet.dart` | Tabelle mit zweiachsigem Scrollen, sticky Header und Copy/CSV |
+| `mobile/lib/screens/widgets/script/script_table_sheet.dart` | Tabelle mit horizontalem Scrollen, sticky Header (große Screens) und Copy/CSV |
 | `mobile/lib/screens/widgets/script/script_message_sheet.dart` | Msgbox |
-| `mobile/lib/screens/widgets/script/run_script_sheet.dart` | Auswahl-Sheet mit Suche, OS-Filter, Gruppierung, Favoriten/Recents und Identity-Auswahl |
+| `mobile/lib/screens/widgets/script/run_script_sheet.dart` | Flache Script-Liste mit Suche, quadratischem Kompatibilitätsfilter und Identity-Auswahl |
 
 Das frühere Web-Overlay (`script_overlay.dart`) wurde entfernt.
 
@@ -155,7 +155,7 @@ Das frühere Web-Overlay (`script_overlay.dart`) wurde entfernt.
 | `main_navigation_page.dart` | Attention-Banner und Sessions-Badge bei wartenden Scripts (auch im nativen iOS-Glass-Navbar); pro Session dismissbar |
 | `servers_screen.dart` | „Run Script“-Einstieg für SSH-Server, gecachter `ScriptManager`, Auswahl-Sheet |
 | `connection_service.dart` | `scriptId` bei der Session-Erstellung |
-| `app_icons.dart` | benötigte Script-/Status-Icons |
+| `app_icons.dart` | benötigte Icon-Zuordnungen |
 
 ---
 
@@ -166,32 +166,38 @@ Das frühere Web-Overlay (`script_overlay.dart`) wurde entfernt.
 Server-Kontextmenü → **Run Script** öffnet das Auswahl-Sheet:
 
 - Suche über Name und Beschreibung.
-- OS-Filter: Bei bekanntem Server-OS sind standardmäßig nur kompatible Scripts sichtbar.
-  „Compatible only“ lässt sich deaktivieren; inkompatible Einträge tragen ein **Other OS**-Badge.
-  Bei unbekanntem OS werden alle Scripts angezeigt.
-- Gruppierung nach Favoriten, zuletzt verwendet, persönlich, Organisation und Source-Scripts.
-- Favoriten/Recents werden lokal in `SharedPreferences` gespeichert.
+- Alle verfügbaren Scripts erscheinen standardmäßig in einer flachen Liste. Es gibt keine
+  Favoriten, Recents, Gruppierung, Script-Icons oder OS-Badges.
+- Der optionale Kompatibilitätsfilter ist ein quadratischer Icon-Button direkt neben der Suche.
+  Ist das Server-OS bekannt, lässt sich damit auf kompatible Scripts einschränken; die
+  Einstellung ist standardmäßig aus. Bei unbekanntem OS bleibt der Button deaktiviert und alle
+  Scripts werden angezeigt.
 - Source-Scripts und Scripts anderer Organisationen werden korrekt berücksichtigt; geheime
   Scripts werden nicht angeboten.
-- Bei mehreren Server-Identitäten erscheint eine Identity-Auswahl. Die Auswahl bleibt beim
-  Filtern und Suchen erhalten.
+- Bei mehreren Server-Identitäten erscheint die Identity-Auswahl als quadratischer Button in
+  derselben Zeile wie Suche und Filter. Die Auswahl bleibt beim Filtern und Suchen erhalten.
+  Der Footer enthält ausschließlich den **Run**-Button; der ausgewählte Eintrag wird nur durch
+  seine gefüllte Zeile markiert, nicht durch einen Haken oder eine zweite Textzeile.
 - Leerer Zustand nennt den reinen Ausführungsumfang und verweist für die Verwaltung auf den
   Web-Client.
 - Auf kleinen Displays mit großer Schrift und geöffneter Tastatur wird das Sheet kompakt:
-  Titel, OS-Zeile und volle Identity-Auswahl entfallen, Suche, Liste und Run-Button bleiben
-  nutzbar. Die Identity bleibt über ein kompaktes Person-Icon mit Popup-Menü erreichbar.
-  Die Höhe bleibt oberhalb der Tastatur.
+  Titel und Drag-Handle entfallen, Suche, Kompatibilitätsfilter, Identity-Button, Liste und
+  **Run** bleiben nutzbar. Die Höhe bleibt oberhalb der Tastatur.
 
 ### 4.2 Ausführung
 
-Nach dem Start öffnet sich die Script-Session im Sessions-Tab:
+Nach dem Start – ohne blockierenden Start-Dialog – öffnet sich die Script-Session direkt im
+Sessions-Tab:
 
 - Read-only-Terminal mit Theme und Schriftgröße aus `TerminalSettings`; Terminal-Daten werden
   inklusive Grafikverarbeitung gerendert.
 - Kollabierbarer **Execution Dock** statt Web-Overlay:
-  - kollabiert: Script-/Server-Name, Status, aktueller Step und primäre Aktion,
-  - expandiert: Step-Checkliste (erledigt/aktiv/fehlgeschlagen), Progress, Notices und Aktionen.
-- Aktionen: **Stop** (Bestätigung, dann `input_cancelled`), **Reconnect** (nur im
+  - kollabiert: Script-/Server-Name, Status, aktueller Step und die neueste Notice,
+  - expandiert: nummerierte Step-Liste (erledigt/aktiv/fehlgeschlagen), Progress, Notices und
+    Aktionen. Die komplette Kopfzeile öffnet den Dock; zusätzlich gibt es einen gut sichtbaren
+    **Details**-Text. Es gibt keine Status-/Step-Icons im Dock.
+- Aktionen sind auf schmalen Displays und bei großer Schrift als volle, gestapelte Buttons
+  umgesetzt: **Stop** (Bestätigung, dann `input_cancelled`), **Reconnect** (nur im
   Disconnected-Zustand), **Close** (Bestätigung bei laufendem Script; die Session wird erst
   serverseitig geschlossen, dann lokal entfernt).
 - **Cancelled** ist ein eigener Zustand: Ein vom Benutzer gestopptes Script wird als
@@ -203,8 +209,15 @@ Nach dem Start öffnet sich die Script-Session im Sessions-Tab:
 
 ### 4.3 Dialoge und Hintergrundverhalten
 
-- Dialoge sind mobile Bottom-Sheets mit 20-px-Radius, Grabber, `SafeArea` und
-  `primaryContainer`-Akzenten.
+- Ergebnis-Dialoge sind mobile Bottom-Sheets mit 20-px-Radius, Grabber und `SafeArea`. Titel
+  enthalten weder dekorative Icons noch Script-/Server-/Step-Untertitel.
+- Aktionen in den Script-Sheets sind grundsätzlich volle, gestapelte Buttons mit mindestens
+  48 px Höhe und einzeiligen Labels. Copy-/CSV-Buttons sind dadurch auch bei großer Schrift
+  vollständig lesbar.
+- Tabellen haben Innenabstand, einen gerundeten Rahmen und einen sichtbaren horizontalen
+  Scrollbalken. Auf großen Screens bleibt der Header beim vertikalen Scrollen stehen; bei sehr
+  großer Schrift scrollt das gesamte Sheet, damit nichts abgeschnitten wird. Zeilen-/Spalten-
+  Zähler werden nicht angezeigt.
 - Es ist immer nur ein Sheet geöffnet; weitere Prompts warten in der Controller-Queue.
 - System-Back und programmatisches Schließen sind gegen stille Dismissals abgesichert.
   Ein Generationstoken verwirft Futures bereits programmatisch geschlossener Sheets.
@@ -233,10 +246,10 @@ Nach dem Start öffnet sich die Script-Session im Sessions-Tab:
 |---|---|
 | Protokoll-/Controller-Zustand, Prompt-Queue, Cancel, Reconnect-Reset | `mobile/test/screens/renderers/script_execution_controller_test.dart` |
 | Dialoge, Back-Schutz, Stop-Bestätigung, Inline-Copy, große Schrift, kleine Displays | `mobile/test/screens/widgets/script_sheets_test.dart` |
-| Auswahl-Sheet: Filter, Suche, Favoriten/Recents, Identities, Fehler/Retry, Tastatur | `mobile/test/screens/widgets/run_script_sheet_test.dart` |
+| Auswahl-Sheet: flache Liste, Kompatibilitätsfilter, Suche, Identities, Fehler/Retry, Tastatur | `mobile/test/screens/widgets/run_script_sheet_test.dart` |
 | Session-Pill: gemessene Größe und Safe-Area-Clamping | `mobile/test/screens/active_sessions_screen_test.dart` |
 | Execution Dock in allen Phasen | `mobile/test/screens/widgets/script_execution_dock_test.dart` |
-| Cache, OS-Erkennung, Favoriten/Recents | `mobile/test/services/script_manager_test.dart` |
+| Cache, OS-Erkennung und Filter-Defaults | `mobile/test/services/script_manager_test.dart` |
 | Runtime-Spiegelung und Session-Lifecycle | `mobile/test/services/session_manager_script_test.dart` |
 | CSV-Parsing | `mobile/test/utils/script_csv_test.dart` |
 | Server-Replay, Cleanup, 500er-Limit, Readiness, Upload-Abbruch | `server/tests/scriptLayer.test.js` |
@@ -264,8 +277,9 @@ Verifikationsstand:
 5. Prompt offen lassen, zu einem anderen Tab wechseln → Banner/Badge erscheint, kein Sheet über
    dem anderen Tab. Zurück zu Sessions → Sheet erscheint.
 6. Fehlschlagendes Script (`set -e`) → **Failed** mit korrektem Exit-Code und fehlgeschlagenem Step.
-7. Sehr kleines Display mit großer Schrift: Auswahl-Sheet mit und ohne Tastatur, alle Dialoge und
-   der Dock ohne Overflow bedienen.
+7. Sehr kleines Display mit großer Schrift: Auswahl-Sheet mit und ohne Tastatur, alle Dialoge,
+   Tabellen und der Dock ohne Overflow bedienen. Tabellen horizontal scrollen und alle
+   Copy-Aktionen vollständig lesen können.
 8. RDP/VNC/SPICE-Server: **Run Script** wird nicht angeboten; ein manipuliertes
    `scriptId` am API-Endpunkt wird abgewiesen.
 9. Script-Session teilen: Server lehnt ab. Hibernate/Resume/Delete mit fremder Session-ID:

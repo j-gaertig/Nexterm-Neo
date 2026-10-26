@@ -317,6 +317,10 @@ void main() {
       );
       await _pumpSheet(tester);
 
+      expect(
+        tester.getSize(find.widgetWithText(OutlinedButton, 'Copy all')).height,
+        greaterThanOrEqualTo(48),
+      );
       await tester.tap(find.text('Copy all'));
       await tester.pump();
       await tester.pump();
@@ -383,7 +387,20 @@ void main() {
       expect(find.text('Status'), findsOneWidget);
       expect(find.text('alpha'), findsOneWidget);
       expect(find.text('beta, two'), findsOneWidget);
-      expect(find.text('2 rows · 2 columns'), findsOneWidget);
+      expect(find.text('2 rows · 2 columns'), findsNothing);
+
+      final horizontalScrolls = tester
+          .widgetList<SingleChildScrollView>(find.byType(SingleChildScrollView))
+          .where((view) => view.scrollDirection == Axis.horizontal);
+      expect(horizontalScrolls, isNotEmpty);
+      expect(
+        tester.getSize(find.widgetWithText(OutlinedButton, 'Copy text')).height,
+        greaterThanOrEqualTo(48),
+      );
+      expect(
+        tester.getSize(find.widgetWithText(FilledButton, 'Close')).height,
+        greaterThanOrEqualTo(48),
+      );
 
       await tester.tap(find.text('Close'));
       await _settleUi(tester);

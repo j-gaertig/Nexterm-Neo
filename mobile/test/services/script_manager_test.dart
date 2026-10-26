@@ -3,7 +3,6 @@ import 'package:nexterm/models/monitoring.dart';
 import 'package:nexterm/models/script.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/services/script_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Script _script({
   required int id,
@@ -70,7 +69,7 @@ void main() {
         serverOsName: 'Ubuntu 24.04 LTS',
       );
 
-      expect(result.map((script) => script.id), [7, 3, 1, 5]);
+      expect(result.map((script) => script.id), [7, 3, 2, 1, 5]);
     });
 
     test('hides scripts from other organizations and secret scripts', () {
@@ -85,24 +84,26 @@ void main() {
       expect(result.map((script) => script.id), isNot(contains(6)));
     });
 
-    test('applies OS compatibility unless explicitly disabled', () {
-      final compatible = filterScriptsForServer(
-        scripts: scripts,
-        sourceScripts: const [],
-        organizationId: 7,
-        serverOsName: 'Windows Server 2022',
-      );
-      expect(compatible.map((script) => script.id), [3, 2, 5]);
-
+    test('shows every compatible and incompatible script by default', () {
       final all = filterScriptsForServer(
         scripts: scripts,
         sourceScripts: const [],
         organizationId: 7,
         serverOsName: 'Windows Server 2022',
-        includeIncompatible: true,
       );
-      expect(all.map((script) => script.id), containsAll([1, 2, 3, 5]));
+      expect(all.map((script) => script.id), [3, 2, 1, 5]);
       expect(all.map((script) => script.id), isNot(contains(4)));
+    });
+
+    test('can filter to the server OS explicitly', () {
+      final compatible = filterScriptsForServer(
+        scripts: scripts,
+        sourceScripts: const [],
+        organizationId: 7,
+        serverOsName: 'Windows Server 2022',
+        includeIncompatible: false,
+      );
+      expect(compatible.map((script) => script.id), [3, 2, 5]);
     });
 
     test('shows every OS when the server OS is unknown', () {
@@ -238,11 +239,7 @@ void main() {
     });
   });
 
-  group('ScriptManager cache and preferences', () {
-    setUp(() {
-      SharedPreferences.setMockInitialValues({});
-    });
-
+  group('ScriptManager cache', () {
     test(
       'loads both catalogues, caches failures, and supports refresh',
       () async {
@@ -313,49 +310,6 @@ void main() {
       await manager.ensureLoaded('token');
       expect(manager.hasLoaded, isTrue);
       expect(manager.error, isNull);
-    });
-
-    test('favorites and recents persist and are capped', () async {
-      SharedPreferences.setMockInitialValues({
-        'script_favorites': '[3,1]',
-        'script_recent': '[2,2,3]',
-      });
-      final manager = ScriptManager();
-      addTearDown(manager.dispose);
-
-      await manager.loadPreferences();
-      expect(manager.favoriteIds, {3, 1});
-      expect(manager.recentIds, [2, 3]);
-
-      await manager.toggleFavorite(3);
-      await manager.toggleFavorite(5);
-      expect(manager.isFavorite(3), isFalse);
-      expect(manager.isFavorite(5), isTrue);
-
-      for (var id = 10; id < 16; id++) {
-        await manager.recordRecent(id);
-      }
-      expect(manager.recentIds, [15, 14, 13, 12, 11]);
-
-      final reloaded = ScriptManager();
-      addTearDown(reloaded.dispose);
-      await reloaded.loadPreferences();
-      expect(reloaded.favoriteIds, {1, 5});
-      expect(reloaded.recentIds, [15, 14, 13, 12, 11]);
-    });
-
-    test('invalid preference data is ignored instead of throwing', () async {
-      SharedPreferences.setMockInitialValues({
-        'script_favorites': 'not json',
-        'script_recent': '{"not":"a list"}',
-      });
-      final manager = ScriptManager();
-      addTearDown(manager.dispose);
-
-      await manager.loadPreferences();
-
-      expect(manager.favoriteIds, isEmpty);
-      expect(manager.recentIds, isEmpty);
     });
 
     test('seedForTesting provides an already fresh catalogue', () async {

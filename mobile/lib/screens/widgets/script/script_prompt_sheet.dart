@@ -11,9 +11,8 @@ import 'script_sheet_shell.dart';
 /// script can never be left waiting because the sheet was dismissed silently.
 Future<ScriptSheetResult?> showScriptPromptSheet(
   BuildContext context,
-  ScriptPromptEvent prompt, {
-  ScriptSheetContext? contextInfo,
-}) {
+  ScriptPromptEvent prompt,
+) {
   return showModalBottomSheet<ScriptSheetResult>(
     context: context,
     isDismissible: false,
@@ -23,15 +22,14 @@ Future<ScriptSheetResult?> showScriptPromptSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ScriptPromptSheet(prompt: prompt, contextInfo: contextInfo),
+    builder: (_) => ScriptPromptSheet(prompt: prompt),
   );
 }
 
 class ScriptPromptSheet extends StatefulWidget {
   final ScriptPromptEvent prompt;
-  final ScriptSheetContext? contextInfo;
 
-  const ScriptPromptSheet({super.key, required this.prompt, this.contextInfo});
+  const ScriptPromptSheet({super.key, required this.prompt});
 
   @override
   State<ScriptPromptSheet> createState() => _ScriptPromptSheetState();
@@ -98,8 +96,6 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       },
       child: ScriptSheetShell(
         title: title,
-        icon: scriptPromptIcon(_isPassword),
-        contextInfo: widget.contextInfo,
         bodyIsScrollable: false,
         wholeSheetScrollable: true,
         footer: _footer(cs),
@@ -140,10 +136,6 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
           : (widget.prompt.defaultValue.isEmpty
                 ? 'Enter value...'
                 : widget.prompt.defaultValue),
-      prefixIcon: Icon(
-        _isPassword ? AppIcons.lockOutline : AppIcons.codeBraces,
-        size: 20,
-      ),
       suffixIcon: _isPassword
           ? IconButton(
               tooltip: _obscurePassword ? 'Show password' : 'Hide password',
@@ -207,8 +199,11 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
             child: Row(
               children: [
                 Container(
-                  width: 24,
-                  height: 24,
+                  constraints: const BoxConstraints(
+                    minWidth: 24,
+                    minHeight: 24,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: cs.surfaceContainerHighest,
@@ -227,7 +222,6 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
                 Expanded(
                   child: Text(options[i], style: const TextStyle(fontSize: 14)),
                 ),
-                Icon(AppIcons.chevronRight, size: 18, color: cs.outline),
               ],
             ),
           ),
@@ -243,22 +237,9 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       color: cs.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(12),
     ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(AppIcons.helpCircleOutline, size: 18, color: cs.primary),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            'Choose Yes to continue or No to answer negatively. Both answers keep the script running.',
-            style: TextStyle(
-              fontSize: 12,
-              height: 1.35,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-        ),
-      ],
+    child: Text(
+      'Choose Yes to continue or No to answer negatively. Both answers keep the script running.',
+      style: TextStyle(fontSize: 12, height: 1.35, color: cs.onSurfaceVariant),
     ),
   );
 
@@ -267,15 +248,18 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       : _controller.text.trim().isNotEmpty;
 
   Widget _footer(ColorScheme cs) {
-    final stopButton = TextButton.icon(
+    final stopButton = TextButton(
       onPressed: _stopping ? null : _stopFromButton,
-      icon: const Icon(AppIcons.stopCircleOutline, size: 16),
-      label: const Text('Stop script'),
-      style: TextButton.styleFrom(foregroundColor: cs.error),
+      style: TextButton.styleFrom(
+        foregroundColor: cs.error,
+        minimumSize: const Size.fromHeight(48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: const Text('Stop script'),
     );
 
     if (_kind == ScriptPromptKind.select) {
-      return Align(alignment: Alignment.centerRight, child: stopButton);
+      return stopButton;
     }
 
     if (_kind == ScriptPromptKind.confirm) {
@@ -286,19 +270,17 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
           ScriptSheetActions(
             primary: scriptSheetPrimaryButton(
               label: 'Yes',
-              icon: AppIcons.check,
               onPressed: _stopping ? null : () => _submit('Yes'),
             ),
             secondary: [
               ScriptSheetSecondaryButton(
                 label: 'No',
-                icon: AppIcons.close,
                 onPressed: _stopping ? null : () => _submit('No'),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Center(child: stopButton),
+          stopButton,
         ],
       );
     }
@@ -309,13 +291,12 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       children: [
         scriptSheetPrimaryButton(
           label: 'Submit',
-          icon: AppIcons.send,
           onPressed: _canSubmit && !_stopping
               ? () => _submit(_controller.text)
               : null,
         ),
         const SizedBox(height: 4),
-        Center(child: stopButton),
+        stopButton,
       ],
     );
   }

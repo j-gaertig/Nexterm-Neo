@@ -5,7 +5,6 @@ import 'package:nexterm/models/script.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/screens/widgets/script/run_script_sheet.dart';
 import 'package:nexterm/services/script_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 late BuildContext hostContext;
 
@@ -107,7 +106,6 @@ Future<RunScriptSelection?> _open(
   required ScriptManager manager,
   Server? server,
   int? organizationId = 7,
-  String? organizationName = 'Acme',
   Future<String?> Function()? osNameLoader,
   Future<List<ManagedIdentity>> Function(String token)? identitiesLoader,
 }) {
@@ -117,47 +115,40 @@ Future<RunScriptSelection?> _open(
     'token',
     manager: manager,
     organizationId: organizationId,
-    organizationName: organizationName,
     osNameLoader: osNameLoader ?? () async => 'Ubuntu 24.04 LTS',
     identitiesLoader: identitiesLoader,
   );
   return future;
 }
 
+Finder get _runButton => find.byKey(const ValueKey('run-script-button'));
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-  });
-
   group('RunScriptSheet', () {
-    testWidgets('filters by OS and groups favorites, recents and personal', (
+    testWidgets('lists every script in one flat list without extra chrome', (
       tester,
     ) async {
-      SharedPreferences.setMockInitialValues({
-        'script_favorites': '[3]',
-        'script_recent': '[4]',
-      });
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       _open(tester, manager: manager);
       await _pumpSheet(tester);
 
-      expect(find.text('Run Script'), findsNWidgets(2));
-      expect(find.text('Ubuntu'), findsNWidgets(2));
-      expect(find.text('Compatible only'), findsOneWidget);
-      expect(find.text('FAVORITES'), findsOneWidget);
-      expect(find.text('RECENTLY USED'), findsOneWidget);
-      expect(find.text('PERSONAL'), findsOneWidget);
+      expect(find.text('Run Script'), findsOneWidget);
+      expect(find.text('Ubuntu deploy'), findsOneWidget);
+      expect(find.text('Windows tune'), findsOneWidget);
       expect(find.text('Org deploy'), findsOneWidget);
       expect(find.text('Source setup'), findsOneWidget);
-      expect(find.text('Ubuntu deploy'), findsOneWidget);
-      expect(find.text('Windows tune'), findsNothing);
+      expect(find.text('FAVORITES'), findsNothing);
+      expect(find.text('RECENTLY USED'), findsNothing);
+      expect(find.text('PERSONAL'), findsNothing);
       expect(find.text('Other OS'), findsNothing);
+      expect(find.text('Ubuntu'), findsNothing);
+      expect(find.text('Select a script to run'), findsNothing);
+      expect(find.byTooltip('Compatible only'), findsOneWidget);
     });
 
     testWidgets('keeps a searched-away selection and submits it by id', (
@@ -165,21 +156,20 @@ void main() {
     ) async {
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
       final result = _open(tester, manager: manager);
       await _pumpSheet(tester);
 
       await tester.tap(find.text('Ubuntu deploy'));
       await tester.pump();
-      expect(find.text('Run Ubuntu deploy'), findsOneWidget);
+      expect(find.text('Select a script to run'), findsNothing);
 
       await tester.enterText(find.byType(TextField), 'zzz');
       await tester.pump();
       expect(find.text('No scripts match your search'), findsOneWidget);
-      expect(find.text('Run Ubuntu deploy'), findsOneWidget);
+      expect(tester.widget<FilledButton>(_runButton).onPressed, isNotNull);
 
-      await tester.tap(find.text('Run Ubuntu deploy'));
+      await tester.tap(_runButton);
       await _settleUi(tester);
 
       final selection = await result;
@@ -189,41 +179,48 @@ void main() {
       expect(selection.identityId, 7);
     });
 
-    testWidgets('shows incompatible scripts when compatible-only is off', (
+    testWidgets('compatibility filter is an opt-in square toggle', (
       tester,
     ) async {
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       _open(tester, manager: manager);
       await _pumpSheet(tester);
-      expect(find.text('Windows tune'), findsNothing);
+      expect(find.text('Windows tune'), findsOneWidget);
 
-      await tester.tap(find.text('Compatible only'));
+      await tester.tap(find.byTooltip('Compatible only'));
+      await tester.pump();
+
+      expect(find.text('Windows tune'), findsNothing);
+      expect(find.text('Ubuntu deploy'), findsOneWidget);
+      expect(find.text('Org deploy'), findsOneWidget);
+      expect(find.byTooltip('Show all scripts'), findsOneWidget);
+
+      await tester.tap(find.byTooltip('Show all scripts'));
       await tester.pump();
 
       expect(find.text('Windows tune'), findsOneWidget);
-      expect(find.text('Other OS'), findsOneWidget);
+      expect(find.byTooltip('Compatible only'), findsOneWidget);
     });
 
     testWidgets('shows all scripts when the OS is unknown', (tester) async {
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       _open(tester, manager: manager, osNameLoader: () async => null);
       await _pumpSheet(tester);
 
-      expect(find.text('OS unknown'), findsOneWidget);
-      expect(find.text('All operating systems'), findsOneWidget);
       expect(find.text('Windows tune'), findsOneWidget);
-      final chip = tester.widget<FilterChip>(
-        find.widgetWithText(FilterChip, 'All operating systems'),
-      );
-      expect(chip.onSelected, isNull);
+      expect(find.byTooltip('Operating system unknown'), findsOneWidget);
+      expect(find.text('OS unknown'), findsNothing);
+      expect(find.text('All operating systems'), findsNothing);
+
+      await tester.tap(find.byTooltip('Operating system unknown'));
+      await tester.pump();
+      expect(find.text('Windows tune'), findsOneWidget);
     });
 
     testWidgets('shows the execution-only empty state when nothing matches', (
@@ -234,17 +231,17 @@ void main() {
         sources: const [],
       );
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       _open(tester, manager: manager);
       await _pumpSheet(tester);
 
-      expect(find.textContaining('No scripts available'), findsOneWidget);
+      expect(find.text('No scripts available'), findsOneWidget);
       expect(
-        find.textContaining('Create and manage scripts in the web client.'),
+        find.text('Create and manage scripts in the web client.'),
         findsOneWidget,
       );
+      expect(tester.widget<FilledButton>(_runButton).onPressed, isNull);
     });
 
     testWidgets('loads identities and submits the selected one', (
@@ -252,7 +249,6 @@ void main() {
     ) async {
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       final result = _open(
@@ -266,10 +262,11 @@ void main() {
       );
       await _pumpSheet(tester);
 
-      expect(find.text('Run as identity'), findsOneWidget);
-      expect(find.text('Deploy admin'), findsOneWidget);
+      expect(find.byTooltip('Run as identity'), findsOneWidget);
+      expect(find.text('Deploy admin'), findsNothing);
+      expect(find.text('Run as identity'), findsNothing);
 
-      await tester.tap(find.text('Deploy admin'));
+      await tester.tap(find.byTooltip('Run as identity'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await tester.tap(find.text('Deploy bot').last);
@@ -277,7 +274,7 @@ void main() {
 
       await tester.tap(find.text('Ubuntu deploy'));
       await tester.pump();
-      await tester.tap(find.text('Run Ubuntu deploy'));
+      await tester.tap(_runButton);
       await _settleUi(tester);
 
       expect((await result)!.identityId, 2);
@@ -295,7 +292,6 @@ void main() {
         sourceScriptsFetcher: (token) async => const [],
       );
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester);
 
       _open(tester, manager: manager);
@@ -318,16 +314,16 @@ void main() {
       addTearDown(tester.view.resetDevicePixelRatio);
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester, textScale: 1.6);
 
       _open(tester, manager: manager);
       await _pumpSheet(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Run Script'), findsNWidgets(2));
+      expect(find.text('Run Script'), findsOneWidget);
       expect(find.text('Search scripts...'), findsOneWidget);
-      expect(find.text('Select a script to run'), findsOneWidget);
+      expect(find.text('Select a script to run'), findsNothing);
+      expect(tester.widget<FilledButton>(_runButton).onPressed, isNull);
     });
 
     testWidgets('stays usable when a small screen keyboard is open', (
@@ -341,20 +337,16 @@ void main() {
       addTearDown(tester.view.resetViewInsets);
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester, textScale: 1.6);
 
       _open(tester, manager: manager);
       await _pumpSheet(tester);
 
       expect(tester.takeException(), isNull);
-      expect(find.text('Run Script'), findsOneWidget);
+      expect(find.text('Run Script'), findsNothing);
       expect(find.text('Search scripts...'), findsOneWidget);
       expect(find.text('Select a script to run'), findsNothing);
-      final runButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Run Script'),
-      );
-      expect(runButton.onPressed, isNull);
+      expect(tester.widget<FilledButton>(_runButton).onPressed, isNull);
     });
 
     testWidgets('keeps identity selection reachable in compact mode', (
@@ -368,7 +360,6 @@ void main() {
       addTearDown(tester.view.resetViewInsets);
       final manager = _seededManager();
       addTearDown(manager.dispose);
-      await manager.loadPreferences();
       await _pumpHost(tester, textScale: 2);
 
       _open(
@@ -400,11 +391,7 @@ void main() {
       );
       await tester.tap(find.text('Ubuntu deploy'));
       await tester.pump();
-      expect(find.text('Run Ubuntu deploy'), findsOneWidget);
-      final runButton = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, 'Run Ubuntu deploy'),
-      );
-      expect(runButton.onPressed, isNotNull);
+      expect(tester.widget<FilledButton>(_runButton).onPressed, isNotNull);
     });
   });
 }

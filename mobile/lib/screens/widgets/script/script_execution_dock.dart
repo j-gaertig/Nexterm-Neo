@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import '../../renderers/script_execution_controller.dart';
 
@@ -85,9 +84,9 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
   }
 
   void _scrollToActiveStep() {
-    if (!_stepsScrollController.hasClients) return;
+    if (!mounted || !_stepsScrollController.hasClients) return;
     final index = math.max(0, widget.controller.currentStepNumber - 1);
-    final target = (index * 52.0 - 32).clamp(
+    final target = (index * 48.0 - 32).clamp(
       0.0,
       _stepsScrollController.position.maxScrollExtent,
     );
@@ -120,10 +119,12 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
           color: cs.surfaceContainer,
           elevation: 10,
           shadowColor: Colors.black.withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: _expanded ? maxHeight : 132),
+            constraints: BoxConstraints(
+              maxHeight: _expanded ? maxHeight : screenHeight,
+            ),
             child: AnimatedSize(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOutCubic,
@@ -132,7 +133,6 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _grabber(cs),
                   _header(cs),
                   _progressBar(cs),
                   if (_expanded) ...[
@@ -149,104 +149,77 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
     );
   }
 
-  Widget _grabber(ColorScheme cs) => GestureDetector(
-    behavior: HitTestBehavior.opaque,
-    onTap: () => _setExpanded(!_expanded),
-    onVerticalDragEnd: (details) {
-      final velocity = details.primaryVelocity ?? 0;
-      if (velocity < -150) {
-        _setExpanded(true);
-      } else if (velocity > 150) {
-        _setExpanded(false);
-      }
-    },
-    child: SizedBox(
-      height: 18,
-      child: Center(
-        child: Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ),
-    ),
-  );
-
   Widget _header(ColorScheme cs) {
     final controller = widget.controller;
-    final visual = _statusVisual(cs);
     final subtitle = _subtitle();
     final progressLabel = _progressLabel();
+    final phaseColor = _phaseColor(cs);
 
-    return InkWell(
-      onTap: () => _setExpanded(!_expanded),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 0, 8, 8),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: visual.color.withValues(alpha: 0.13),
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Center(child: visual.child),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    controller.scriptName,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < -150) {
+          _setExpanded(true);
+        } else if (velocity > 150) {
+          _setExpanded(false);
+        }
+      },
+      child: Semantics(
+        button: true,
+        label: _expanded ? 'Collapse script details' : 'Expand script details',
+        child: InkWell(
+          onTap: () => _setExpanded(!_expanded),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.scriptName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: TextStyle(fontSize: 11.5, color: cs.outline),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
+                ),
+                if (progressLabel != null) ...[
+                  const SizedBox(width: 10),
                   Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 11.5, color: cs.outline),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    progressLabel,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: phaseColor,
+                    ),
                   ),
                 ],
-              ),
-            ),
-            if (progressLabel != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: visual.color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  progressLabel,
+                const SizedBox(width: 8),
+                Text(
+                  _expanded ? 'Less' : 'Details',
                   style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: visual.color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: cs.primary,
                   ),
                 ),
-              ),
-            IconButton(
-              onPressed: () => _setExpanded(!_expanded),
-              tooltip: _expanded ? 'Collapse details' : 'Expand details',
-              visualDensity: VisualDensity.compact,
-              icon: Icon(
-                _expanded ? AppIcons.chevronDown : AppIcons.chevronUp,
-                size: 20,
-                color: cs.outline,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -284,6 +257,14 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
     return null;
   }
 
+  Color _phaseColor(ColorScheme cs) => switch (widget.controller.phase) {
+    ScriptExecutionPhase.failed ||
+    ScriptExecutionPhase.disconnected => cs.error,
+    ScriptExecutionPhase.cancelled ||
+    ScriptExecutionPhase.waitingForInput => cs.tertiary,
+    _ => cs.primary,
+  };
+
   Widget _progressBar(ColorScheme cs) {
     final controller = widget.controller;
     final progress = controller.displayProgress;
@@ -294,14 +275,7 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
       ScriptExecutionPhase.disconnected => true,
       _ => false,
     };
-    final color = switch (controller.phase) {
-      ScriptExecutionPhase.completed => cs.primary,
-      ScriptExecutionPhase.failed ||
-      ScriptExecutionPhase.disconnected => cs.error,
-      ScriptExecutionPhase.cancelled => cs.tertiary,
-      ScriptExecutionPhase.waitingForInput => cs.tertiary,
-      _ => cs.primary,
-    };
+    final color = _phaseColor(cs);
     // A terminal script must not keep an indeterminate animation alive. Use a
     // static full bar so the dock reflects that execution has stopped.
     final value = progress != null ? progress / 100 : (terminal ? 1.0 : null);
@@ -319,13 +293,21 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
 
   Widget _collapsedNotice(ColorScheme cs) {
     final notice = widget.controller.notices.last;
-    final visual = _noticeVisual(notice.kind, cs);
+    final color = _noticeColor(notice.kind, cs);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 7, 14, 9),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(visual.$1, size: 14, color: visual.$2),
-          const SizedBox(width: 6),
+          Container(
+            width: 3,
+            height: 15,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               notice.message,
@@ -342,44 +324,31 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
   Widget _expandedBody(ColorScheme cs) {
     final controller = widget.controller;
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (controller.errorMessage != null) ...[
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: cs.errorContainer,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    AppIcons.alertCircle,
-                    size: 16,
-                    color: cs.onErrorContainer,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      controller.errorMessage!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: cs.onErrorContainer,
-                      ),
-                    ),
-                  ),
-                ],
+              child: Text(
+                controller.errorMessage!,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  color: cs.onErrorContainer,
+                ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
           ],
           _stepsSection(cs),
           if (controller.notices.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             _noticesSection(cs),
           ],
         ],
@@ -417,7 +386,7 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
             color: cs.outline,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 7),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 220),
           child: Scrollbar(
@@ -430,7 +399,6 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
                 final visual = _visualForStep(index);
                 final isActive = index == controller.currentStepNumber - 1;
                 return _stepRow(
-                  context,
                   index,
                   controller.steps[index],
                   visual,
@@ -466,51 +434,50 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
   }
 
   Widget _stepRow(
-    BuildContext context,
     int index,
     String description,
     StepVisual visual,
     bool isActive,
     ColorScheme cs,
   ) {
-    final (icon, color) = switch (visual) {
-      StepVisual.success => (AppIcons.check, cs.primary),
-      StepVisual.error => (AppIcons.close, cs.error),
-      StepVisual.cancelled => (AppIcons.stopCircleOutline, cs.tertiary),
-      StepVisual.skip => (AppIcons.minus, cs.outline),
-      StepVisual.pending => (AppIcons.checkboxBlankOutline, cs.outline),
-      StepVisual.waiting => (AppIcons.alertCircle, cs.tertiary),
+    final color = switch (visual) {
+      StepVisual.success ||
       StepVisual.progress ||
-      StepVisual.loading => (AppIcons.chevronRight, cs.primary),
+      StepVisual.loading => cs.primary,
+      StepVisual.error => cs.error,
+      StepVisual.cancelled || StepVisual.waiting => cs.tertiary,
+      StepVisual.skip || StepVisual.pending => cs.outline,
     };
-    final showSpinner =
-        isActive &&
-        (visual == StepVisual.loading || visual == StepVisual.progress);
+    final muted = visual == StepVisual.skip || visual == StepVisual.cancelled;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 3),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
       decoration: BoxDecoration(
         color: isActive ? cs.primaryContainer.withValues(alpha: 0.55) : null,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 20,
-            height: 20,
-            child: showSpinner
-                ? Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.8,
-                      color: cs.primary,
-                    ),
-                  )
-                : Icon(icon, size: 16, color: color),
+          Container(
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Text(
+              '${index + 1}',
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               description,
@@ -518,10 +485,7 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
                 fontSize: 12,
                 height: 1.3,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color:
-                    visual == StepVisual.skip || visual == StepVisual.cancelled
-                    ? cs.outline
-                    : cs.onSurface,
+                color: muted ? cs.outline : cs.onSurface,
               ),
             ),
           ),
@@ -547,13 +511,13 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
             color: cs.outline,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 7),
         Container(
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(10),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -561,12 +525,16 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      _noticeVisual(visible[i].kind, cs).$1,
-                      size: 13,
-                      color: _noticeVisual(visible[i].kind, cs).$2,
+                    Container(
+                      margin: const EdgeInsets.only(top: 2),
+                      width: 3,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: _noticeColor(visible[i].kind, cs),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         visible[i].message,
@@ -579,7 +547,7 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
                     ),
                   ],
                 ),
-                if (i != visible.length - 1) const SizedBox(height: 5),
+                if (i != visible.length - 1) const SizedBox(height: 6),
               ],
             ],
           ),
@@ -588,41 +556,41 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
     );
   }
 
-  (IconData, Color) _noticeVisual(ScriptNoticeKind kind, ColorScheme cs) =>
-      switch (kind) {
-        ScriptNoticeKind.warning => (AppIcons.alertOutline, cs.tertiary),
-        ScriptNoticeKind.info => (AppIcons.informationOutline, cs.primary),
-        ScriptNoticeKind.success => (AppIcons.checkCircle, cs.primary),
-      };
+  Color _noticeColor(ScriptNoticeKind kind, ColorScheme cs) => switch (kind) {
+    ScriptNoticeKind.warning => cs.tertiary,
+    ScriptNoticeKind.info => cs.primary,
+    ScriptNoticeKind.success => cs.primary,
+  };
 
   Widget _actions(ColorScheme cs) {
     final controller = widget.controller;
     final buttons = <Widget>[];
     if (controller.isDisconnected) {
       buttons.add(
-        FilledButton.icon(
+        FilledButton(
           onPressed: widget.onReconnect,
-          icon: const Icon(AppIcons.refresh, size: 16),
-          label: const Text('Reconnect'),
+          style: _dockPrimaryStyle(),
+          child: const Text('Reconnect'),
         ),
       );
     }
     if (controller.canStop) {
       buttons.add(
-        OutlinedButton.icon(
+        OutlinedButton(
           onPressed: widget.onStop,
-          icon: const Icon(AppIcons.stopCircleOutline, size: 16),
-          label: const Text('Stop script'),
-          style: OutlinedButton.styleFrom(foregroundColor: cs.error),
+          style: _dockSecondaryStyle(
+            cs,
+          ).copyWith(foregroundColor: WidgetStatePropertyAll(cs.error)),
+          child: const Text('Stop script'),
         ),
       );
     }
     if (controller.isTerminal) {
       buttons.add(
-        FilledButton.icon(
+        FilledButton(
           onPressed: widget.onClose,
-          icon: const Icon(AppIcons.close, size: 16),
-          label: const Text('Close'),
+          style: _dockPrimaryStyle(),
+          child: const Text('Close'),
         ),
       );
     }
@@ -631,79 +599,40 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
       buttons.add(
         TextButton(
           onPressed: widget.onClose,
+          style: TextButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
           child: const Text('Close session'),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Flexible(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              alignment: WrapAlignment.end,
-              children: buttons,
-            ),
-          ),
+          for (var i = 0; i < buttons.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            buttons[i],
+          ],
         ],
       ),
     );
   }
 
-  ({IconData? icon, Widget? child, Color color}) _statusVisual(ColorScheme cs) {
-    final phase = widget.controller.phase;
-    if (phase == ScriptExecutionPhase.connecting ||
-        phase == ScriptExecutionPhase.cancelling) {
-      return (
-        icon: null,
-        child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
-        ),
-        color: cs.primary,
-      );
-    }
-    return switch (phase) {
-      ScriptExecutionPhase.running => (
-        icon: AppIcons.play,
-        child: null,
-        color: cs.primary,
-      ),
-      ScriptExecutionPhase.waitingForInput => (
-        icon: AppIcons.alertCircle,
-        child: null,
-        color: cs.tertiary,
-      ),
-      ScriptExecutionPhase.cancelled => (
-        icon: AppIcons.stopCircleOutline,
-        child: null,
-        color: cs.tertiary,
-      ),
-      ScriptExecutionPhase.completed => (
-        icon: AppIcons.checkCircle,
-        child: null,
-        color: cs.primary,
-      ),
-      ScriptExecutionPhase.failed => (
-        icon: AppIcons.alertCircle,
-        child: null,
-        color: cs.error,
-      ),
-      ScriptExecutionPhase.disconnected => (
-        icon: AppIcons.wifiOff,
-        child: null,
-        color: cs.error,
-      ),
-      ScriptExecutionPhase.connecting || ScriptExecutionPhase.cancelling => (
-        icon: null,
-        child: null,
-        color: cs.primary,
-      ),
-    };
-  }
+  ButtonStyle _dockPrimaryStyle() => FilledButton.styleFrom(
+    minimumSize: const Size.fromHeight(48),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
+
+  ButtonStyle _dockSecondaryStyle(ColorScheme cs) => OutlinedButton.styleFrom(
+    minimumSize: const Size.fromHeight(48),
+    side: BorderSide(color: cs.outlineVariant),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  );
 }

@@ -46,7 +46,6 @@ class _ServersScreenState extends State<ServersScreen> {
   final Set<int> _selectedTags = {};
   List<Tag> _allTags = [];
   late final ScriptManager _scriptManager;
-  bool _startingScriptDialogOpen = false;
 
   String _folderKey(ServerFolder folder) {
     final id = folder.id;
@@ -73,7 +72,6 @@ class _ServersScreenState extends State<ServersScreen> {
     _hasText = _search.text.isNotEmpty;
     _search.addListener(_onSearch);
     _scriptManager = ScriptManager();
-    _scriptManager.loadPreferences();
     _initStateManager();
   }
 
@@ -809,57 +807,6 @@ class _ServersScreenState extends State<ServersScreen> {
     );
   }
 
-  void _showStartingScriptDialog(String scriptName) {
-    _startingScriptDialogOpen = true;
-    unawaited(
-      showDialog<void>(
-        context: context,
-        useRootNavigator: true,
-        barrierDismissible: false,
-        builder: (dialogContext) => PopScope(
-          canPop: false,
-          child: AlertDialog(
-            content: Row(
-              children: [
-                const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Starting script'),
-                      const SizedBox(height: 2),
-                      Text(
-                        scriptName,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(dialogContext).colorScheme.outline,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ).whenComplete(() => _startingScriptDialogOpen = false),
-    );
-  }
-
-  void _hideStartingScriptDialog() {
-    if (!_startingScriptDialogOpen || !mounted) return;
-    _startingScriptDialogOpen = false;
-    final navigator = Navigator.of(context, rootNavigator: true);
-    if (navigator.canPop()) navigator.pop();
-  }
-
   ServerFolder? _organizationForServer(Server server) {
     final id = _serverIdInt(server.id);
     if (id == null) return null;
@@ -904,7 +851,6 @@ class _ServersScreenState extends State<ServersScreen> {
       if (connectionReason == null || !mounted) return;
     }
 
-    if (script != null) _showStartingScriptDialog(script.scriptName);
     try {
       if (script != null) {
         await widget.sessionManager.createScriptSession(
@@ -940,10 +886,8 @@ class _ServersScreenState extends State<ServersScreen> {
             );
         }
       }
-      if (script != null) _hideStartingScriptDialog();
       if (mounted) widget.onSwitchToSessions?.call();
     } catch (e) {
-      if (script != null) _hideStartingScriptDialog();
       if (!mounted) return;
       final raw = e.toString();
       final msg = raw.toLowerCase().contains('disabled')
@@ -1004,7 +948,6 @@ class _ServersScreenState extends State<ServersScreen> {
       token,
       manager: _scriptManager,
       organizationId: _organizationIdFromFolder(organization),
-      organizationName: organization?.name,
     );
     if (selection == null || !mounted) return;
 

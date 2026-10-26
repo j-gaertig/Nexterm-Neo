@@ -64,6 +64,7 @@ class AppIcons {
   static const IconData filePdfBox = LucideIcons.fileType;
   static const IconData fileUploadOutline = LucideIcons.fileUp;
   static const IconData fileVideoOutline = LucideIcons.fileVideo;
+  static const IconData filterVariant = LucideIcons.filter;
   static const IconData fitToScreen = LucideIcons.maximize;
   static const IconData flashOff = LucideIcons.zapOff;
   static const IconData flashOn = LucideIcons.zap;
@@ -74,8 +75,6 @@ class AppIcons {
   static const IconData folderOutline = LucideIcons.folder;
   static const IconData folderPlusOutline = LucideIcons.folderPlus;
   static const IconData formatSize = LucideIcons.type;
-  static const IconData helpCircleOutline = LucideIcons.circleHelp;
-  static const IconData history = LucideIcons.history;
   static const IconData informationOutline = LucideIcons.info;
   static const IconData key = LucideIcons.keyRound;
   static const IconData keyboard = LucideIcons.keyboard;
@@ -100,7 +99,6 @@ class AppIcons {
   static const IconData openInNew = LucideIcons.externalLink;
   static const IconData palette = LucideIcons.palette;
   static const IconData pencilOutline = LucideIcons.pencil;
-  static const IconData play = LucideIcons.play;
   static const IconData plus = LucideIcons.plus;
   static const IconData powerPlug = LucideIcons.plugZap;
   static const IconData qrcodeScan = LucideIcons.qrCode;
@@ -112,10 +110,7 @@ class AppIcons {
   static const IconData serverNetworkOff = LucideIcons.serverOff;
   static const IconData serverOff = LucideIcons.serverOff;
   static const IconData shieldAccountOutline = LucideIcons.shieldCheck;
-  static const IconData star = LucideIcons.star;
-  static const IconData starOutline = LucideIcons.star;
   static const IconData stop = LucideIcons.square;
-  static const IconData stopCircleOutline = LucideIcons.circleStop;
   static const IconData tablet = LucideIcons.tablet;
   static const IconData themeLightDark = LucideIcons.sunMoon;
   static const IconData themeSystem = LucideIcons.sparkles;
@@ -125,7 +120,6 @@ class AppIcons {
   static const IconData viewList = LucideIcons.list;
   static const IconData viewGrid = LucideIcons.grid2x2;
   static const IconData web = LucideIcons.globe;
-  static const IconData wifiOff = LucideIcons.wifiOff;
   static const IconData zipBoxOutline = LucideIcons.archive;
 
   static const IconData brandServer = MdiIcons.server;

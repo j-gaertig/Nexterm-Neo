@@ -14,16 +14,17 @@ import '../../../utils/app_icons.dart';
 /// Bottom sheet to pick a script to run on [server]. Returns
 /// `(scriptId, scriptName, identityId)` or `null` when cancelled.
 ///
-/// Mirrors the web `ScriptsMenu`: searchable list with OS compatibility
-/// filtering, personal/organization/source grouping, favorites, recents, and
-/// identity selection when the server has several identities.
+/// All scripts available to the server are listed in one flat list. The
+/// optional compatibility filter is controlled by the icon button next to the
+/// search field. When the server has several identities, the identity picker
+/// lives in the same row so the footer can stay focused on the single action
+/// that matters: running the selected script.
 Future<RunScriptSelection?> showRunScriptSheet(
   BuildContext context,
   Server server,
   String token, {
   required ScriptManager manager,
   int? organizationId,
-  String? organizationName,
   Future<String?> Function()? osNameLoader,
   Future<List<ManagedIdentity>> Function(String token)? identitiesLoader,
 }) {
@@ -41,7 +42,6 @@ Future<RunScriptSelection?> showRunScriptSheet(
       token: token,
       manager: manager,
       organizationId: organizationId,
-      organizationName: organizationName,
       osNameLoader: osNameLoader,
       identitiesLoader: identitiesLoader,
     ),
@@ -65,7 +65,6 @@ class RunScriptSheet extends StatefulWidget {
   final String token;
   final ScriptManager manager;
   final int? organizationId;
-  final String? organizationName;
   final Future<String?> Function()? osNameLoader;
   final Future<List<ManagedIdentity>> Function(String token)? identitiesLoader;
 
@@ -75,7 +74,6 @@ class RunScriptSheet extends StatefulWidget {
     required this.token,
     required this.manager,
     this.organizationId,
-    this.organizationName,
     this.osNameLoader,
     this.identitiesLoader,
   });
@@ -91,7 +89,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
   String? _osName;
   bool _osLoading = true;
   bool _initializing = true;
-  bool _includeIncompatible = false;
+  bool _compatibleOnly = false;
   int? _selectedScriptId;
   int? _selectedIdentityId;
   Map<int, ManagedIdentity> _identities = {};
@@ -101,6 +99,14 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
       (widget.server.identities?.length ?? 0) > 1;
 
   bool get _osKnown => _osName != null && _osName!.isNotEmpty;
+
+  bool get _compatibilityFilterActive => _osKnown && _compatibleOnly;
+
+  String get _compatibilityTooltip {
+    if (_osLoading) return 'Detecting operating system';
+    if (!_osKnown) return 'Operating system unknown';
+    return _compatibleOnly ? 'Show all scripts' : 'Compatible only';
+  }
 
   @override
   void initState() {
@@ -138,26 +144,24 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
   }
 
   Future<void> _load({bool refresh = false}) async {
-    setState(() {
-      _initializing = true;
-      _osLoading = true;
-      _loadError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _initializing = true;
+        _osLoading = true;
+        _loadError = null;
+      });
+    }
 
     final osFuture = _resolveOsName(
       refresh: refresh,
     ).then<String?>((value) => normalizeOsName(value)).catchError((_) => null);
 
     try {
-      await Future.wait([
-        widget.manager.ensureLoaded(widget.token, refresh: refresh),
-        widget.manager.loadPreferences(),
-      ]);
-      final os = await osFuture;
+      // The catalogue is the only blocking load. OS detection happens in the
+      // background so the list can appear as soon as the scripts are ready.
+      await widget.manager.ensureLoaded(widget.token, refresh: refresh);
       if (!mounted) return;
       setState(() {
-        _osName = os;
-        _osLoading = false;
         _initializing = false;
         _loadError = null;
       });
@@ -165,10 +169,21 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
       if (!mounted) return;
       setState(() {
         _loadError = error;
-        _osLoading = false;
         _initializing = false;
       });
     }
+
+    final os = await osFuture;
+    if (!mounted) return;
+    setState(() {
+      _osName = os;
+      _osLoading = false;
+      if (!_osKnown) _compatibleOnly = false;
+      final selected = _selectedScript;
+      if (_compatibleOnly && selected != null && !_isCompatible(selected)) {
+        _selectedScriptId = null;
+      }
+    });
   }
 
   Future<void> _loadIdentities() async {
@@ -199,7 +214,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
   List<Script> get _visibleScripts => widget.manager.scriptsForServer(
     organizationId: widget.organizationId,
     serverOsName: _osName,
-    includeIncompatible: _includeIncompatible,
+    includeIncompatible: !_compatibilityFilterActive,
     query: _query,
   );
 
@@ -214,12 +229,12 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     return matchesOsFilter(script.osFilter, _osName, isPveEntry: false);
   }
 
-  void _setCompatibleOnly(bool compatibleOnly) {
+  void _toggleCompatibilityFilter() {
     if (!_osKnown) return;
     final selected = _selectedScript;
     setState(() {
-      _includeIncompatible = !compatibleOnly;
-      if (compatibleOnly && selected != null && !_isCompatible(selected)) {
+      _compatibleOnly = !_compatibleOnly;
+      if (_compatibleOnly && selected != null && !_isCompatible(selected)) {
         _selectedScriptId = null;
       }
     });
@@ -228,7 +243,6 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
   void _submit() {
     final script = _selectedScript;
     if (script == null) return;
-    unawaited(widget.manager.recordRecent(script.id));
     Navigator.pop(
       context,
       RunScriptSelection(
@@ -277,22 +291,9 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 12, 4),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: cs.primaryContainer,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          AppIcons.codeBracesBox,
-                          color: cs.onPrimaryContainer,
-                          size: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,7 +325,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
               if (widget.manager.isLoading)
                 const LinearProgressIndicator(minHeight: 2),
               Padding(
-                padding: EdgeInsets.fromLTRB(20, compact ? 0 : 6, 20, 2),
+                padding: EdgeInsets.fromLTRB(20, compact ? 0 : 6, 20, 4),
                 child: Row(
                   children: [
                     Expanded(
@@ -366,58 +367,15 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                         ),
                       ),
                     ),
-                    if (compact && _needsIdentitySelection) ...[
+                    const SizedBox(width: 8),
+                    _compatibilityButton(cs),
+                    if (_needsIdentitySelection) ...[
                       const SizedBox(width: 8),
-                      _compactIdentityButton(cs),
+                      _identityButton(cs),
                     ],
                   ],
                 ),
               ),
-              if (!compact && !_initializing && _loadError == null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 2),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      _osChip(cs),
-                      FilterChip(
-                        selected: _osKnown && !_includeIncompatible,
-                        onSelected: _osKnown
-                            ? (value) => _setCompatibleOnly(value)
-                            : null,
-                        label: Text(
-                          _osKnown
-                              ? 'Compatible only'
-                              : 'All operating systems',
-                          style: const TextStyle(fontSize: 11),
-                        ),
-                        visualDensity: VisualDensity.compact,
-                        side: BorderSide(color: cs.outlineVariant),
-                      ),
-                      if (_osLoading)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.8,
-                                color: cs.outline,
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Detecting OS...',
-                              style: TextStyle(fontSize: 11, color: cs.outline),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
               Divider(height: 1, color: cs.outlineVariant),
               Expanded(child: _buildBody(cs)),
               _footer(cs, compact: compact),
@@ -428,41 +386,95 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     );
   }
 
-  Widget _osChip(ColorScheme cs) {
-    final label = _osKnown ? _osName! : 'OS unknown';
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: math.max(120, MediaQuery.sizeOf(context).width - 80),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _osKnown ? AppIcons.laptop : AppIcons.helpCircleOutline,
-              size: 13,
-              color: cs.outline,
-            ),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: cs.outline,
-                ),
+  Widget _compatibilityButton(ColorScheme cs) {
+    final active = _compatibilityFilterActive;
+    final enabled = _osKnown && !_osLoading;
+    final background = active
+        ? cs.primary
+        : (enabled ? cs.surfaceContainerHigh : cs.surfaceContainerLow);
+    final foreground = active
+        ? cs.onPrimary
+        : (enabled ? cs.onSurfaceVariant : cs.outline);
+
+    return Tooltip(
+      message: _compatibilityTooltip,
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        toggled: active,
+        label: _compatibilityTooltip,
+        child: Material(
+          color: background,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled ? _toggleCompatibilityFilter : null,
+            child: SizedBox.square(
+              dimension: 48,
+              child: Center(
+                child: _osLoading
+                    ? SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: foreground,
+                        ),
+                      )
+                    : Icon(AppIcons.filterVariant, size: 20, color: foreground),
               ),
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _identityButton(ColorScheme cs) {
+    final wanted = widget.server.identities ?? const <int>[];
+    final selectedIdentity = _selectedIdentityId ?? wanted.firstOrNull;
+
+    return PopupMenuButton<int>(
+      tooltip: 'Run as identity',
+      initialValue: selectedIdentity,
+      onSelected: (value) => setState(() => _selectedIdentityId = value),
+      itemBuilder: (context) => [
+        for (final id in wanted)
+          PopupMenuItem(
+            value: id,
+            child: Text(
+              _identityLabel(id),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: id == selectedIdentity
+                    ? FontWeight.w700
+                    : FontWeight.w400,
+                color: id == selectedIdentity ? cs.primary : cs.onSurface,
+              ),
+            ),
+          ),
+      ],
+      child: SizedBox.square(
+        dimension: 48,
+        child: Material(
+          color: cs.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(AppIcons.account, size: 20),
+              if (_identitiesLoading)
+                const Positioned(
+                  right: 7,
+                  bottom: 7,
+                  child: SizedBox.square(
+                    dimension: 10,
+                    child: CircularProgressIndicator(strokeWidth: 1.6),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -479,17 +491,15 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(AppIcons.alertCircle, size: 32, color: cs.error),
-              const SizedBox(height: 10),
               Text(
                 'Failed to load scripts',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: cs.onSurface,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 friendlyApiError(
                   _loadError!,
@@ -498,11 +508,10 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: cs.outline),
               ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
+              const SizedBox(height: 16),
+              FilledButton(
                 onPressed: () => _load(refresh: true),
-                icon: const Icon(AppIcons.refresh, size: 16),
-                label: const Text('Retry'),
+                child: const Text('Retry'),
               ),
             ],
           ),
@@ -519,27 +528,36 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
             includeIncompatible: true,
           )
           .isNotEmpty;
+      final filteredByCompatibility =
+          hasAny && _compatibilityFilterActive && _query.isEmpty;
+
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                _query.isEmpty ? AppIcons.codeBraces : AppIcons.magnify,
-                size: 30,
-                color: cs.outline,
-              ),
-              const SizedBox(height: 10),
               Text(
                 !hasAny
-                    ? 'No scripts available\nCreate and manage scripts in the web client.'
+                    ? 'No scripts available'
                     : (_query.isEmpty
                           ? 'No compatible scripts for this server'
                           : 'No scripts match your search'),
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: cs.outline),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
               ),
+              if (!hasAny) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Create and manage scripts in the web client.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: cs.outline),
+                ),
+              ],
               if (_query.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 TextButton(
@@ -549,11 +567,11 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                   },
                   child: const Text('Clear search'),
                 ),
-              ] else if (hasAny && !_includeIncompatible && _osKnown) ...[
+              ] else if (filteredByCompatibility) ...[
                 const SizedBox(height: 8),
                 TextButton(
-                  onPressed: () => _setCompatibleOnly(false),
-                  child: const Text('Show scripts for other systems'),
+                  onPressed: _toggleCompatibilityFilter,
+                  child: const Text('Show all scripts'),
                 ),
               ],
             ],
@@ -562,409 +580,90 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
       );
     }
 
-    final entries = _entries(scripts);
     return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 8),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        if (entry is _SectionEntry) return _sectionHeader(entry.label, cs);
-        final script = (entry as _ScriptEntry).script;
-        return _scriptTile(script, cs);
-      },
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      itemCount: scripts.length,
+      itemBuilder: (context, index) => _scriptTile(scripts[index], cs),
     );
   }
-
-  List<Object> _entries(List<Script> visible) {
-    final entries = <Object>[];
-    final used = <int>{};
-    final byId = {for (final script in visible) script.id: script};
-
-    final favorites = visible
-        .where((s) => widget.manager.isFavorite(s.id))
-        .toList();
-    if (favorites.isNotEmpty) {
-      entries.add(const _SectionEntry('Favorites'));
-      for (final script in favorites) {
-        entries.add(_ScriptEntry(script));
-        used.add(script.id);
-      }
-    }
-
-    final recents = <Script>[];
-    for (final id in widget.manager.recentIds) {
-      final script = byId[id];
-      if (script != null && !used.contains(id)) {
-        recents.add(script);
-        used.add(id);
-      }
-    }
-    if (recents.isNotEmpty) {
-      entries.add(const _SectionEntry('Recently used'));
-      for (final script in recents) {
-        entries.add(_ScriptEntry(script));
-      }
-    }
-
-    void addGroup(String label, Iterable<Script> scripts) {
-      final group = scripts
-          .where((script) => !used.contains(script.id))
-          .toList(growable: false);
-      if (group.isEmpty) return;
-      entries.add(_SectionEntry(label));
-      for (final script in group) {
-        entries.add(_ScriptEntry(script));
-        used.add(script.id);
-      }
-    }
-
-    addGroup(
-      'Personal',
-      visible.where((s) => !s.isSource && s.organizationId == null),
-    );
-    addGroup(
-      widget.organizationName?.isNotEmpty == true
-          ? widget.organizationName!
-          : 'Organization',
-      visible.where((s) => !s.isSource && s.organizationId != null),
-    );
-    addGroup('Source scripts', visible.where((s) => s.isSource));
-    return entries;
-  }
-
-  Widget _sectionHeader(String label, ColorScheme cs) => Padding(
-    padding: const EdgeInsets.fromLTRB(22, 14, 22, 5),
-    child: Text(
-      label.toUpperCase(),
-      style: TextStyle(
-        fontSize: 10.5,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.5,
-        color: cs.outline,
-      ),
-    ),
-  );
 
   Widget _scriptTile(Script script, ColorScheme cs) {
     final selected = script.id == _selectedScriptId;
-    final favorite = widget.manager.isFavorite(script.id);
-    final compatible = _isCompatible(script);
+    final description = script.description?.trim() ?? '';
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
-        color: selected ? cs.primaryContainer : Colors.transparent,
+        color: selected ? cs.primary : Colors.transparent,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          dense: true,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          contentPadding: const EdgeInsets.only(left: 14, right: 2),
-          leading: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: (selected ? cs.onPrimaryContainer : cs.primary).withValues(
-                alpha: 0.12,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              AppIcons.codeBraces,
-              size: 18,
-              color: selected ? cs.onPrimaryContainer : cs.primary,
-            ),
-          ),
-          title: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  script.name,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                    color: selected ? cs.onPrimaryContainer : cs.onSurface,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (script.isSource) ...[
-                const SizedBox(width: 6),
-                Icon(
-                  AppIcons.linkVariant,
-                  size: 13,
-                  color: selected
-                      ? cs.onPrimaryContainer.withValues(alpha: 0.7)
-                      : cs.outline,
-                ),
-              ],
-              if (!compatible) ...[
-                const SizedBox(width: 6),
-                Text(
-                  'Other OS',
-                  style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    color: cs.error,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (script.description?.isNotEmpty == true)
-                Text(
-                  script.description!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: selected
-                        ? cs.onPrimaryContainer.withValues(alpha: 0.7)
-                        : cs.outline,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              if (script.osBadges.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 3,
-                  children: [
-                    for (final os in script.osBadges) _osBadge(os, selected),
-                  ],
-                ),
-              ],
-            ],
-          ),
-          onTap: () =>
-              setState(() => _selectedScriptId = selected ? null : script.id),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: () => widget.manager.toggleFavorite(script.id),
-                tooltip: favorite
-                    ? 'Remove from favorites'
-                    : 'Add to favorites',
-                icon: Icon(
-                  favorite ? AppIcons.star : AppIcons.starOutline,
-                  size: 18,
-                  color: favorite
-                      ? (selected ? cs.onPrimaryContainer : cs.primary)
-                      : cs.outline,
-                ),
-              ),
-              if (selected)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Icon(
-                    AppIcons.checkCircle,
-                    size: 18,
-                    color: cs.onPrimaryContainer,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _osBadge(String os, bool selected) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: selected
-            ? cs.onPrimaryContainer.withValues(alpha: 0.08)
-            : cs.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Text(
-        os,
-        style: TextStyle(
-          fontSize: 10,
-          color: selected
-              ? cs.onPrimaryContainer.withValues(alpha: 0.8)
-              : cs.outline,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
-  Widget _compactIdentityButton(ColorScheme cs) {
-    final wanted = widget.server.identities ?? const <int>[];
-    final selectedIdentity = _selectedIdentityId ?? wanted.firstOrNull;
-    return PopupMenuButton<int>(
-      tooltip: 'Run as identity',
-      initialValue: selectedIdentity,
-      onSelected: (value) => setState(() => _selectedIdentityId = value),
-      itemBuilder: (context) => [
-        for (final id in wanted)
-          PopupMenuItem(
-            value: id,
-            child: Row(
-              children: [
-                Icon(
-                  id == selectedIdentity
-                      ? AppIcons.checkCircle
-                      : AppIcons.account,
-                  size: 17,
-                  color: id == selectedIdentity ? cs.primary : cs.outline,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _identityLabel(id),
+        child: Semantics(
+          selected: selected,
+          child: InkWell(
+            key: ValueKey('script-${script.id}'),
+            onTap: () => setState(() => _selectedScriptId = script.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    script.name,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: selected ? cs.onPrimary : cs.onSurface,
+                    ),
                   ),
-                ),
-              ],
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        color: selected
+                            ? cs.onPrimary.withValues(alpha: 0.78)
+                            : cs.outline,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
-      ],
-      child: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant),
         ),
-        child: Icon(AppIcons.account, size: 20, color: cs.primary),
       ),
     );
   }
 
   Widget _footer(ColorScheme cs, {required bool compact}) {
     final selected = _selectedScript;
-    final wanted = widget.server.identities ?? const <int>[];
-    final selectedIdentity = _selectedIdentityId ?? wanted.firstOrNull;
 
     return Container(
       decoration: BoxDecoration(
+        color: cs.surface,
         border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
-      padding: EdgeInsets.fromLTRB(20, compact ? 6 : 10, 20, compact ? 8 : 12),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (!compact && _needsIdentitySelection) ...[
-            Row(
-              children: [
-                Text(
-                  'Run as identity',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: cs.outline,
-                  ),
-                ),
-                if (_identitiesLoading) ...[
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 12,
-                    height: 12,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.7,
-                      color: cs.outline,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(height: 4),
-            DropdownButtonFormField<int>(
-              initialValue: selectedIdentity,
-              isExpanded: true,
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: cs.surfaceContainerHigh,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              items: [
-                for (final id in wanted)
-                  DropdownMenuItem(
-                    value: id,
-                    child: Text(
-                      _identityLabel(id),
-                      style: const TextStyle(fontSize: 12),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _selectedIdentityId = value),
-            ),
-            const SizedBox(height: 8),
-          ],
-          if (!compact) ...[
-            Row(
-              children: [
-                Icon(
-                  selected == null ? AppIcons.codeBraces : AppIcons.checkCircle,
-                  size: 14,
-                  color: selected == null ? cs.outline : cs.primary,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    selected?.name ?? 'Select a script to run',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: selected == null
-                          ? FontWeight.w400
-                          : FontWeight.w600,
-                      color: selected == null ? cs.outline : cs.onSurface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (selected != null)
-                  IconButton(
-                    tooltip: 'Clear selection',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => setState(() => _selectedScriptId = null),
-                    icon: const Icon(AppIcons.close, size: 16),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 4),
-          ],
-          FilledButton.icon(
-            onPressed: selected == null ? null : _submit,
-            icon: const Icon(AppIcons.play, size: 18),
-            label: Text(
-              selected == null ? 'Run Script' : 'Run ${selected.name}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            style: FilledButton.styleFrom(
-              padding: EdgeInsets.symmetric(vertical: compact ? 9 : 13),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
+      padding: EdgeInsets.fromLTRB(20, compact ? 8 : 10, 20, compact ? 8 : 12),
+      child: FilledButton(
+        key: const ValueKey('run-script-button'),
+        onPressed: selected == null ? null : _submit,
+        style: FilledButton.styleFrom(
+          minimumSize: Size.fromHeight(compact ? 46 : 52),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
+        ),
+        child: const Text(
+          'Run',
+          maxLines: 1,
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -976,14 +675,4 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     if (identity.username.trim().isNotEmpty) return identity.username;
     return 'Identity #$id';
   }
-}
-
-class _SectionEntry {
-  final String label;
-  const _SectionEntry(this.label);
-}
-
-class _ScriptEntry {
-  final Script script;
-  const _ScriptEntry(this.script);
 }
