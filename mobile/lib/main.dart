@@ -3,7 +3,11 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/device_setup_screen.dart';
 import 'screens/main_navigation_page.dart';
+import 'screens/screen_lock_screen.dart';
+import 'services/screen_lock_service.dart';
 import 'services/session_manager.dart';
+import 'utils/screen_lock_coordinator.dart';
+import 'utils/screen_lock_settings.dart';
 import 'utils/theme_manager.dart';
 import 'utils/auth_manager.dart';
 import 'utils/ai_manager.dart';
@@ -23,6 +27,7 @@ void main() async {
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
+  final screenLockSettings = await ScreenLockSettings.load();
 
   final accountManager = ServerAccountManager();
   await accountManager.load();
@@ -35,6 +40,7 @@ void main() async {
     terminalSettings: terminalSettings,
     sftpSettings: sftpSettings,
     serverViewSettings: serverViewSettings,
+    screenLockSettings: screenLockSettings,
   ));
 }
 
@@ -46,6 +52,7 @@ class MyApp extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
+  final ScreenLockSettings screenLockSettings;
 
   const MyApp({
     super.key,
@@ -56,6 +63,7 @@ class MyApp extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
+    required this.screenLockSettings,
   });
 
   @override
@@ -71,6 +79,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late TerminalSettings _terminalSettings;
   late SftpSettings _sftpSettings;
   late ServerViewSettings _serverViewSettings;
+  late ScreenLockSettings _screenLockSettings;
+  late ScreenLockService _screenLockService;
+  late ScreenLockCoordinator _screenLockCoordinator;
+  final _navigatorKey = GlobalKey<NavigatorState>();
+  bool _showStartupLockCover = false;
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
@@ -88,8 +102,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _terminalSettings = widget.terminalSettings;
     _sftpSettings = widget.sftpSettings;
     _serverViewSettings = widget.serverViewSettings;
+    _screenLockSettings = widget.screenLockSettings;
+    _screenLockService = ScreenLockService();
+    _wasAuthenticated = _authManager.isAuthenticated;
+    _showStartupLockCover =
+        _screenLockSettings.enabled && _wasAuthenticated;
+    _screenLockCoordinator = ScreenLockCoordinator(
+      navigatorKey: _navigatorKey,
+      settings: _screenLockSettings,
+      authManager: _authManager,
+      service: _screenLockService,
+      onLockShown: _hideStartupLockCover,
+    );
 
     _authManager.addListener(_onAuthChanged);
+    _screenLockCoordinator.start();
 
     if (_authManager.isAuthenticated) {
       _loadSnippets();
@@ -126,10 +153,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
+  void _hideStartupLockCover() {
+    if (!mounted || !_showStartupLockCover) return;
+    setState(() => _showStartupLockCover = false);
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authManager.removeListener(_onAuthChanged);
+    _screenLockCoordinator.dispose();
     _themeManager.dispose();
     _authManager.dispose();
     _snippetManager.dispose();
@@ -138,11 +171,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _terminalSettings.dispose();
     _sftpSettings.dispose();
     _serverViewSettings.dispose();
+    _screenLockSettings.dispose();
     super.dispose();
   }
 
   void _onAuthChanged() {
-    if (_authManager.isAuthenticated) {
+    final authenticated = _authManager.isAuthenticated;
+    final signedIn = authenticated && !_wasAuthenticated;
+    _wasAuthenticated = authenticated;
+
+    if (authenticated) {
+      if (signedIn && _screenLockSettings.enabled) {
+        _showStartupLockCover = true;
+      }
       _loadSnippets();
       _loadAISettings();
       _restoreSessions();
@@ -153,6 +194,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (token != null) {
         _sessionManager.closeAll(token);
       }
+      _showStartupLockCover = false;
     }
     setState(() {});
   }
@@ -166,10 +208,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           builder: (lightDynamic, darkDynamic) {
             return MaterialApp(
               title: 'Nexterm',
+              navigatorKey: _navigatorKey,
               theme: _themeManager.lightTheme(dynamicColorScheme: lightDynamic),
               darkTheme: _themeManager.darkTheme(dynamicColorScheme: darkDynamic),
               themeMode: _themeManager.themeMode,
-              home: _determineInitialScreen(),
+              home: _showStartupLockCover
+                  ? const ScreenLockStartupCover()
+                  : _determineInitialScreen(),
             );
           },
         );
@@ -188,6 +233,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             terminalSettings: _terminalSettings,
             sftpSettings: _sftpSettings,
             serverViewSettings: _serverViewSettings,
+            screenLockSettings: _screenLockSettings,
+            screenLockService: _screenLockService,
           )
         : DeviceSetupScreen(authManager: _authManager);
   }

@@ -6,10 +6,12 @@ import '../utils/app_icons.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/password_prompt_localizations.dart';
+import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
 import '../services/api_config.dart';
+import '../services/screen_lock_service.dart';
 import 'sessions_screen.dart';
 import 'server_accounts_screen.dart';
 import 'qr_scanner_screen.dart';
@@ -57,6 +59,8 @@ class SettingsScreen extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
+  final ScreenLockSettings screenLockSettings;
+  final ScreenLockService screenLockService;
 
   const SettingsScreen({
     super.key,
@@ -65,6 +69,8 @@ class SettingsScreen extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
+    required this.screenLockSettings,
+    required this.screenLockService,
   });
 
   @override
@@ -74,6 +80,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   String? _username;
   String? _fullName;
+  bool _screenLockBusy = false;
 
   @override
   void initState() {
@@ -86,6 +93,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _username = widget.authManager.getUsername();
       _fullName = widget.authManager.getFullName();
     });
+  }
+
+  Future<void> _handleScreenLockChanged(bool value) async {
+    if (_screenLockBusy) return;
+
+    setState(() => _screenLockBusy = true);
+    try {
+      if (value) {
+        final supported = await widget.screenLockService.isDeviceSupported();
+        if (!mounted) return;
+        if (!supported) {
+          await _showScreenLockUnavailableDialog();
+          return;
+        }
+
+        final result = await widget.screenLockService.authenticate(
+          reason: 'Authenticate to enable screen lock for Nexterm.',
+        );
+        if (!mounted) return;
+        if (result != ScreenLockAuthResult.success) {
+          _showScreenLockMessage(result.message);
+          return;
+        }
+
+        await widget.screenLockSettings.setEnabled(true);
+        if (!mounted) return;
+        _showScreenLockMessage(
+          widget.screenLockSettings.enabled
+              ? 'Screen lock enabled.'
+              : 'Could not save screen lock setting.',
+        );
+        return;
+      }
+
+      final result = await widget.screenLockService.authenticate(
+        reason: 'Authenticate to disable screen lock for Nexterm.',
+      );
+      if (!mounted) return;
+      if (result == ScreenLockAuthResult.success) {
+        await widget.screenLockSettings.setEnabled(false);
+        if (!mounted) return;
+        _showScreenLockMessage(
+          !widget.screenLockSettings.enabled
+              ? 'Screen lock disabled.'
+              : 'Could not save screen lock setting.',
+        );
+        return;
+      }
+      if (result != ScreenLockAuthResult.canceled) {
+        _showScreenLockMessage(result.message);
+      }
+    } catch (_) {
+      if (mounted) {
+        _showScreenLockMessage('Could not update screen lock setting.');
+      }
+    } finally {
+      if (mounted) setState(() => _screenLockBusy = false);
+    }
+  }
+
+  void _showScreenLockMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _showScreenLockUnavailableDialog() {
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Screen lock unavailable'),
+        content: const Text(
+          'Set up a screen lock (PIN, pattern, password, or biometrics) in your device settings, then try again.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _handleLogout() async {
@@ -206,6 +295,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const SizedBox(height: 8),
+          _sectionHeader('Security', cs),
+          _section(cs, children: [
+            ListenableBuilder(
+              listenable: widget.screenLockSettings,
+              builder: (_, __) => SwitchListTile(
+                contentPadding: const EdgeInsets.only(left: 16, right: 12),
+                secondary: Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
+                  child: Icon(AppIcons.lockOutline, color: cs.onPrimaryContainer, size: 18),
+                ),
+                title: const Text('Screen Lock', style: TextStyle(fontSize: 15)),
+                subtitle: Text(
+                  _screenLockBusy
+                      ? 'Waiting for authentication...'
+                      : widget.screenLockSettings.enabled
+                          ? 'Required when opening Nexterm'
+                          : 'Use your device screen lock to open the app',
+                  style: TextStyle(fontSize: 12, color: cs.outline),
+                ),
+                value: widget.screenLockSettings.enabled,
+                onChanged: _screenLockBusy ? null : _handleScreenLockChanged,
+              ),
+            ),
+          ]),
+
+          const SizedBox(height: 4),
           _section(cs, children: [
             _navTile(AppIcons.serverNetwork, 'Connections',
               '${widget.authManager.accountManager.accounts.length} server(s)', cs,
