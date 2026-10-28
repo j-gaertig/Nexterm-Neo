@@ -18,13 +18,16 @@ const feedSplit = (sanitizer, text, size) => {
     return output;
 };
 
-test("removes Kitty, iTerm2 and SIXEL payloads from recorded output", () => {
+test("keeps Kitty file references but removes inline image payloads", () => {
     const sanitizer = new TerminalOutputSanitizer();
     const image = Buffer.from("not-a-real-png").toString("base64");
+    const direct = `\x1b_Ga=T,f=100,t=d;${image}${ST}`;
     const text = [
         "logo line 1\r\n",
-        FASTFETCH_AVATAR,
+        direct,
         "\x1b[8Cuser\r\n",
+        FASTFETCH_AVATAR,
+        "after avatar\r\n",
         `\x1b]1337;File=inline=1;width=4:${image}\x07`,
         "after iTerm\r\n",
         `\x1bPq#0;2;0;0;0#0~~${ST}`,
@@ -33,10 +36,131 @@ test("removes Kitty, iTerm2 and SIXEL payloads from recorded output", () => {
 
     const output = sanitizer.push(text);
 
-    assert.equal(output, "logo line 1\r\n\x1b[8Cuser\r\nafter iTerm\r\nafter sixel\r\n");
+    // The path-only fastfetch avatar must survive so a reconnecting terminal
+    // can fetch it again; all real image payloads must not.
+    assert.equal(output, `logo line 1\r\n\x1b[8Cuser\r\n${FASTFETCH_AVATAR}after avatar\r\nafter iTerm\r\nafter sixel\r\n`);
     assert.equal(output.includes("avatar.png"), false);
     assert.equal(output.includes(image), false);
-    assert.equal(output.includes("\x1b_G"), false);
+    assert.equal(output.includes(direct), false);
+});
+
+test("keeps chunked Kitty file transmissions intact", () => {
+    const payload = Buffer.from("/home/user/.config/fastfetch/avatar.png").toString("base64");
+    const third = Math.ceil(payload.length / 3);
+    const transmission = [
+        `\x1b_Ga=T,f=100,t=f,m=1;${payload.slice(0, third)}${ST}`,
+        `\x1b_Gm=1;${payload.slice(third, third * 2)}${ST}`,
+        `\x1b_Gm=0;${payload.slice(third * 2)}${ST}`,
+    ].join("");
+    const text = `logo${transmission}modules\r\n`;
+
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, text.length), text);
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 1), text);
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 7), text);
+});
+
+test("keeps chunked Kitty animation frame file transmissions", () => {
+    const payload = Buffer.from("/home/user/.config/fastfetch/avatar.png").toString("base64");
+    const third = Math.ceil(payload.length / 3);
+    const transmission = [
+        `\x1b_Ga=f,i=1,f=100,t=f,m=1;${payload.slice(0, third)}${ST}`,
+        `\x1b_Gm=1,a=f;${payload.slice(third, third * 2)}${ST}`,
+        `\x1b_Gm=0,a=f;${payload.slice(third * 2)}${ST}`,
+    ].join("");
+    const text = `logo${transmission}modules\r\n`;
+
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, text.length), text);
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 1), text);
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 7), text);
+});
+
+test("keeps temporary-file Kitty references", () => {
+    const payload = Buffer.from("/tmp/kitty-image.png").toString("base64");
+    const transmission = `\x1b_Ga=T,f=100,t=t;${payload}${ST}`;
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), `a${transmission}b`);
+});
+
+test("keeps 8-bit Kitty file references", () => {
+    const payload = Buffer.from("/tmp/kitty-image.png").toString("base64");
+    const transmission = `\u009dGa=T,f=100,t=f;${payload}\u009c`;
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), `a${transmission}b`);
+});
+
+test("drops a file reference with oversized control data", () => {
+    const payload = Buffer.from("/tmp/kitty-image.png").toString("base64");
+    const transmission = `\x1b_Ga=T,f=100,t=f,${"X".repeat(20 * 1024)};${payload}${ST}`;
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), "ab");
+});
+
+test("drops a chunked file reference that exceeds the replay limit", () => {
+    const transmission = [
+        `\x1b_Ga=T,f=100,t=f,m=1;${"A".repeat(6000)}${ST}`,
+        `\x1b_Gm=1;${"B".repeat(6000)}${ST}`,
+        `\x1b_Gm=0;${"C".repeat(100)}${ST}`,
+    ].join("");
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), "ab");
+});
+
+test("abandons an interrupted group instead of swallowing the next reference", () => {
+    const sanitizer = new TerminalOutputSanitizer();
+
+    assert.equal(sanitizer.push(`\x1b_Ga=T,f=100,t=d,m=1;QUJD${ST}`), "");
+    assert.equal(sanitizer.push(`a${FASTFETCH_AVATAR}b`), `a${FASTFETCH_AVATAR}b`);
+});
+
+test("bounds a flood of empty file continuations", () => {
+    const sanitizer = new TerminalOutputSanitizer();
+    const first = `\x1b_Ga=T,f=100,t=f,m=1;${Buffer.from("/tmp/a.png").toString("base64")}${ST}`;
+
+    assert.equal(sanitizer.push(first), "");
+    for (let i = 0; i < 2000; i++) {
+        assert.equal(sanitizer.push(`\x1b_Gm=1;${ST}`), "");
+    }
+
+    assert.equal(sanitizer._kittyGroup.keep, false);
+    assert.deepEqual(sanitizer._kittyGroup.sequences, []);
+    assert.equal(sanitizer.push(`\x1b_Gm=0;${ST}`), "");
+});
+
+test("never mixes direct-data sequences into a preserved file group", () => {
+    const sanitizer = new TerminalOutputSanitizer();
+    const direct = `\x1b_Ga=T,f=100,t=d;QUJD${ST}`;
+
+    assert.equal(sanitizer.push(`\x1b_Ga=T,f=100,t=f,m=1;${Buffer.from("/tmp/a.png").toString("base64")}${ST}`), "");
+    assert.equal(sanitizer.push(direct), "");
+    assert.equal(sanitizer.push("after"), "after");
+});
+
+test("does not preserve BEL-terminated Kitty sequences", () => {
+    const payload = Buffer.from("/tmp/kitty-image.png").toString("base64");
+    const transmission = `\x1b_Ga=T,f=100,t=f;${payload}\x07`;
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), "ab");
+});
+
+test("drops a file reference larger than the replay limit", () => {
+    const payload = Buffer.from("x".repeat(20 * 1024)).toString("base64");
+    const transmission = `\x1b_Ga=T,f=100,t=f;${payload}${ST}`;
+
+    assert.equal(new TerminalOutputSanitizer().push(`a${transmission}b`), "ab");
+});
+
+test("drops chunked Kitty direct-data transmissions", () => {
+    const image = Buffer.from("payload".repeat(200)).toString("base64");
+    const transmission = [
+        `\x1b_Ga=T,f=100,t=d,m=1;${image.slice(0, 100)}${ST}`,
+        `\x1b_Gm=1;${image.slice(100, 200)}${ST}`,
+        `\x1b_Gm=0;${image.slice(200)}${ST}`,
+    ].join("");
+    const text = `a${transmission}b`;
+
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, text.length), "ab");
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 1), "ab");
+    assert.equal(feedSplit(new TerminalOutputSanitizer(), text, 7), "ab");
 });
 
 test("sanitizes identical output regardless of chunk boundaries", () => {
