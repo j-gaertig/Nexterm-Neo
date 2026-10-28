@@ -76,6 +76,10 @@ class AppSession {
 
   VoidCallback? showAI;
 
+  /// Handles the system back button while this session is visible.
+  /// Returns true when the renderer consumed the event.
+  bool Function()? handleBack;
+
   VoidCallback? onCallbacksReady;
 
   AppSession({
