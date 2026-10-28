@@ -72,8 +72,12 @@ class _MainNavigationPageState extends State<MainNavigationPage>
 
   void _switchTab(int index) {
     if (index == _selectedIndex) return;
+    // The sessions destination only exists while sessions are active, so index
+    // 1 is the Monitoring tab otherwise. Resolve the tapped destination before
+    // the fade starts, otherwise the guard below also blocks Monitoring.
+    final isSessionsTab = _hasSessions && index == 1;
     _tabSwitcher.switchTab(
-      canApply: () => mounted && !(index == 1 && !_hasSessions),
+      canApply: () => mounted && (!isSessionsTab || _hasSessions),
       apply: () {
         if (!mounted) return;
         setState(() => _selectedIndex = index);
