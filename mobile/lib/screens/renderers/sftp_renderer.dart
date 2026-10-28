@@ -168,6 +168,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.session.handleBack = _handleBack;
     unawaited(_sweepStaleEditTemps());
     _currentPath = widget.session.sftpPath ?? '/';
     _rootPath = widget.session.sftpRootPath ?? '/';
@@ -596,19 +597,28 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
     _sendOperation(_SftpOps.pathSync, {'path': path});
   }
 
-  void _goBack() {
-    if (_historyIndex > 0) {
-      _historyIndex--;
-      final path = _history[_historyIndex];
-      setState(() {
-        _currentPath = path;
-        _selectedIndices.clear();
-        _selectionMode = false;
-      });
-      widget.session.sftpPath = path;
-      _listDirectory(path);
-      _sendOperation(_SftpOps.pathSync, {'path': path});
+  bool _goBack() {
+    if (_historyIndex <= 0) return false;
+    _historyIndex--;
+    final path = _history[_historyIndex];
+    setState(() {
+      _currentPath = path;
+      _selectedIndices.clear();
+      _selectionMode = false;
+    });
+    widget.session.sftpPath = path;
+    _listDirectory(path);
+    _sendOperation(_SftpOps.pathSync, {'path': path});
+    return true;
+  }
+
+  bool _handleBack() {
+    // Cancel an active selection first, then walk the directory history.
+    if (_selectionMode) {
+      _cancelSelection();
+      return true;
     }
+    return _goBack();
   }
 
   void _goUp() {
@@ -1423,6 +1433,12 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
   @override
   void didUpdateWidget(SftpRenderer oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session)) {
+      if (oldWidget.session.handleBack == _handleBack) {
+        oldWidget.session.handleBack = null;
+      }
+      widget.session.handleBack = _handleBack;
+    }
     if (oldWidget.session.sessionId != widget.session.sessionId) {
       final oldSid = oldWidget.session.sessionId;
       for (final key in _pendingEdits.keys.toList()) {
@@ -1887,6 +1903,9 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
     _openingPaths.clear();
     _scrollController.dispose();
     widget.sftpSettings.removeListener(_onSftpSettingsChanged);
+    if (widget.session.handleBack == _handleBack) {
+      widget.session.handleBack = null;
+    }
     super.dispose();
   }
 

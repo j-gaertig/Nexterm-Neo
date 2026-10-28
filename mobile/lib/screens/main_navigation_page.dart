@@ -174,6 +174,11 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         if (didPop) return;
 
         if (isOnSessionsTab) {
+          // Let the visible renderer handle in-session navigation (for example
+          // the SFTP directory history) before leaving the sessions view.
+          final handled =
+              widget.sessionManager.activeSession?.handleBack?.call() ?? false;
+          if (handled) return;
           _switchTab(0);
           return;
         }
