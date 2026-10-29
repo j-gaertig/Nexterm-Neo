@@ -20,7 +20,8 @@ const cleanOldLogs = () => {
     } catch {}
 };
 
-setInterval(cleanOldLogs, 24 * 60 * 60 * 1000);
+const logCleanupInterval = setInterval(cleanOldLogs, 24 * 60 * 60 * 1000);
+if (typeof logCleanupInterval.unref === "function") logCleanupInterval.unref();
 cleanOldLogs();
 
 winston.addColors({

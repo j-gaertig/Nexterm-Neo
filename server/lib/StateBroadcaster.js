@@ -15,9 +15,10 @@ class StateBroadcaster {
     register(accountId, sessionId, ws, tabId = null, browserId = null) {
         if (!this.connections.has(accountId)) this.connections.set(accountId, new Set());
         const conn = { ws, tabId, browserId, sessionId };
+        const sessionKey = String(sessionId);
         this.connections.get(accountId).add(conn);
-        if (!this.sessionIndex.has(sessionId)) this.sessionIndex.set(sessionId, new Set());
-        this.sessionIndex.get(sessionId).add(conn);
+        if (!this.sessionIndex.has(sessionKey)) this.sessionIndex.set(sessionKey, new Set());
+        this.sessionIndex.get(sessionKey).add(conn);
     }
 
     unregister(accountId, ws) {
@@ -26,10 +27,11 @@ class StateBroadcaster {
             for (const conn of conns) {
                 if (conn.ws === ws) {
                     conns.delete(conn);
-                    const sessionConns = this.sessionIndex.get(conn.sessionId);
+                    const sessionKey = String(conn.sessionId);
+                    const sessionConns = this.sessionIndex.get(sessionKey);
                     if (sessionConns) {
                         sessionConns.delete(conn);
-                        if (sessionConns.size === 0) this.sessionIndex.delete(conn.sessionId);
+                        if (sessionConns.size === 0) this.sessionIndex.delete(sessionKey);
                     }
                     break;
                 }
@@ -136,9 +138,10 @@ class StateBroadcaster {
                 }
             }
             if (conn.sessionId) {
-                const sessionConns = this.sessionIndex.get(conn.sessionId);
+                const sessionKey = String(conn.sessionId);
+                const sessionConns = this.sessionIndex.get(sessionKey);
                 if (sessionConns) sessionConns.delete(conn);
-                if (!sessionConns?.size) this.sessionIndex.delete(conn.sessionId);
+                if (!sessionConns?.size) this.sessionIndex.delete(sessionKey);
             }
         }
         this.connections.delete(numericId);
@@ -146,7 +149,8 @@ class StateBroadcaster {
     }
 
     forceLogoutSession(sessionId) {
-        const conns = this.sessionIndex.get(sessionId);
+        const sessionKey = String(sessionId);
+        const conns = this.sessionIndex.get(sessionKey);
         if (!conns?.size) return;
         for (const conn of conns) {
             if (conn.ws.readyState === 1) {
@@ -158,7 +162,7 @@ class StateBroadcaster {
                 }
             }
         }
-        this.sessionIndex.delete(sessionId);
+        this.sessionIndex.delete(sessionKey);
         logger.info(`StateBroadcaster: forced logout for session`, { sessionId });
     }
 }

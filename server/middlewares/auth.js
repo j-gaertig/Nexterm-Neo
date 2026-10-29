@@ -1,6 +1,7 @@
 const Account = require("../models/Account");
 const Session = require("../models/Session");
 const { isApiKeyToken, validateApiKey } = require("../controllers/apiKey");
+const { findActiveSession } = require("../utils/sessionActivity");
 
 module.exports.authenticate = async (req, res, next) => {
     const authHeader = req.header("authorization");
@@ -23,7 +24,7 @@ module.exports.authenticate = async (req, res, next) => {
         return next();
     }
 
-    req.session = await Session.findOne({ where: { token } });
+    req.session = await findActiveSession(token);
 
     if (req.session === null)
         return res.status(401).json({ message: "The provided token is not valid" });
@@ -38,10 +39,7 @@ module.exports.authenticate = async (req, res, next) => {
 };
 
 module.exports.authenticateQuery = async (req, res, next) => {
-    const token = req.query.token;
-    if (!token) return res.status(401).json({ message: "Token required" });
-
-    const session = await Session.findOne({ where: { token } });
+    const session = await findActiveSession(req.query.token);
     if (!session) return res.status(401).json({ message: "Invalid token" });
 
     const user = await Account.findByPk(session.accountId);
@@ -53,12 +51,9 @@ module.exports.authenticateQuery = async (req, res, next) => {
 };
 
 module.exports.authenticateDownload = async (req, res, next) => {
-    const token = req.query.token;
-    if (!token) return res.status(401).json({ message: "Token required" });
-    
-    const session = await Session.findOne({ where: { token } });
+    const session = await findActiveSession(req.query.token);
     if (!session) return res.status(401).json({ message: "Invalid token" });
-    
+
     const user = await Account.findByPk(session.accountId);
     if (!user) return res.status(401).json({ message: "Invalid token" });
 
@@ -71,4 +66,3 @@ module.exports.authenticateDownload = async (req, res, next) => {
     req.session = session;
     next();
 };
-

@@ -8,7 +8,7 @@ const { validateSchema } = require("../utils/schema");
 const { generateAuthenticationOptions, verifyAuthentication } = require("../controllers/passkey");
 const { createCode, pollToken, authorizeCode, getCodeInfo, checkLinkStatus } = require("../controllers/deviceCode");
 const { authenticate } = require("../middlewares/auth");
-const Session = require("../models/Session");
+const { findActiveSession } = require("../utils/sessionActivity");
 const Account = require("../models/Account");
 
 const optionalAuth = async (req, res, next) => {
@@ -17,7 +17,7 @@ const optionalAuth = async (req, res, next) => {
     const parts = authHeader.split(" ");
     if (parts.length !== 2) return next();
     try {
-        const session = await Session.findOne({ where: { token: parts[1] } });
+        const session = await findActiveSession(parts[1]);
         if (session) {
             req.session = session;
             req.user = await Account.findByPk(session.accountId);

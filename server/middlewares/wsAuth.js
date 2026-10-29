@@ -6,6 +6,7 @@ const SessionManager = require("../lib/SessionManager");
 const { validateEntryAccess } = require("../controllers/entry");
 const { getOrganizationAuditSettingsInternal } = require("../controllers/audit");
 const { resolveIdentity } = require("../utils/identityResolver");
+const { findActiveSession } = require("../utils/sessionActivity");
 const { safeCloseWs } = require("../utils/wsClose");
 
 const SHARED_ENTRY_ATTRIBUTES = ["id", "type", "config", "integrationId", "disabled"];
@@ -13,7 +14,7 @@ const SHARED_ENTRY_ATTRIBUTES = ["id", "type", "config", "integrationId", "disab
 const authenticateToken = async (ws, sessionToken) => {
     if (!sessionToken) return ws.close(4001, "You need to provide the token in the 'sessionToken' parameter"), null;
 
-    const session = await Session.findOne({ where: { token: sessionToken } });
+    const session = await findActiveSession(sessionToken);
     if (!session) return ws.close(4003, "The token is not valid"), null;
 
     await Session.update({ lastActivity: new Date() }, { where: { id: session.id } });
@@ -72,7 +73,7 @@ const authenticateOrganizationJoin = async (ws, query) => {
 
     if (!(await checkOrgJoinAccessPolicy(ws, auth.user.id, entry))) return null;
 
-    SessionManager.updateActivity(joinSessionId);
+    SessionManager.updateActivity(joinSessionId, { touchLoginSession: false });
 
     return buildSharedContext(query, access.session, entry, {
         user: auth.user,

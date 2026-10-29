@@ -20,7 +20,10 @@ const handleShared = (ws, ctx) => {
     const outputStream = createDecodedTextStream((text) => {
         if (text !== "OK" && ws.readyState === ws.OPEN) ws.send(text);
     });
-    const onData = (data) => outputStream.write(data);
+    const onData = (data) => {
+        SessionManager.updateActivity(sessionId, { touchLoginSession: false });
+        outputStream.write(data);
+    };
     const onClose = () => {
         outputStream.end();
         ws.readyState === ws.OPEN && ws.close(4014, "Session ended");
@@ -41,6 +44,7 @@ const handleShared = (ws, ctx) => {
         }
         SessionManager.setActiveWs(sessionId, ws);
         SessionManager.markTyping(sessionId, ws);
+        SessionManager.updateActivity(sessionId, { touchLoginSession: false });
         dataSocket.write(`0:${data.length}:${data}`);
     });
 
@@ -71,6 +75,7 @@ const setupHandler = (ws, dataSocket, sessionId) => {
         if (sessionId) {
             SessionManager.setActiveWs(sessionId, ws);
             SessionManager.markTyping(sessionId, ws);
+            SessionManager.updateActivity(sessionId);
         }
         dataSocket.write(`0:${data.length}:${data}`);
     });
@@ -96,7 +101,10 @@ module.exports = async (ws, context) => {
     SessionManager.setActiveWs(serverSession.sessionId, ws);
     const outputStream = setupHandler(ws, dataSocket, serverSession.sessionId);
 
-    const onData = (data) => outputStream.write(data);
+    const onData = (data) => {
+        SessionManager.updateActivity(serverSession.sessionId);
+        outputStream.write(data);
+    };
     dataSocket.on("data", onData);
 
     const onFirstResize = (data) => {

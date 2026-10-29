@@ -30,6 +30,10 @@ module.exports = db.define("device_codes", {
         type: Sequelize.INTEGER,
         allowNull: true,
     },
+    redeemedAt: {
+        type: Sequelize.DATE,
+        allowNull: true,
+    },
     ipAddress: {
         type: Sequelize.STRING,
         allowNull: false,

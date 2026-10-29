@@ -9,6 +9,7 @@ const stateBroadcaster = require("../lib/StateBroadcaster");
 const sessionManager = require("../lib/SessionManager");
 const { createLogoutUrlForSession } = require("./oidc");
 const { logoutWithDependencies } = require("../utils/sessionLogout");
+const { forgetSession } = require("../utils/sessionActivity");
 
 module.exports.login = async (configuration, user) => {
     const internalProvider = await OIDCProvider.findOne({ where: { isInternal: true, enabled: true } });
@@ -66,7 +67,13 @@ module.exports.logout = async token => logoutWithDependencies(token, {
     logLogout: accountId => logger.system(`User logged out`, { accountId }),
     findSession: value => Session.findOne({ where: { token: value } }),
     destroySession: value => Session.destroy({ where: { token: value } }),
-    removeAccountSessions: accountId => sessionManager.removeAllByAccountId(accountId),
+    removeSessionTerminals: sessionId => sessionManager.removeAllByAuthSessionId(sessionId),
+    disconnectSessionViewers: sessionId => sessionManager.disconnectAuthSessionViewers(sessionId),
+    forgetSessionActivity: sessionId => forgetSession(sessionId),
+    warnSessionTeardown: (sessionId, error) => logger.warn(
+        "Failed to terminate terminal sessions on logout",
+        { sessionId, error: error?.message },
+    ),
     broadcastLogout: sessionId => stateBroadcaster.forceLogoutSession(sessionId),
     createOIDCLogoutUrl: session => createLogoutUrlForSession(session),
     warnOIDCLogout: providerId => logger.warn(

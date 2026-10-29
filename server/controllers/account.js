@@ -69,6 +69,7 @@ module.exports.deleteAccount = async (id) => {
         return { code: 106, message: "You cannot delete the last administrator account" };
 
     stateBroadcaster.forceLogout(id);
+    SessionManager.disconnectAccountViewers(id);
     await SessionManager.removeAllByAccountId(id);
 
     await Folder.destroy({ where: { accountId: id } });

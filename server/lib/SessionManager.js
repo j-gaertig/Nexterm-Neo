@@ -4,6 +4,7 @@ const logger = require("../utils/logger");
 const AuditLog = require("../models/AuditLog");
 const { isRecordingEnabled, getRecordingPath, compressRecording } = require("../utils/recordingService");
 const stateBroadcaster = require("./StateBroadcaster");
+const { touchSession } = require("../utils/sessionActivity");
 const { safeCloseWs } = require("../utils/wsClose");
 const TerminalOutputSanitizer = require("./TerminalOutputSanitizer");
 
@@ -26,12 +27,13 @@ module.exports.create = ({
     browserId = null,
     auditLogId = null,
     organizationId = null,
+    authSessionId = null,
     sessionId = uuidv4(),
     connectionGeneration = 0,
 }) => {
     const session = {
         sessionId, accountId, entryId, configuration, connectionReason,
-        tabId, browserId, auditLogId, organizationId, connectionGeneration,
+        tabId, browserId, auditLogId, organizationId, authSessionId, connectionGeneration,
         isHibernated: false,
         createdAt: new Date(),
         lastActivity: new Date(),
@@ -319,6 +321,7 @@ module.exports.addWebSocket = (sessionId, ws, isShared = false, participant = nu
             lastName: participant.lastName || null,
             avatarHash: participant.avatarHash || null,
             kind: participant.kind || (isShared ? "link" : "owner"),
+            authSessionId: participant.authSessionId || null,
             writable: participant.writable !== false,
             typingUntil: 0,
             typingTimer: null,
@@ -391,13 +394,15 @@ module.exports.hibernate = (sessionId) => {
     return true;
 };
 
-module.exports.resume = (sessionId, tabId = null, browserId = null) => {
+module.exports.resume = (sessionId, tabId = null, browserId = null, authSessionId = null, { touchLoginSession = true } = {}) => {
     const session = module.exports.get(sessionId);
     if (!session) return false;
     session.isHibernated = false;
     session.lastActivity = new Date();
     if (tabId !== null) session.tabId = tabId;
     if (browserId !== null) session.browserId = browserId;
+    if (authSessionId !== null) session.authSessionId = authSessionId;
+    if (touchLoginSession) touchSession(session.authSessionId);
     logger.info(`Session resumed`, { sessionId });
     return true;
 };
@@ -475,9 +480,12 @@ module.exports.remove = (sessionId, options = {}) => {
     return session._removePromise;
 };
 
-module.exports.updateActivity = (sessionId) => {
+module.exports.updateActivity = (sessionId, { touchLoginSession = true } = {}) => {
     const session = module.exports.get(sessionId);
-    if (session) session.lastActivity = new Date();
+    if (!session) return;
+
+    session.lastActivity = new Date();
+    if (touchLoginSession) touchSession(session.authSessionId);
 };
 
 module.exports.setSftpPath = (sessionId, path) => {
@@ -566,7 +574,66 @@ module.exports.removeAllByEntryId = async (entryId) => {
     return toRemove.length;
 };
 
-setInterval(() => {
+const getValidSessionId = value => {
+    const numericId = Number(value);
+    return Number.isSafeInteger(numericId) && numericId > 0 ? numericId : null;
+};
+
+module.exports.removeAllByAuthSessionId = async (authSessionId) => {
+    const numericId = getValidSessionId(authSessionId);
+    if (numericId === null) return 0;
+
+    const toRemove = [...sessions.entries()]
+        .filter(([, s]) => Number(s.authSessionId) === numericId)
+        .map(([id]) => id);
+    for (const id of toRemove) await module.exports.remove(id);
+    if (toRemove.length > 0) {
+        logger.info(`Removed sessions for login session`, { authSessionId: numericId, count: toRemove.length });
+    }
+    return toRemove.length;
+};
+
+module.exports.disconnectAuthSessionViewers = (authSessionId) => {
+    const numericId = getValidSessionId(authSessionId);
+    if (numericId === null) return 0;
+
+    let disconnected = 0;
+    for (const session of sessions.values()) {
+        for (const [ws, participant] of session.participants) {
+            if (participant.kind !== "organization") continue;
+            if (Number(participant.authSessionId) !== numericId) continue;
+            try { ws.close(4016, "Session invalidated"); } catch {}
+            disconnected++;
+        }
+    }
+
+    if (disconnected > 0) {
+        logger.info("Disconnected organization session viewers for login session", { authSessionId: numericId, disconnected });
+    }
+    return disconnected;
+};
+
+module.exports.disconnectAccountViewers = (accountId) => {
+    const numericId = getValidSessionId(accountId);
+    if (numericId === null) return 0;
+
+    let disconnected = 0;
+    for (const session of sessions.values()) {
+        for (const [ws, participant] of session.participants) {
+            if (participant.kind !== "organization") continue;
+            if (Number(participant.accountId) !== numericId) continue;
+            try { ws.close(4016, "Session invalidated"); } catch {}
+            disconnected++;
+        }
+    }
+
+    if (disconnected > 0) {
+        logger.info("Disconnected organization session viewers for account", { accountId: numericId, disconnected });
+    }
+    return disconnected;
+};
+
+const idleCleanupTimer = setInterval(() => {
     const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
     let removed = 0;
     for (const [sessionId, session] of sessions) {
@@ -578,3 +645,4 @@ setInterval(() => {
     }
     if (removed > 0) logger.info(`Cleaned up ${removed} old sessions`);
 }, 30 * 60 * 1000);
+if (typeof idleCleanupTimer.unref === "function") idleCleanupTimer.unref();

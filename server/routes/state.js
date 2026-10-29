@@ -1,12 +1,13 @@
 const Session = require("../models/Session");
 const Account = require("../models/Account");
 const stateBroadcaster = require("../lib/StateBroadcaster");
+const { findActiveSession, touchSession } = require("../utils/sessionActivity");
 
 module.exports = async (ws, req) => {
     const { sessionToken, tabId, browserId } = req.query;
     if (!sessionToken) return ws.close(4001, "Missing sessionToken");
 
-    const session = await Session.findOne({ where: { token: sessionToken } });
+    const session = await findActiveSession(sessionToken);
     if (!session) return ws.close(4003, "Invalid session");
 
     await Session.update({ lastActivity: new Date() }, { where: { id: session.id } });
@@ -22,6 +23,7 @@ module.exports = async (ws, req) => {
         try {
             const { action, type } = JSON.parse(msg);
             if (action === "refresh") {
+                touchSession(session.id);
                 type ? stateBroadcaster.sendStateToConnection(user.id, conn, type) : stateBroadcaster.sendAllStateToConnection(user.id, conn);
             }
         } catch {}
