@@ -13,7 +13,6 @@ import '../../services/session_manager.dart';
 import '../../utils/ai_manager.dart';
 import '../../utils/app_icons.dart';
 import '../../utils/password_prompt.dart';
-import '../../utils/password_prompt_localizations.dart';
 import '../../utils/snippet_manager.dart';
 import '../../utils/terminal_font.dart';
 import '../../utils/terminal_graphics.dart';
@@ -75,6 +74,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   List<PasswordIdentity> _passwordIdentities = [];
   int _passwordHintIndex = -1;
   bool _passwordPromptVisible = false;
+  bool _passwordFillInFlight = false;
 
   TerminalGraphicsProcessor _createGraphicsProcessor() {
     return TerminalGraphicsProcessor(
@@ -187,9 +187,8 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   /// server whose type carries a password, prioritizing the session identity
   /// exactly like the web client.
   ///
-  /// Like the web context, identities load independently of the detection
-  /// setting: the manual toolbar fill (web context-menu equivalent) stays
-  /// available while detection is off and pastes without submitting.
+  /// Identities load independently of the detection setting so the key
+  /// button can appear immediately when a prompt is detected.
   Future<void> _loadPasswordIdentities() async {
     // Coalesce overlapping requests: at most one load in flight, at most one
     // queued. A queued request whose snapshot was discarded by the guard
@@ -293,7 +292,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
       // An identity may have been added while this terminal was open (the
       // web client reloads live via IdentityContext). Retry at most once a
       // minute instead of polling on every chunk. This runs independently of
-      // the detection setting so the manual toolbar fill heals as well.
+      // the detection setting so the list is ready when detection is enabled.
       final last = _lastIdentityLoadAttempt;
       if (last == null ||
           DateTime.now().difference(last) > const Duration(seconds: 60)) {
@@ -339,9 +338,12 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   }
 
   /// Fills the identity password via `POST /paste-password` (web
-  /// `fillIdentityPassword`). [identityId] null pastes the session default;
-  /// `submit` is true while a prompt is visible, exactly like the web client.
+  /// `fillIdentityPassword`). `submit` is true while a prompt is visible,
+  /// exactly like the web client.
   Future<void> _fillIdentityPassword([dynamic identityId]) async {
+    // A double tap can race the hide animation; never send the password twice.
+    if (_passwordFillInFlight) return;
+    _passwordFillInFlight = true;
     final shouldSubmit = _passwordPromptVisible;
     _hidePasswordHint();
     try {
@@ -367,6 +369,8 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         ),
       );
       return;
+    } finally {
+      _passwordFillInFlight = false;
     }
     if (mounted) _terminalFocusNode.requestFocus();
   }
@@ -503,7 +507,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
       // Mirrors web `term.onData`: any user input dismisses the hint.
       // Note the deliberate mobile asymmetry: a soft-keyboard Enter arrives
       // here as plain input (it dismisses without filling), while a hardware
-      // Tab/Enter is intercepted above and fills. Tapping the hint card is
+      // Tab/Enter is intercepted above and fills. Tapping the key button is
       // the primary touch flow.
       _hidePasswordHint();
       _sendTerminalText(data);
@@ -844,10 +848,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                       child: NotificationListener<ScrollNotification>(
                         onNotification: (_) {
                           // Deliberate divergence from web `term.onScroll`
-                          // (which hides the hint): this card is
+                          // (which hides the hint): this button is
                           // bottom-anchored and never misplaced by scrolling,
                           // and hiding on every autoscroll from incoming
-                          // output would make the hint flicker.
+                          // output would make it flicker.
                           _cursorRevision.value++;
                           return false;
                         },
@@ -894,27 +898,17 @@ class _TerminalRendererState extends State<TerminalRenderer> {
                                 ),
                               ),
                             ),
+                            // Compact key button floats at the bottom-right of
+                            // the terminal, directly above the keyboard
+                            // toolbar, and only while a password prompt is
+                            // detected. It takes no layout space away from the
+                            // terminal.
+                            _buildPasswordHintOverlay(),
                           ],
                         ),
                       ),
                     ),
                   ),
-                  if (_passwordPromptVisible &&
-                      _passwordIdentities.isNotEmpty &&
-                      widget.terminalSettings.passwordPromptDetection)
-                    SafeArea(
-                      top: false,
-                      // The keyboard toolbar below already applies the bottom
-                      // inset when visible; avoid padding twice.
-                      bottom: !_showKeyboardToolbar,
-                      child: PasswordFillHint(
-                        items: _passwordIdentities,
-                        selectedIndex: _passwordHintIndex,
-                        onFill: (id) => _fillIdentityPassword(id),
-                        onCycle: () => _cyclePasswordHint(1),
-                        onDismiss: _hidePasswordHint,
-                      ),
-                    ),
                   if (_showKeyboardToolbar) _buildKeyboardToolbar(),
                 ],
               ),
@@ -956,6 +950,51 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     );
   }
 
+  Widget _buildPasswordHintOverlay() {
+    final media = MediaQuery.of(context);
+    final visible =
+        _passwordPromptVisible &&
+        _passwordIdentities.isNotEmpty &&
+        widget.terminalSettings.passwordPromptDetection;
+    return Positioned(
+      right: 12 + media.viewPadding.right,
+      // The keyboard toolbar already applies the bottom inset when visible;
+      // avoid padding twice.
+      bottom: 12 + (_showKeyboardToolbar ? 0 : media.viewPadding.bottom),
+      child: ExcludeSemantics(
+        // AnimatedSwitcher keeps the outgoing button mounted for the fade-out;
+        // make sure it cannot be tapped or announced during that window.
+        excluding: !visible,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.85, end: 1).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+                child: child,
+              ),
+            ),
+            child: visible
+                ? PasswordFillHint(
+                    items: _passwordIdentities,
+                    selectedIndex: _passwordHintIndex,
+                    onFill: (id) => _fillIdentityPassword(id),
+                    onCycle: () => _cyclePasswordHint(1),
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildKeyboardToolbar() {
     final ts = widget.terminalSettings;
     return Container(
@@ -977,24 +1016,10 @@ class _TerminalRendererState extends State<TerminalRenderer> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _toolbarBtn('ESC'), const SizedBox(width: 8),
-                _toolbarBtn('TAB'), const SizedBox(width: 8),
-                // Manual fill (web context-menu / `paste-identity-password`
-                // keybind equivalent): pastes the session default password
-                // without submitting unless a prompt is currently visible.
-                if (_passwordIdentities.isNotEmpty) ...[
-                  Tooltip(
-                    message: PasswordPromptLocalizations.of(
-                      context,
-                    ).pasteIdentityPassword,
-                    child: _toolbarBtn(
-                      'Password',
-                      icon: AppIcons.key,
-                      onPressed: () => _fillIdentityPassword(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
+                _toolbarBtn('ESC'),
+                const SizedBox(width: 8),
+                _toolbarBtn('TAB'),
+                const SizedBox(width: 8),
                 for (final group in ts.groupOrder)
                   if (ts.isGroupEnabled(group)) ..._buildGroupButtons(group),
               ],
