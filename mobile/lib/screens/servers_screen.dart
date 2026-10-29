@@ -13,6 +13,7 @@ import '../utils/folder_state_manager.dart';
 import '../utils/server_view_settings.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/connection_reason_dialog.dart';
+import 'widgets/server_actions_sheet.dart';
 import 'widgets/server_protocol_sheet.dart';
 import 'widgets/script/run_script_sheet.dart';
 import '../services/server_editor_service.dart';
@@ -976,82 +977,48 @@ class _ServersScreenState extends State<ServersScreen> {
   int? _serverIdInt(dynamic id) => id is int ? id : int.tryParse(id.toString());
 
   void _showServerMenu(Server server) {
-    final cs = Theme.of(context).colorScheme;
     final showQuick = server.isServer && !server.isPve;
 
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Center(child: Container(
-          margin: const EdgeInsets.only(top: 12, bottom: 4), width: 36, height: 4,
-          decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)),
-        )),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-              child: Icon(_serverIcon(server), color: cs.onPrimaryContainer, size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(server.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-              if (server.ip.isNotEmpty && server.ip != 'N/A')
-                Text(server.ip, style: TextStyle(fontSize: 12, color: cs.outline)),
-            ])),
-          ]),
-        ),
-        const SizedBox(height: 8),
-        _menuItem(ctx, AppIcons.connection, 'Connect', cs, () {
-          Navigator.pop(ctx); _connectToServer(server);
+    showServerActionsSheet(
+      context,
+      server,
+      icon: _serverIcon(server),
+      actions: [
+        ServerAction(icon: AppIcons.connection, label: 'Connect', onTap: () {
+          _connectToServer(server);
         }),
         if (showQuick && (server.identities?.isNotEmpty == true) && server.protocol?.toLowerCase() == 'ssh')
-          _menuItem(ctx, AppIcons.codeBracesBox, 'Run Script', cs, () {
-            Navigator.pop(ctx); _runScript(server);
+          ServerAction(icon: AppIcons.codeBracesBox, label: 'Run Script', onTap: () {
+            _runScript(server);
           }),
         if (showQuick)
-          _menuItem(ctx, AppIcons.cursorDefaultClick, 'Quick Connect', cs, () {
-            Navigator.pop(ctx); _quickConnect(server);
+          ServerAction(icon: AppIcons.cursorDefaultClick, label: 'Quick Connect', onTap: () {
+            _quickConnect(server);
           }),
         if (server.canWakeOnLan && !server.disabled)
-          _menuItem(ctx, AppIcons.powerPlug, 'Wake-On-LAN', cs, () {
-            Navigator.pop(ctx); _wakeServer(server);
+          ServerAction(icon: AppIcons.powerPlug, label: 'Wake-On-LAN', onTap: () {
+            _wakeServer(server);
           }),
         if (showQuick)
-          _menuItem(ctx, AppIcons.pencilOutline, 'Edit', cs, () {
-            Navigator.pop(ctx); _editServer(server);
+          ServerAction(icon: AppIcons.pencilOutline, label: 'Edit', onTap: () {
+            _editServer(server);
           }),
-        _menuItem(ctx, AppIcons.contentCopy, 'Duplicate', cs, () {
-          Navigator.pop(ctx); _duplicateServer(server);
+        ServerAction(icon: AppIcons.contentCopy, label: 'Duplicate', onTap: () {
+          _duplicateServer(server);
         }),
-        _menuItem(ctx, server.disabled ? AppIcons.checkCircle : AppIcons.serverOff,
-            server.disabled ? 'Enable' : 'Disable', cs, () {
-          Navigator.pop(ctx); _toggleServerDisabled(server);
+        ServerAction(
+          icon: server.disabled ? AppIcons.checkCircle : AppIcons.serverOff,
+          label: server.disabled ? 'Enable' : 'Disable',
+          onTap: () {
+            _toggleServerDisabled(server);
+          },
+        ),
+        ServerAction(icon: AppIcons.trashCanOutline, label: 'Delete', onTap: () {
+          _deleteServer(server);
         }),
-        _menuItem(ctx, AppIcons.trashCanOutline, 'Delete', cs, () {
-          Navigator.pop(ctx); _deleteServer(server);
-        }),
-        const SizedBox(height: 12),
-      ])),
+      ],
     );
   }
-
-  Widget _menuItem(BuildContext ctx, IconData icon, String title, ColorScheme cs, VoidCallback onTap) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(children: [
-              Icon(icon, size: 22, color: cs.primary),
-              const SizedBox(width: 16),
-              Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-            ]),
-          ),
-        ),
-      );
 
   Future<void> _quickConnect(Server server) async {
     if (server.disabled) {
