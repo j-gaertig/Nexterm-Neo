@@ -57,14 +57,26 @@ Future<void> _pumpHost(
   );
 }
 
-List<ServerAction> _actions(List<String> tapped) => [
-  for (final label in _labels)
-    ServerAction(
-      icon: AppIcons.connection,
-      label: label,
-      onTap: () => tapped.add(label),
-    ),
-];
+List<ServerAction> _buildActions(Server server, {List<String>? tapped}) {
+  final events = tapped ?? <String>[];
+  return buildServerActions(
+    server,
+    onConnect: () => events.add('Connect'),
+    onRunScript: () => events.add('Run Script'),
+    onQuickConnect: () => events.add('Quick Connect'),
+    onWakeOnLan: () => events.add('Wake-On-LAN'),
+    onEdit: () => events.add('Edit'),
+    onDuplicate: () => events.add('Duplicate'),
+    onToggleDisabled: () => events.add('Disable'),
+    onDelete: () => events.add('Delete'),
+  );
+}
+
+List<ServerAction> _actions(List<String> tapped) =>
+    _buildActions(_server, tapped: tapped);
+
+List<String> _labelsFor(Server server) =>
+    _buildActions(server).map((action) => action.label).toList();
 
 Future<void> _openSheet(WidgetTester tester, List<String> tapped) async {
   showServerActionsSheet(
@@ -79,6 +91,77 @@ Future<void> _openSheet(WidgetTester tester, List<String> tapped) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('buildServerActions', () {
+    test('orders every action for a fully featured SSH server', () {
+      expect(_labelsFor(_server), _labels);
+    });
+
+    test('hides quick actions for Proxmox entries and shows the disabled state', () {
+      const pve = Server(
+        id: 2,
+        name: 'pve-node',
+        ip: '10.0.0.2',
+        type: 'pve-qemu',
+        disabled: true,
+      );
+      expect(_labelsFor(pve), ['Connect', 'Duplicate', 'Enable', 'Delete']);
+    });
+
+    test('only offers Run Script for SSH servers with an identity', () {
+      const noIdentities = Server(
+        id: 3,
+        name: 'no-id',
+        ip: '10.0.0.3',
+        protocol: 'ssh',
+        type: 'server',
+      );
+      const rdp = Server(
+        id: 4,
+        name: 'rdp-host',
+        ip: '10.0.0.4',
+        protocol: 'rdp',
+        type: 'server',
+        identities: [1],
+      );
+      expect(_labelsFor(noIdentities), isNot(contains('Run Script')));
+      expect(_labelsFor(rdp), isNot(contains('Run Script')));
+      expect(_labelsFor(_server), contains('Run Script'));
+    });
+
+    test('only offers Wake-On-LAN for enabled entries with a MAC address', () {
+      const disabled = Server(
+        id: 5,
+        name: 'sleepy',
+        ip: '10.0.0.5',
+        type: 'server',
+        protocol: 'ssh',
+        disabled: true,
+        wakeOnLanEnabled: true,
+        macAddress: 'AA:BB:CC:DD:EE:FF',
+      );
+      const noMac = Server(
+        id: 6,
+        name: 'no-mac',
+        ip: '10.0.0.6',
+        type: 'server',
+        protocol: 'ssh',
+        wakeOnLanEnabled: true,
+        macAddress: '  ',
+      );
+      expect(_labelsFor(disabled), isNot(contains('Wake-On-LAN')));
+      expect(_labelsFor(noMac), isNot(contains('Wake-On-LAN')));
+      expect(_labelsFor(_server), contains('Wake-On-LAN'));
+    });
+
+    test('wires each callback to its action', () {
+      final tapped = <String>[];
+      for (final action in _buildActions(_server, tapped: tapped)) {
+        action.onTap();
+      }
+      expect(tapped, _labels);
+    });
+  });
 
   group('ServerActionsSheet', () {
     testWidgets('scrolls so every action stays reachable on a short screen', (
@@ -104,12 +187,54 @@ void main() {
       await tester.ensureVisible(find.text('Delete'));
       await tester.pumpAndSettle();
       expect(find.text('Delete').hitTestable(), findsOneWidget);
+      expect(find.text('web-01').hitTestable(), findsOneWidget);
 
       await tester.tap(find.text('Delete'));
       await tester.pumpAndSettle();
 
       expect(tapped, ['Delete']);
       expect(find.byType(ServerActionsSheet), findsNothing);
+    });
+
+    testWidgets('keeps the last action reachable in landscape', (
+      tester,
+    ) async {
+      await _pumpHost(tester, size: const Size(640, 360), textScale: 2);
+      final tapped = <String>[];
+      await _openSheet(tester, tapped);
+
+      await tester.ensureVisible(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete').hitTestable(), findsOneWidget);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(tapped, ['Delete']);
+    });
+
+    testWidgets('does not overflow with a long name at an extreme text scale', (
+      tester,
+    ) async {
+      await _pumpHost(tester, size: const Size(320, 480), textScale: 4);
+      final tapped = <String>[];
+      showServerActionsSheet(
+        _hostContext,
+        const Server(
+          id: 7,
+          name: 'a-very-long-server-name-that-needs-to-ellipsize',
+          ip: '2001:db8::1234:5678:9abc:def0',
+          protocol: 'ssh',
+          type: 'server',
+        ),
+        icon: AppIcons.brandServer,
+        actions: _actions(tapped),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.ensureVisible(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete').hitTestable(), findsOneWidget);
     });
 
     testWidgets('keeps the last action reachable at a large text scale', (

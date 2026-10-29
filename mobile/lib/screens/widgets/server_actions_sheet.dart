@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/server.dart';
+import '../../utils/app_icons.dart';
 
 /// One row in the long-press action menu for a server.
 class ServerAction {
@@ -13,6 +14,74 @@ class ServerAction {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+}
+
+/// Builds the action list for [server] in display order.
+///
+/// Visibility rules mirror the server capabilities: quick actions are only
+/// available for regular servers, scripts additionally require an SSH server
+/// with an identity, and Wake-On-LAN requires a MAC address on an enabled
+/// entry.
+List<ServerAction> buildServerActions(
+  Server server, {
+  required VoidCallback onConnect,
+  required VoidCallback onRunScript,
+  required VoidCallback onQuickConnect,
+  required VoidCallback onWakeOnLan,
+  required VoidCallback onEdit,
+  required VoidCallback onDuplicate,
+  required VoidCallback onToggleDisabled,
+  required VoidCallback onDelete,
+}) {
+  final showQuick = server.isServer && !server.isPve;
+  return [
+    ServerAction(
+      icon: AppIcons.connection,
+      label: 'Connect',
+      onTap: onConnect,
+    ),
+    if (showQuick &&
+        (server.identities?.isNotEmpty == true) &&
+        server.protocol?.toLowerCase() == 'ssh')
+      ServerAction(
+        icon: AppIcons.codeBracesBox,
+        label: 'Run Script',
+        onTap: onRunScript,
+      ),
+    if (showQuick)
+      ServerAction(
+        icon: AppIcons.cursorDefaultClick,
+        label: 'Quick Connect',
+        onTap: onQuickConnect,
+      ),
+    if (server.canWakeOnLan && !server.disabled)
+      ServerAction(
+        icon: AppIcons.powerPlug,
+        label: 'Wake-On-LAN',
+        onTap: onWakeOnLan,
+      ),
+    if (showQuick)
+      ServerAction(
+        icon: AppIcons.pencilOutline,
+        label: 'Edit',
+        onTap: onEdit,
+      ),
+    ServerAction(
+      icon: AppIcons.contentCopy,
+      label: 'Duplicate',
+      onTap: onDuplicate,
+    ),
+    ServerAction(
+      icon: server.disabled ? AppIcons.checkCircle : AppIcons.serverOff,
+      label: server.disabled ? 'Enable' : 'Disable',
+      onTap: onToggleDisabled,
+    ),
+    ServerAction(
+      icon: AppIcons.trashCanOutline,
+      label: 'Delete',
+      onTap: onDelete,
+    ),
+  ];
 }
 
 /// Shows the long-press action menu for [server].
@@ -99,12 +168,15 @@ class ServerActionsSheet extends StatelessWidget {
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
                         if (server.ip.isNotEmpty && server.ip != 'N/A')
                           Text(
                             server.ip,
                             style: TextStyle(fontSize: 12, color: cs.outline),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),

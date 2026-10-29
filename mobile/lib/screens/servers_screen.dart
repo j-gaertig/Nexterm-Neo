@@ -977,46 +977,21 @@ class _ServersScreenState extends State<ServersScreen> {
   int? _serverIdInt(dynamic id) => id is int ? id : int.tryParse(id.toString());
 
   void _showServerMenu(Server server) {
-    final showQuick = server.isServer && !server.isPve;
-
     showServerActionsSheet(
       context,
       server,
       icon: _serverIcon(server),
-      actions: [
-        ServerAction(icon: AppIcons.connection, label: 'Connect', onTap: () {
-          _connectToServer(server);
-        }),
-        if (showQuick && (server.identities?.isNotEmpty == true) && server.protocol?.toLowerCase() == 'ssh')
-          ServerAction(icon: AppIcons.codeBracesBox, label: 'Run Script', onTap: () {
-            _runScript(server);
-          }),
-        if (showQuick)
-          ServerAction(icon: AppIcons.cursorDefaultClick, label: 'Quick Connect', onTap: () {
-            _quickConnect(server);
-          }),
-        if (server.canWakeOnLan && !server.disabled)
-          ServerAction(icon: AppIcons.powerPlug, label: 'Wake-On-LAN', onTap: () {
-            _wakeServer(server);
-          }),
-        if (showQuick)
-          ServerAction(icon: AppIcons.pencilOutline, label: 'Edit', onTap: () {
-            _editServer(server);
-          }),
-        ServerAction(icon: AppIcons.contentCopy, label: 'Duplicate', onTap: () {
-          _duplicateServer(server);
-        }),
-        ServerAction(
-          icon: server.disabled ? AppIcons.checkCircle : AppIcons.serverOff,
-          label: server.disabled ? 'Enable' : 'Disable',
-          onTap: () {
-            _toggleServerDisabled(server);
-          },
-        ),
-        ServerAction(icon: AppIcons.trashCanOutline, label: 'Delete', onTap: () {
-          _deleteServer(server);
-        }),
-      ],
+      actions: buildServerActions(
+        server,
+        onConnect: () => _connectToServer(server),
+        onRunScript: () => _runScript(server),
+        onQuickConnect: () => _quickConnect(server),
+        onWakeOnLan: () => _wakeServer(server),
+        onEdit: () => _editServer(server),
+        onDuplicate: () => _duplicateServer(server),
+        onToggleDisabled: () => _toggleServerDisabled(server),
+        onDelete: () => _deleteServer(server),
+      ),
     );
   }
 
