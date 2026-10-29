@@ -8,7 +8,10 @@ import 'package:flutter/widgets.dart';
 // `servers.passwordHint.{paste,pasteFor,cycle}` and
 // `servers.contextMenu.pasteIdentityPassword` from
 // `client/public/assets/locales/*.json` (11 languages). Strings are copied
-// 1:1 from the web client so both platforms read identically.
+// 1:1 from the web client so both platforms read identically. The
+// `cycleLongPress` string is mobile-only: the compact key button has no room
+// for a visible label, so long-press is the touch gesture for switching
+// identity and accessibility services need to announce it.
 
 class PasswordPromptStrings {
   final String settingTitle;
@@ -17,6 +20,7 @@ class PasswordPromptStrings {
   final String paste;
   final String pasteForTemplate;
   final String cycle;
+  final String cycleLongPress;
   final String pasteIdentityPassword;
 
   const PasswordPromptStrings({
@@ -26,6 +30,7 @@ class PasswordPromptStrings {
     required this.paste,
     required this.pasteForTemplate,
     required this.cycle,
+    required this.cycleLongPress,
     required this.pasteIdentityPassword,
   });
 
@@ -42,6 +47,7 @@ const PasswordPromptStrings _en = PasswordPromptStrings(
   paste: 'paste password',
   pasteForTemplate: 'paste {{username}} password',
   cycle: 'Use the arrow keys to switch identity',
+  cycleLongPress: 'Long press to switch identity',
   pasteIdentityPassword: 'Paste Password',
 );
 
@@ -54,6 +60,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'Passwort einfügen',
     pasteForTemplate: 'Einfügen {{username}} Passwort',
     cycle: 'Verwende die Pfeiltasten, um die Identität zu wechseln',
+    cycleLongPress: 'Lange drücken, um die Identität zu wechseln',
     pasteIdentityPassword: 'Passwort einfügen',
   ),
   'fr': PasswordPromptStrings(
@@ -63,6 +70,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'coller le mot de passe',
     pasteForTemplate: 'copier-coller {{username}} mot de passe',
     cycle: 'Utilise les touches fléchées pour changer d\'identité',
+    cycleLongPress: 'Appuyez longuement pour changer d\'identité',
     pasteIdentityPassword: 'Coller le mot de passe',
   ),
   'es': PasswordPromptStrings(
@@ -72,6 +80,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'pega la contraseña',
     pasteForTemplate: 'pega {{username}} contraseña',
     cycle: 'Usa las teclas de flecha para cambiar de identidad',
+    cycleLongPress: 'Mantén pulsado para cambiar de identidad',
     pasteIdentityPassword: 'Pegar contraseña',
   ),
   'it': PasswordPromptStrings(
@@ -81,6 +90,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'incolla la password',
     pasteForTemplate: 'incolla {{username}} password',
     cycle: 'Usa i tasti freccia per cambiare identità',
+    cycleLongPress: 'Tieni premuto per cambiare identità',
     pasteIdentityPassword: 'Incolla la password',
   ),
   'pt': PasswordPromptStrings(
@@ -90,6 +100,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'colar a senha',
     pasteForTemplate: 'colar {{username}} senha',
     cycle: 'Use as setas do teclado para trocar de identidade',
+    cycleLongPress: 'Mantenha pressionado para trocar de identidade',
     pasteIdentityPassword: 'Colar Senha',
   ),
   'ru': PasswordPromptStrings(
@@ -99,6 +110,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'вставить пароль',
     pasteForTemplate: 'вставь {{username}} пароль',
     cycle: 'Используй клавиши со стрелками, чтобы сменить персонажа',
+    cycleLongPress: 'Удерживайте нажатие, чтобы сменить личность',
     pasteIdentityPassword: 'Вставить пароль',
   ),
   'cs': PasswordPromptStrings(
@@ -108,6 +120,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'vložit heslo',
     pasteForTemplate: 'vložit {{username}} heslo',
     cycle: 'K přepínání identity použijte šipky',
+    cycleLongPress: 'Dlouhým stisknutím přepnete identitu',
     pasteIdentityPassword: 'Vložit heslo',
   ),
   'ar': PasswordPromptStrings(
@@ -117,6 +130,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: 'لصق كلمة المرور',
     pasteForTemplate: 'لصق {{username}} كلمة المرور',
     cycle: 'استخدم مفاتيح الأسهم لتغيير الهوية',
+    cycleLongPress: 'اضغط مطولاً لتبديل الهوية',
     pasteIdentityPassword: 'لصق كلمة المرور',
   ),
   'zh_CN': PasswordPromptStrings(
@@ -126,6 +140,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: '粘贴密码',
     pasteForTemplate: '粘贴 {{username}} 密码',
     cycle: '使用方向键切换角色',
+    cycleLongPress: '长按切换身份',
     pasteIdentityPassword: '粘贴密码',
   ),
   'zh_TW': PasswordPromptStrings(
@@ -135,6 +150,7 @@ const Map<String, PasswordPromptStrings> _localized = {
     paste: '貼上密碼',
     pasteForTemplate: '貼上 {{username}} 密碼',
     cycle: '使用方向鍵切換角色',
+    cycleLongPress: '長按切換身分',
     pasteIdentityPassword: '貼上密碼',
   ),
 };
@@ -174,7 +190,8 @@ class PasswordPromptLocalizations {
       if (resolved != _en) return resolved;
       if (locale.countryCode != null && locale.countryCode!.isNotEmpty) {
         return passwordPromptStringsForTag(
-            '${locale.languageCode}_${locale.countryCode}');
+          '${locale.languageCode}_${locale.countryCode}',
+        );
       }
       return passwordPromptStringsForTag(locale.languageCode);
     } catch (_) {

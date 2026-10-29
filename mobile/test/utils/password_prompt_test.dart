@@ -49,8 +49,9 @@ void main() {
     test('ignores ansi noise like the web stripTerminalNoise', () {
       expect(isPasswordPrompt('\x1b[32mPassword:\x1b[0m'), isTrue);
       expect(
-          isPasswordPrompt('\x1b]8;;https://example.com\x1b\\Password:\x07'),
-          isTrue);
+        isPasswordPrompt('\x1b]8;;https://example.com\x1b\\Password:\x07'),
+        isTrue,
+      );
     });
   });
 
@@ -92,19 +93,29 @@ void main() {
 
   group('passwordPromptStringsForTag', () {
     test('resolves locales like the web client', () {
-      expect(passwordPromptStringsForTag('en').settingTitle,
-          'Password input detection');
-      expect(passwordPromptStringsForTag('de_DE').settingTitle,
-          'Erkennung der Passworteingabe');
+      expect(
+        passwordPromptStringsForTag('en').settingTitle,
+        'Password input detection',
+      );
+      expect(
+        passwordPromptStringsForTag('de_DE').settingTitle,
+        'Erkennung der Passworteingabe',
+      );
       expect(passwordPromptStringsForTag('de').paste, 'Passwort einfügen');
-      expect(passwordPromptStringsForTag('pt-BR').settingTitle,
-          'Detecção de digitação de senha');
+      expect(
+        passwordPromptStringsForTag('pt-BR').settingTitle,
+        'Detecção de digitação de senha',
+      );
       expect(passwordPromptStringsForTag('zh-CN').paste, '粘贴密码');
       expect(passwordPromptStringsForTag('zh-Hant-TW').paste, '貼上密碼');
-      expect(passwordPromptStringsForTag('xx').settingTitle,
-          'Password input detection');
-      expect(passwordPromptStringsForTag(null).settingTitle,
-          'Password input detection');
+      expect(
+        passwordPromptStringsForTag('xx').settingTitle,
+        'Password input detection',
+      );
+      expect(
+        passwordPromptStringsForTag(null).settingTitle,
+        'Password input detection',
+      );
     });
 
     test('pasteFor interpolates the username', () {
@@ -123,5 +134,6 @@ const _enProbe = PasswordPromptStrings(
   paste: 'paste password',
   pasteForTemplate: 'paste {{username}} password',
   cycle: 'Use the arrow keys to switch identity',
+  cycleLongPress: 'Long press to switch identity',
   pasteIdentityPassword: 'Paste Password',
 );
