@@ -3,6 +3,7 @@ const { createConnectionForSession } = require("../lib/ConnectionService");
 const Entry = require("../models/Entry");
 const EntryIdentity = require("../models/EntryIdentity");
 const Account = require("../models/Account");
+const Session = require("../models/Session");
 const MonitoringSnapshot = require("../models/MonitoringSnapshot");
 const { validateEntryAccess } = require("./entry");
 const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
@@ -73,6 +74,7 @@ const getRequiredConnectPermission = (entry, type, scriptId) => {
 
 const createSession = async ({
     accountId,
+    authSessionId = null,
     entryId,
     identityId,
     connectionReason,
@@ -149,6 +151,10 @@ const createSession = async ({
         return { code: 400, message: "Identity not found" };
     }
 
+    if (authSessionId !== null && !(await Session.findByPk(authSessionId))) {
+        return { code: 401, message: "Your session has expired" };
+    }
+
     const auditLogId = await createAuditLog({
         accountId,
         organizationId: entry.organizationId,
@@ -182,9 +188,15 @@ const createSession = async ({
         browserId,
         auditLogId,
         organizationId: entry.organizationId,
+        authSessionId,
         sessionId: sessionId || undefined,
         connectionGeneration,
     });
+
+    if (authSessionId !== null && !(await Session.findByPk(authSessionId))) {
+        await SessionManager.remove(session.sessionId, { broadcast: false, skipAfterHooks: true });
+        return { code: 401, message: "Your session has expired" };
+    }
 
     if (broadcast) {
         stateBroadcaster.broadcast("CONNECTIONS", { accountId });
@@ -314,10 +326,13 @@ const hibernateSession = (accountId, sessionId) => {
     return { code: 404, message: "Session not found" };
 };
 
-const resumeSession = (accountId, sessionId, tabId = null, browserId = null) => {
+const resumeSession = async (accountId, sessionId, tabId = null, browserId = null, authSessionId = null) => {
     const { error } = validateSessionOwnership(accountId, sessionId);
     if (error) return error;
-    const success = SessionManager.resume(sessionId, tabId, browserId);
+    if (authSessionId !== null && !(await Session.findByPk(authSessionId))) {
+        return { code: 401, message: "Your session has expired" };
+    }
+    const success = SessionManager.resume(sessionId, tabId, browserId, authSessionId);
     if (success) {
         return { message: "Session resumed" };
     }
@@ -412,7 +427,7 @@ const updateSharePermissions = (accountId, sessionId, writable) => {
     return { writable };
 };
 
-const duplicateSession = async (accountId, sessionId, tabId = null, browserId = null, ipAddress = null, userAgent = null) => {
+const duplicateSession = async (accountId, sessionId, tabId = null, browserId = null, ipAddress = null, userAgent = null, authSessionId = null) => {
     const session = SessionManager.get(sessionId);
     if (!session) {
         return { code: 404, message: "Session not found" };
@@ -431,6 +446,7 @@ const duplicateSession = async (accountId, sessionId, tabId = null, browserId = 
     
     return await createSession({
         accountId,
+        authSessionId,
         entryId: session.entryId,
         identityId: config.identityId,
         connectionReason: null,

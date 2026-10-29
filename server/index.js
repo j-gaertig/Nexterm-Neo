@@ -22,6 +22,7 @@ const { Permission } = require("./permissions/registry");
 const logger = require("./utils/logger");
 const { startSourceSyncService, stopSourceSyncService } = require("./utils/sourceSyncService");
 const backupService = require("./utils/backupService");
+const sessionCleanup = require("./utils/sessionCleanup");
 const controlPlane = require("./lib/controlPlane/ControlPlaneServer");
 const SessionManager = require("./lib/SessionManager");
 const { ensureLocalEngine } = require("./controllers/engine");
@@ -146,6 +147,10 @@ db.authenticate()
 
         backupService.start();
 
+        sessionCleanup.start().catch(error =>
+            logger.error("Failed to start session cleanup", { error: error.message })
+        );
+
         if (process.env.LOCAL_ENGINE_TOKEN) {
             await ensureLocalEngine(process.env.LOCAL_ENGINE_TOKEN);
             logger.system("Local engine configured");
@@ -209,6 +214,7 @@ process.on("SIGINT", async () => {
     stopStatusChecker();
     stopSourceSyncService();
     backupService.stop();
+    await sessionCleanup.stop();
 
     controlPlane.stop();
 

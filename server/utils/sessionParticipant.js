@@ -7,6 +7,7 @@ const buildParticipant = (ctx) => ({
     lastName: ctx.user?.lastName || null,
     avatarHash: ctx.user?.avatarHash || null,
     kind: !ctx.isShared ? "owner" : ctx.isOrgJoin ? "organization" : "link",
+    authSessionId: ctx.session?.id || null,
     writable: !ctx.isShared ? true : ctx.shareWritable === true,
 });
 

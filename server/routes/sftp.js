@@ -9,6 +9,7 @@ const { createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES } = require("../controller
 const { hasResourcePermission } = require("../utils/permission");
 const { Permission } = require("../permissions/registry");
 const logger = require("../utils/logger");
+const { findActiveSession } = require("../utils/sessionActivity");
 const { ZipArchive } = require("archiver");
 
 const app = Router();
@@ -87,7 +88,7 @@ const archiveItems = async (sftpClient, archive, paths) => {
 }
 
 const validateSession = async (sessionToken, sessionId) => {
-    const session = await Session.findOne({ where: { token: sessionToken } });
+    const session = await findActiveSession(sessionToken);
     if (!session) return { error: "Invalid session", status: 401 };
 
     const [user, serverSession] = await Promise.all([

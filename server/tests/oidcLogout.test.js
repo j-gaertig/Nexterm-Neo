@@ -170,7 +170,7 @@ test("completes local session deletion before remote logout failure", async () =
         findSession: async () => ({ id: 3, accountId: 4, oidcProviderId: 7 }),
         logLogout: () => events.push("log"),
         destroySession: async () => events.push("destroy"),
-        removeAccountSessions: () => events.push("disconnect"),
+        removeSessionTerminals: () => events.push("disconnect"),
         broadcastLogout: () => events.push("broadcast"),
         createOIDCLogoutUrl: async () => {
             events.push("remote");
@@ -183,12 +183,94 @@ test("completes local session deletion before remote logout failure", async () =
     assert.deepEqual(events, ["log", "destroy", "disconnect", "broadcast", "remote", "warn:7"]);
 });
 
+test("closes the state socket before slow terminal teardown finishes", async () => {
+    const events = [];
+    let finishTeardown;
+    let settled = false;
+
+    const result = logoutWithDependencies("session-token", {
+        findSession: async () => ({ id: 3, accountId: 4 }),
+        logLogout: () => {},
+        destroySession: async () => events.push("destroy"),
+        removeSessionTerminals: () => new Promise(resolve => {
+            finishTeardown = () => {
+                events.push("disconnect");
+                resolve();
+            };
+        }),
+        broadcastLogout: () => events.push("broadcast"),
+        createOIDCLogoutUrl: async () => null,
+        warnOIDCLogout: () => {},
+    });
+    result.then(() => { settled = true; });
+
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(events, ["destroy", "broadcast"]);
+    assert.equal(settled, false);
+
+    finishTeardown();
+    await result;
+    assert.deepEqual(events, ["destroy", "broadcast", "disconnect"]);
+});
+
+test("completes logout when terminal teardown rejects", async () => {
+    const warnings = [];
+    const result = await logoutWithDependencies("session-token", {
+        findSession: async () => ({ id: 3, accountId: 4 }),
+        logLogout: () => {},
+        destroySession: async () => {},
+        removeSessionTerminals: async () => { throw new Error("teardown failed"); },
+        warnSessionTeardown: (sessionId, error) => warnings.push([sessionId, error.message]),
+        broadcastLogout: () => {},
+        createOIDCLogoutUrl: async () => null,
+        warnOIDCLogout: () => {},
+    });
+
+    assert.deepEqual(result, { message: "Your session got deleted successfully" });
+    assert.deepEqual(warnings, [[3, "teardown failed"]]);
+});
+
+test("reports every failed logout teardown step", async () => {
+    const warnings = [];
+    const result = await logoutWithDependencies("session-token", {
+        findSession: async () => ({ id: 3, accountId: 4 }),
+        logLogout: () => {},
+        destroySession: async () => {},
+        removeSessionTerminals: async () => {},
+        broadcastLogout: async () => { throw new Error("broadcast failed"); },
+        warnSessionTeardown: (sessionId, error) => warnings.push([sessionId, error.message]),
+        createOIDCLogoutUrl: async () => null,
+        warnOIDCLogout: () => {},
+    });
+
+    assert.deepEqual(result, { message: "Your session got deleted successfully" });
+    assert.deepEqual(warnings, [[3, "broadcast failed"]]);
+});
+
+test("disconnects joined organization viewers during logout", async () => {
+    const events = [];
+    const result = await logoutWithDependencies("session-token", {
+        findSession: async () => ({ id: 3, accountId: 4 }),
+        logLogout: () => {},
+        destroySession: async () => {},
+        removeSessionTerminals: async () => events.push("terminals"),
+        broadcastLogout: async () => events.push("broadcast"),
+        disconnectSessionViewers: async sessionId => events.push(["viewers", sessionId]),
+        forgetSessionActivity: sessionId => events.push(["forget", sessionId]),
+        createOIDCLogoutUrl: async () => null,
+        warnOIDCLogout: () => {},
+    });
+
+    assert.deepEqual(result, { message: "Your session got deleted successfully" });
+    assert.deepEqual(events, ["terminals", "broadcast", ["viewers", 3], ["forget", 3]]);
+});
+
 test("returns the remote logout URL after local cleanup", async () => {
     const result = await logoutWithDependencies("session-token", {
         findSession: async () => ({ id: 3, accountId: 4, oidcProviderId: 7 }),
         logLogout: () => {},
         destroySession: async () => {},
-        removeAccountSessions: () => {},
+        removeSessionTerminals: () => {},
         broadcastLogout: () => {},
         createOIDCLogoutUrl: async () => "https://idp.example.com/logout",
         warnOIDCLogout: () => {},

@@ -1,10 +1,13 @@
+const { Op } = require("sequelize");
 const Session = require("../models/Session");
 const Account = require("../models/Account");
-const stateBroadcaster = require("../lib/StateBroadcaster");
+const { getSessionRetentionCutoff, teardownLoginSession } = require("../utils/sessionCleanup");
 
 module.exports.listSessions = async (accountId, currentSessionId) => {
-    return (await Session.findAll({ where: { accountId } }))
-        .sort((a, b) => b.lastActivity - a.lastActivity)
+    const cutoff = getSessionRetentionCutoff();
+
+    return (await Session.findAll({ where: { accountId, lastActivity: { [Op.gte]: cutoff } } }))
+        .sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity))
         .map(session => ({ id: session.id, ip: session.ip, userAgent: session.userAgent, lastActivity: session.lastActivity,
             current: session.id === currentSessionId }));
 }
@@ -26,8 +29,8 @@ module.exports.destroySession = async (accountId, sessionId) => {
     if (session === null)
         return { code: 206, message: "The provided session does not exist" };
 
-    await Session.destroy({ where: { accountId, id: sessionId } });
-    stateBroadcaster.forceLogoutSession(sessionId);
+    await Session.destroy({ where: { accountId, id: session.id } });
+    await teardownLoginSession(session.id);
 
     return { message: "The session has been successfully destroyed" };
 };

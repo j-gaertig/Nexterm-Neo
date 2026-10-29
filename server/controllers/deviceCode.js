@@ -2,13 +2,19 @@ const DeviceCode = require("../models/DeviceCode");
 const Session = require("../models/Session");
 const { Op } = require("sequelize");
 const logger = require("../utils/logger");
+const { CODE_EXPIRY_MS, cleanupExpiredCodes, expireDeviceCode } = require("../utils/deviceCodeCleanup");
 
-const CODE_EXPIRY_MS = 10 * 60 * 1000;
+const getExpiryCutoff = () => new Date(Date.now() - CODE_EXPIRY_MS);
 
-const cleanupExpiredCodes = async () => {
-    await DeviceCode.destroy({
-        where: { createdAt: { [Op.lt]: new Date(Date.now() - CODE_EXPIRY_MS) } },
-    });
+const destroyOrphanSession = async sessionId => {
+    try {
+        await Session.destroy({ where: { id: sessionId } });
+    } catch (error) {
+        logger.warn("Failed to remove orphaned device login session", {
+            sessionId,
+            error: error.message,
+        });
+    }
 };
 
 module.exports.createCode = async ({ clientType, ipAddress, userAgent }) => {
@@ -17,7 +23,6 @@ module.exports.createCode = async ({ clientType, ipAddress, userAgent }) => {
     const deviceCode = await DeviceCode.create({ clientType, ipAddress, userAgent });
     
     logger.system(`Device code created for ${clientType}`, { 
-        code: deviceCode.code, 
         ip: ipAddress 
     });
 
@@ -34,12 +39,14 @@ module.exports.authorizeCode = async ({ code, accountId }) => {
     const deviceCode = await DeviceCode.findOne({
         where: {
             code: code.toUpperCase(),
-            createdAt: { [Op.gt]: new Date(Date.now() - CODE_EXPIRY_MS) },
+            createdAt: { [Op.gt]: getExpiryCutoff() },
         },
     });
 
     if (!deviceCode) return { code: 404, message: "Invalid or expired device code" };
-    if (deviceCode.sessionId) return { code: 400, message: "Device code has already been authorized" };
+    if (deviceCode.sessionId || deviceCode.redeemedAt) {
+        return { code: 400, message: "Device code has already been authorized" };
+    }
 
     const session = await Session.create({
         accountId,
@@ -47,9 +54,27 @@ module.exports.authorizeCode = async ({ code, accountId }) => {
         userAgent: deviceCode.userAgent,
     });
 
-    await DeviceCode.update({ sessionId: session.id }, { where: { id: deviceCode.id } });
-    
-    logger.system(`Device code authorized`, { code: deviceCode.code, accountId, sessionId: session.id });
+    const [claimed] = await DeviceCode.update(
+        { sessionId: session.id },
+        {
+            where: {
+                id: deviceCode.id,
+                sessionId: null,
+                redeemedAt: null,
+                createdAt: { [Op.gt]: getExpiryCutoff() },
+            },
+        },
+    ).catch(async error => {
+        await destroyOrphanSession(session.id);
+        throw error;
+    });
+
+    if (claimed === 0) {
+        await destroyOrphanSession(session.id);
+        return { code: 400, message: "Device code has already been authorized" };
+    }
+
+    logger.system(`Device code authorized`, { accountId, sessionId: session.id });
 
     return {
         message: "Device authorized successfully",
@@ -62,27 +87,32 @@ module.exports.authorizeCode = async ({ code, accountId }) => {
 };
 
 module.exports.pollToken = async ({ token }) => {
-    await cleanupExpiredCodes();
-
     const deviceCode = await DeviceCode.findOne({ where: { token } });
     if (!deviceCode) return { status: "invalid" };
+    if (deviceCode.redeemedAt) return { status: "invalid" };
 
     const createdTime = new Date(deviceCode.createdAt).getTime();
     if (Date.now() > createdTime + CODE_EXPIRY_MS) {
-        await DeviceCode.destroy({ where: { id: deviceCode.id } });
+        await expireDeviceCode(deviceCode);
         return { status: "invalid" };
     }
 
     if (deviceCode.sessionId) {
         const session = await Session.findByPk(deviceCode.sessionId);
         if (!session) {
-            await DeviceCode.destroy({ where: { id: deviceCode.id } });
+            await DeviceCode.update({ sessionId: null }, { where: { id: deviceCode.id } });
             return { status: "invalid" };
         }
-        
-        await DeviceCode.destroy({ where: { id: deviceCode.id } });
+
+        const [redeemed] = await DeviceCode.update(
+            { sessionId: null, redeemedAt: new Date() },
+            { where: { id: deviceCode.id, sessionId: deviceCode.sessionId, redeemedAt: null } },
+        );
+
+        if (redeemed === 0) return { status: "invalid" };
+
         logger.system(`Device code redeemed for session`, { sessionId: session.id });
-        
+
         return { status: "authorized", token: session.token };
     }
 
@@ -94,11 +124,16 @@ module.exports.checkLinkStatus = async ({ code }) => {
         where: { code: code.toUpperCase() },
     });
 
-    if (!deviceCode) return { status: "claimed" };
+    // Redeemed codes stay as tombstones so the QR dialog can observe the claim.
+    // A missing row must not be reported as claimed; otherwise an expired or
+    // already purged code would look like a successful link.
+    if (!deviceCode) return { status: "expired" };
+
+    if (deviceCode.redeemedAt) return { status: "claimed" };
 
     const createdTime = new Date(deviceCode.createdAt).getTime();
     if (Date.now() > createdTime + CODE_EXPIRY_MS) {
-        await DeviceCode.destroy({ where: { id: deviceCode.id } });
+        await expireDeviceCode(deviceCode);
         return { status: "expired" };
     }
 
@@ -112,12 +147,14 @@ module.exports.getCodeInfo = async ({ code }) => {
     const deviceCode = await DeviceCode.findOne({
         where: {
             code: code.toUpperCase(),
-            createdAt: { [Op.gt]: new Date(Date.now() - CODE_EXPIRY_MS) },
+            createdAt: { [Op.gt]: getExpiryCutoff() },
         },
     });
 
     if (!deviceCode) return { code: 404, message: "Invalid or expired device code" };
-    if (deviceCode.sessionId) return { code: 400, message: "Device code has already been authorized" };
+    if (deviceCode.sessionId || deviceCode.redeemedAt) {
+        return { code: 400, message: "Device code has already been authorized" };
+    }
 
     return {
         ipAddress: deviceCode.ipAddress,

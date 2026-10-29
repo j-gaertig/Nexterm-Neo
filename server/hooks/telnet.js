@@ -22,6 +22,7 @@ const bindHandlers = (ws, conn, sessionId, config, isShared, canWrite) => {
         }
         SessionManager.setActiveWs(sessionId, ws);
         SessionManager.markTyping(sessionId, ws);
+        SessionManager.updateActivity(sessionId, { touchLoginSession: !isShared });
         dataSocket.write(translateKeys(data, config));
     };
     ws.on("message", msgHandler);
@@ -29,7 +30,10 @@ const bindHandlers = (ws, conn, sessionId, config, isShared, canWrite) => {
     const outputStream = createDecodedTextStream((text) => {
         ws.readyState === ws.OPEN && ws.send(text);
     });
-    const dataHandler = (data) => outputStream.write(data);
+    const dataHandler = (data) => {
+        SessionManager.updateActivity(sessionId, { touchLoginSession: !isShared });
+        outputStream.write(data);
+    };
     dataSocket.on("data", dataHandler);
 
     return { msgHandler, dataHandler, endData: () => outputStream.end() };

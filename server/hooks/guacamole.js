@@ -63,6 +63,7 @@ const handleGuacJoin = async (ws, sessionId, ctx, pinnedMonitor = null) => {
         connectionSettings: masterClient.connectionSettings,
         existingSocket: joinSocket,
         onData: (data) => {
+            SessionManager.updateActivity(sessionId, { touchLoginSession: !isShared });
             try {
                 if (ws.readyState === ws.OPEN) ws.send(data, { binary: false, mask: false });
             } catch {
@@ -103,7 +104,7 @@ const handleGuacJoin = async (ws, sessionId, ctx, pinnedMonitor = null) => {
                 || SessionManager.isMonitorPinnedByOther(sessionId, ws, sizedMonitor))) return;
         }
 
-        SessionManager.updateActivity(sessionId);
+        SessionManager.updateActivity(sessionId, { touchLoginSession: !isShared });
         joinClient.send(msgStr);
     });
 

@@ -7,8 +7,20 @@ const logoutWithDependencies = async (token, dependencies) => {
     dependencies.logLogout(session.accountId);
 
     await dependencies.destroySession(token);
-    dependencies.removeAccountSessions(session.accountId);
-    dependencies.broadcastLogout(session.id);
+
+    const teardown = await Promise.allSettled([
+        Promise.resolve().then(() => dependencies.removeSessionTerminals(session.id)),
+        Promise.resolve().then(() => dependencies.broadcastLogout(session.id)),
+        Promise.resolve().then(() => dependencies.disconnectSessionViewers?.(session.id)),
+    ]);
+
+    dependencies.forgetSessionActivity?.(session.id);
+
+    for (const result of teardown) {
+        if (result.status === "rejected") {
+            dependencies.warnSessionTeardown?.(session.id, result.reason);
+        }
+    }
 
     let logoutUrl = null;
     if (session.oidcProviderId) {

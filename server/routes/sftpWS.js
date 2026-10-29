@@ -201,7 +201,11 @@ module.exports = async (ws, req) => {
         return;
     }
 
-    if (serverSession) SessionManager.resume(serverSession.sessionId);
+    if (serverSession) {
+        SessionManager.resume(serverSession.sessionId, null, null, ctx.session?.id || null, {
+            touchLoginSession: !ctx.isShared,
+        });
+    }
 
     const sessionId = serverSession?.sessionId;
     const auditLogId = serverSession?.auditLogId ?? null;
@@ -267,6 +271,8 @@ module.exports = async (ws, req) => {
 
         const messageHandler = async (msg) => {
             const opCode = msg[0];
+
+            if (sessionId) SessionManager.updateActivity(sessionId, { touchLoginSession: !ctx.isShared });
 
             if (opCode === OP.PATH_SYNC) {
                 let payload;

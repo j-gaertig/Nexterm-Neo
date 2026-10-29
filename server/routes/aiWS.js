@@ -70,7 +70,7 @@ module.exports = async function handleAIConnection(ws, req) {
     if (!isConfigured(settings)) return ws.close(4020, "AI assistant is not configured");
 
     const sessionId = serverSession.sessionId;
-    SessionManager.resume(sessionId);
+    SessionManager.resume(sessionId, null, null, context.session?.id || null);
     if (!await waitForConnection(sessionId)) return ws.close(4014, "Connection not available");
 
     const session = SessionManager.get(sessionId);

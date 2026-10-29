@@ -34,7 +34,7 @@ module.exports = async (ws, req) => {
 
     if (!serverSession) return ws.close(4007, "Session required");
 
-    SessionManager.resume(serverSession.sessionId);
+    SessionManager.resume(serverSession.sessionId, null, null, context.session?.id || null);
     const { conn, sessionRemoved } = await waitForConnection(serverSession.sessionId);
 
     if (!conn) {

@@ -1,7 +1,11 @@
 const {Sequelize} = require('sequelize');
 const logger = require('./logger');
 
-const STORAGE_PATH = `data/nexterm.db`;
+// Only honored by the test suite so a stray environment variable can never
+// point a production instance at a different database file.
+const STORAGE_PATH = process.env.NODE_ENV === "test" && process.env.DB_STORAGE_PATH
+    ? process.env.DB_STORAGE_PATH
+    : `data/nexterm.db`;
 
 Sequelize.DATE.prototype._stringify = function(date) {
     return (date instanceof Date ? date : new Date(date)).toISOString();
