@@ -21,7 +21,7 @@ class ServerAccountsScreen extends StatelessWidget {
             child: Row(children: [
               IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: () => Navigator.pop(context)),
               const SizedBox(width: 4),
-              Expanded(child: Text('Connections', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
+              Expanded(child: Text('Server Connections', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
               Material(
                 color: cs.primaryContainer,
                 borderRadius: BorderRadius.circular(10),
@@ -66,7 +66,7 @@ class ServerAccountsScreen extends StatelessWidget {
         child: Icon(AppIcons.serverNetworkOff, size: 32, color: cs.outline),
       ),
       const SizedBox(height: 20),
-      Text('No connections', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+      Text('No server connections', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
       Text('Add a server to get started', style: tt.bodySmall?.copyWith(color: cs.outline)),
     ]),

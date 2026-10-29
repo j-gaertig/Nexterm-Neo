@@ -32,11 +32,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Revoke Session'),
-        content: const Text('Are you sure you want to end this session?'),
+        title: const Text('Sign Out Device'),
+        content: const Text('Are you sure you want to sign out this device?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Revoke')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sign Out')),
         ],
       ),
     );
@@ -46,7 +46,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final success = await _auth.revokeSession(token, id);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(success ? 'Session revoked' : 'Failed to revoke session'),
+      content: Text(success ? 'Device signed out' : 'Failed to sign out device'),
       behavior: SnackBarBehavior.floating));
     if (success) _load();
   }
@@ -105,7 +105,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             child: Row(children: [
               IconButton(icon: const Icon(AppIcons.arrowBack), onPressed: () => Navigator.pop(context)),
               const SizedBox(width: 4),
-              Expanded(child: Text('Active Sessions', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
+              Expanded(child: Text('Signed-in Devices', style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700))),
               IconButton(icon: Icon(AppIcons.refresh, size: 22), onPressed: _load),
             ]),
           ),
@@ -128,7 +128,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         child: Icon(AppIcons.monitor, size: 32, color: cs.outline),
       ),
       const SizedBox(height: 20),
-      Text('No other sessions', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+      Text('No other devices', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
       const SizedBox(height: 6),
       Text('Only this device is active', style: tt.bodySmall?.copyWith(color: cs.outline)),
     ])),
