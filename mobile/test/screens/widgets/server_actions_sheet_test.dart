@@ -31,6 +31,7 @@ late BuildContext _hostContext;
 Future<void> _pumpHost(
   WidgetTester tester, {
   Size size = const Size(360, 800),
+  double textScale = 1.0,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -38,6 +39,12 @@ Future<void> _pumpHost(
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Scaffold(
         body: Builder(
           builder: (context) {
@@ -103,6 +110,27 @@ void main() {
 
       expect(tapped, ['Delete']);
       expect(find.byType(ServerActionsSheet), findsNothing);
+    });
+
+    testWidgets('keeps the last action reachable at a large text scale', (
+      tester,
+    ) async {
+      await _pumpHost(tester, size: const Size(320, 480), textScale: 2);
+      final tapped = <String>[];
+      await _openSheet(tester, tapped);
+
+      final scrollableState = tester.state<ScrollableState>(
+        find.byType(Scrollable),
+      );
+      expect(scrollableState.position.maxScrollExtent, greaterThan(0));
+
+      await tester.ensureVisible(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete').hitTestable(), findsOneWidget);
+
+      await tester.tap(find.text('Delete'));
+      await tester.pumpAndSettle();
+      expect(tapped, ['Delete']);
     });
 
     testWidgets('wraps its content when all actions fit on a tall screen', (
