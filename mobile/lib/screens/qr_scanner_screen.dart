@@ -38,7 +38,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   Future<void> _openScanner() async {
     final result = await Navigator.push<Map<String, String>>(context, MaterialPageRoute(
       builder: (_) => QrScannerPage(
-        title: 'Scan QR Code',
+        title: 'Authorize Login',
         hint: 'Point your camera at the QR code on the login page',
         onDetect: (raw) {
           final parsed = _parse(raw);

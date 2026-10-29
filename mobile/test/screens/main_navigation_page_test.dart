@@ -15,13 +15,6 @@ import 'package:nexterm/utils/terminal_settings.dart';
 import 'package:nexterm/utils/theme_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Drains unrelated framework assertions raised while the offstage tabs build.
-/// `SettingsScreen` wraps its `ListTile`s in a decorated container, which is a
-/// pre-existing debug-only assertion that does not affect tab navigation.
-void _drainFrameworkExceptions(WidgetTester tester) {
-  while (tester.takeException() != null) {}
-}
-
 void main() {
   testWidgets('opens the monitoring tab when no sessions are active', (
     tester,
@@ -59,7 +52,6 @@ void main() {
       ),
     );
     await tester.pump();
-    _drainFrameworkExceptions(tester);
 
     // Without sessions there is no sessions destination, so index 1 is the
     // Monitoring tab and must be selectable.
@@ -72,7 +64,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump(const Duration(milliseconds: 250));
-    _drainFrameworkExceptions(tester);
 
     final stack = tester.widget<IndexedStack>(find.byType(IndexedStack));
     expect(stack.index, 1);
@@ -131,7 +122,6 @@ void main() {
       ),
     );
     await tester.pump();
-    _drainFrameworkExceptions(tester);
 
     await tester.tap(
       find.descendant(
@@ -142,7 +132,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump(const Duration(milliseconds: 250));
-    _drainFrameworkExceptions(tester);
 
     // The sessions tab is fullscreen and has no bottom navigation bar.
     expect(find.byType(NavigationBar), findsNothing);
@@ -164,7 +153,6 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump(const Duration(milliseconds: 250));
-    _drainFrameworkExceptions(tester);
 
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(sessionManager.sessionCount, 1);
