@@ -12,11 +12,12 @@ import { applyActiveThemeCSS, removeActiveThemeCSS } from "@/common/components/T
 import Icon from "@mdi/react";
 import {
     mdiPalette, mdiWhiteBalanceSunny, mdiWeatherNight, mdiCheck, mdiCloudSync,
-    mdiCloudOffOutline, mdiPlus, mdiBrush,
+    mdiCloudOffOutline, mdiPlus, mdiBrush, mdiMonitor,
 } from "@mdi/js";
 import ThemeCard from "./components/ThemeCard";
 import ThemeEditorDialog from "./components/ThemeEditorDialog";
 import Tooltip from "@/common/components/Tooltip";
+import { AUTO_SCALE, SCALE_STEPS } from "@/common/utils/displayScale.js";
 
 export const Appearance = () => {
     const { t } = useTranslation();
@@ -25,7 +26,13 @@ export const Appearance = () => {
         themeMode, setTheme, accentColor, setAccentColor, accentColors,
         uiScale, setUiScale, isGroupSynced, toggleGroupSync, theme: actualTheme,
         serverNoteScrollMode, setServerNoteScrollMode,
+        defaultDisplayScale, setDefaultDisplayScale,
     } = usePreferences();
+
+    const displayScaleOptions = [
+        { label: t("settings.account.remoteDesktopScaleAuto"), value: AUTO_SCALE },
+        ...SCALE_STEPS.map(scale => ({ label: `${scale}%`, value: scale })),
+    ];
 
     const sizeOptions = [
         { label: t("settings.account.sizeXS"), value: 0.7 },
@@ -41,6 +48,16 @@ export const Appearance = () => {
         { label: t("settings.account.serverList.scrollModeInfinite"), value: "infinite" },
     ];
     const { sendToast } = useToast();
+
+    const toggleSync = (group, enabledKey, disabledKey) => {
+        if (!user) {
+            sendToast(t("common.error"), t("settings.account.syncLoginRequired"));
+            return;
+        }
+        const wasSynced = isGroupSynced(group);
+        toggleGroupSync(group);
+        sendToast(t("common.success"), t(wasSynced ? disabledKey : enabledKey));
+    };
 
     const [darkClickCount, setDarkClickCount] = useState(0);
     const darkClickTimeout = useRef(null);
@@ -135,18 +152,8 @@ export const Appearance = () => {
                     </h2>
                     <Button
                         icon={isGroupSynced("appearance") ? mdiCloudSync : mdiCloudOffOutline}
-                        onClick={() => {
-                            if (!user) {
-                                sendToast(t("common.error"), t("settings.account.syncLoginRequired"));
-                                return;
-                            }
-                            const wasSynced = isGroupSynced("appearance");
-                            toggleGroupSync("appearance");
-                            sendToast(
-                                t("common.success"),
-                                wasSynced ? t("settings.account.appearanceSyncDisabled") : t("settings.account.appearanceSyncEnabled"),
-                            );
-                        }}
+                        onClick={() => toggleSync("appearance",
+                            "settings.account.appearanceSyncEnabled", "settings.account.appearanceSyncDisabled")}
                         type={isGroupSynced("appearance") ? "primary" : undefined}
                     />
                 </div>
@@ -236,6 +243,33 @@ export const Appearance = () => {
                         <div className="size-selector">
                             <span className="size-label">{t("settings.account.sizeLabel")}</span>
                             <SelectBox options={sizeOptions} selected={uiScale} setSelected={setUiScale} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="appearance-section">
+                <div className="section-header">
+                    <h2>
+                        <Icon path={mdiMonitor} size={0.8} />
+                        {t("settings.account.remoteDesktop")}
+                    </h2>
+                    <Button
+                        icon={isGroupSynced("remoteDesktop") ? mdiCloudSync : mdiCloudOffOutline}
+                        onClick={() => toggleSync("remoteDesktop",
+                            "settings.account.remoteDesktopSyncEnabled", "settings.account.remoteDesktopSyncDisabled")}
+                        type={isGroupSynced("remoteDesktop") ? "primary" : undefined}
+                    />
+                </div>
+                <div className="section-inner appearance-controls">
+                    <p className="appearance-description">{t("settings.account.remoteDesktopDescription")}</p>
+                </div>
+                <div className="section-inner">
+                    <div className="appearance-content">
+                        <div className="size-selector">
+                            <span className="size-label">{t("settings.account.remoteDesktopScale")}</span>
+                            <SelectBox options={displayScaleOptions} selected={defaultDisplayScale}
+                                       setSelected={setDefaultDisplayScale} />
                         </div>
                     </div>
                 </div>

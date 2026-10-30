@@ -24,6 +24,7 @@ import { StateStreamContext, STATE_TYPES } from "@/common/contexts/StateStreamCo
 import { isTauri } from "@/common/utils/TauriUtil.js";
 import { getTabId, getBrowserId, requiresIdentity, canConnectWithoutPrompt } from "@/common/utils/ConnectionUtil.js";
 import { postRequest, deleteRequest } from "@/common/utils/RequestUtil";
+import { getExpectedDisplaySize, resolveScale, resolveScaleSetting, scaleToDpi } from "@/common/utils/displayScale.js";
 
 const makeReconnectKey = () => {
     const values = new Uint32Array(4);
@@ -64,7 +65,11 @@ export const Servers = () => {
     const { liveSessions } = useLiveSessions();
     const { getServerById, servers } = useContext(ServerContext);
     const { registerHandler, isConnected } = useContext(StateStreamContext);
-    const { autoReconnect } = usePreferences();
+    const { autoReconnect, defaultDisplayScale } = usePreferences();
+    const defaultDisplayScaleRef = useRef(defaultDisplayScale);
+    useEffect(() => {
+        defaultDisplayScaleRef.current = defaultDisplayScale;
+    }, [defaultDisplayScale]);
     const { sendToast } = useToast();
     const { t } = useTranslation();
     const sessionLayout = useSessionLayout();
@@ -347,6 +352,7 @@ export const Servers = () => {
         }
         try {
             const existingSession = activeSessionsRef.current.find(s => s.id === reconnectSessionId);
+            const displaySize = getExpectedDisplaySize();
             const payload = {
                 entryId: server.id,
                 identityId: identity?.id,
@@ -354,7 +360,8 @@ export const Servers = () => {
                 type,
                 tabId: getTabId(),
                 browserId: getBrowserId(),
-                displayDpi: Math.round((window.devicePixelRatio || 1) * 96),
+                displayDpi: scaleToDpi(resolveScale(resolveScaleSetting(server.id, server.displayScale, defaultDisplayScaleRef.current))),
+                ...(displaySize && { displayWidth: displaySize.width, displayHeight: displaySize.height }),
                 ...(reconnectSessionId && { connectionGeneration: existingSession?.connectionGeneration ?? 0 }),
             };
 

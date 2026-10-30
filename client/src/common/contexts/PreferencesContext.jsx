@@ -9,7 +9,7 @@ export const usePreferences = () => useContext(PreferencesContext);
 const OVERRIDE_KEY_PREFIX = "pref-override-";
 const SERVER_NOTE_SCROLL_MODE_KEY = "serverNoteScrollMode";
 const SERVER_NOTE_SCROLL_MODES = ["none", "hover", "stop", "infinite"];
-const GROUPS = ["terminal.font", "terminal.cursor", "terminal.input", "terminal.theme", "appearance", "files", "general"];
+const GROUPS = ["terminal.font", "terminal.cursor", "terminal.input", "terminal.theme", "appearance", "files", "remoteDesktop", "general"];
 
 const PATH_TO_GROUP = {
     "terminal.fontFamily": "terminal.font", "terminal.fontSize": "terminal.font",
@@ -21,6 +21,7 @@ const PATH_TO_GROUP = {
     "theme.mode": "appearance", "theme.accentColor": "appearance", "theme.uiScale": "appearance",
     "files.showThumbnails": "files", "files.defaultViewMode": "files", "files.showHiddenFiles": "files",
     "files.confirmBeforeDelete": "files", "files.dragDropAction": "files",
+    "remoteDesktop.displayScale": "remoteDesktop",
     "general.language": "general",
 };
 
@@ -579,6 +580,9 @@ export const PreferencesProvider = ({ children, user, refreshUser }) => {
     const toggleHiddenFiles = useCallback(() => setShowHiddenFiles(!showHiddenFiles), [setShowHiddenFiles, showHiddenFiles]);
     const toggleConfirmBeforeDelete = useCallback(() => setConfirmBeforeDelete(!confirmBeforeDelete), [setConfirmBeforeDelete, confirmBeforeDelete]);
 
+    const defaultDisplayScale = get("remoteDesktop.displayScale", "auto");
+    const setDefaultDisplayScale = useCallback((v) => set("remoteDesktop.displayScale", v), [set]);
+
     const language = get("general.language", null);
     const setLanguage = useCallback((lang) => set("general.language", lang), [set]);
 
@@ -607,6 +611,7 @@ export const PreferencesProvider = ({ children, user, refreshUser }) => {
             showHiddenFiles, setShowHiddenFiles, toggleHiddenFiles,
             confirmBeforeDelete, setConfirmBeforeDelete, toggleConfirmBeforeDelete,
             dragDropAction, setDragDropAction,
+            defaultDisplayScale, setDefaultDisplayScale,
             language, setLanguage,
         }}>
             {children}
