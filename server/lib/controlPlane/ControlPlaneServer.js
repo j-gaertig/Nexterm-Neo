@@ -32,6 +32,7 @@ const { RECORDINGS_DIR, ensureRecordingsDir, compressRecording, getRecordingPath
 const AuditLog = require("../../models/AuditLog");
 
 const SESSION_TIMEOUT = 30000;
+const PORT_CHECK_RESPONSE_MARGIN = 15000;
 const DATA_CONNECTION_TIMEOUT = 30000;
 
 class ControlPlaneServer extends EventEmitter {
@@ -201,7 +202,7 @@ class ControlPlaneServer extends EventEmitter {
         const requestId = `portcheck-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
         return this._createPendingRequest(requestId, null, () => {
             this._sendFrame(engine.socket, buildPortCheck(requestId, targets, timeoutMs));
-        }, null, engine.engineId);
+        }, null, engine.engineId, timeoutMs + PORT_CHECK_RESPONSE_MARGIN);
     }
 
     httpFetch(method, url, headers = {}, body = null, timeoutMs = 30000, insecure = false, engineId = null) {
