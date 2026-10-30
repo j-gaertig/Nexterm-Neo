@@ -6,6 +6,7 @@ import 'package:nexterm/screens/server_accounts_screen.dart';
 import 'package:nexterm/screens/settings_screen.dart';
 import 'package:nexterm/services/screen_lock_service.dart';
 import 'package:nexterm/utils/auth_manager.dart';
+import 'package:nexterm/utils/navigation_bar_settings.dart';
 import 'package:nexterm/utils/screen_lock_settings.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
 import 'package:nexterm/utils/server_view_settings.dart';
@@ -19,6 +20,7 @@ class _SettingsHarness {
   final AuthManager authManager;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
+  final NavigationBarSettings navigationBarSettings;
   final TerminalSettings terminalSettings;
   final ScreenLockSettings screenLockSettings;
 
@@ -27,6 +29,7 @@ class _SettingsHarness {
     required this.authManager,
     required this.sftpSettings,
     required this.serverViewSettings,
+    required this.navigationBarSettings,
     required this.terminalSettings,
     required this.screenLockSettings,
   });
@@ -64,6 +67,7 @@ Future<_SettingsHarness> _pumpSettings(
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
+  final navigationBarSettings = await NavigationBarSettings.load();
   final screenLockSettings = await ScreenLockSettings.load();
   final screenLockService = ScreenLockService();
 
@@ -87,6 +91,7 @@ Future<_SettingsHarness> _pumpSettings(
         terminalSettings: terminalSettings,
         sftpSettings: sftpSettings,
         serverViewSettings: serverViewSettings,
+        navigationBarSettings: navigationBarSettings,
         screenLockSettings: screenLockSettings,
         screenLockService: screenLockService,
       ),
@@ -99,6 +104,7 @@ Future<_SettingsHarness> _pumpSettings(
     authManager: authManager,
     sftpSettings: sftpSettings,
     serverViewSettings: serverViewSettings,
+    navigationBarSettings: navigationBarSettings,
     terminalSettings: terminalSettings,
     screenLockSettings: screenLockSettings,
   );
@@ -186,6 +192,27 @@ void main() {
     await harness.serverViewSettings.setMode(ServerViewMode.list);
     await tester.pump();
     expect(find.text('Columns'), findsNothing);
+  });
+
+  testWidgets('toggles the floating navigation bar', (tester) async {
+    final harness = await _pumpSettings(tester);
+
+    expect(harness.navigationBarSettings.useFloating, isTrue);
+    expect(find.text('Floating Navigation Bar'), findsOneWidget);
+
+    await tester.tap(
+      find.widgetWithText(SwitchListTile, 'Floating Navigation Bar'),
+    );
+    await tester.pump();
+
+    expect(harness.navigationBarSettings.useFloating, isFalse);
+
+    await tester.tap(
+      find.widgetWithText(SwitchListTile, 'Floating Navigation Bar'),
+    );
+    await tester.pump();
+
+    expect(harness.navigationBarSettings.useFloating, isTrue);
   });
 
   testWidgets('keeps logout in the account card and can cancel it', (
