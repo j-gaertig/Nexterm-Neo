@@ -658,7 +658,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                         softWrap: false,
                                       ),
                                       Text(
-                                        'Number of columns in grid view',
+                                        'Preferred columns, adapted to screen width',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: cs.outline,
