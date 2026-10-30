@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../utils/app_icons.dart';
 import '../models/server.dart';
@@ -11,7 +12,9 @@ import '../utils/auth_manager.dart';
 import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
 import '../utils/server_view_settings.dart';
+import '../utils/tag_color.dart';
 import 'widgets/quick_connect_sheet.dart';
+import 'widgets/server_grid_card.dart';
 import 'widgets/connection_reason_dialog.dart';
 import 'widgets/server_actions_sheet.dart';
 import 'widgets/server_protocol_sheet.dart';
@@ -25,8 +28,9 @@ class ServersScreen extends StatefulWidget {
   final SessionManager sessionManager;
   final ServerViewSettings serverViewSettings;
   final VoidCallback? onSwitchToSessions;
+  final Future<List<dynamic>> Function(String token)? loadEntries;
 
-  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSwitchToSessions});
+  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSwitchToSessions, this.loadEntries});
 
   @override
   State<ServersScreen> createState() => _ServersScreenState();
@@ -109,7 +113,7 @@ class _ServersScreenState extends State<ServersScreen> {
     try {
       final token = widget.authManager.sessionToken;
       if (token == null) { if (mounted) setState(() { errorMessage = 'Not authenticated'; isLoading = false; }); return; }
-      final data = await ServerService.getServerList(token);
+      final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
       _selectedTags.removeWhere((id) => !validTagIds.contains(id));
@@ -236,7 +240,7 @@ class _ServersScreenState extends State<ServersScreen> {
     try {
       final token = widget.authManager.sessionToken;
       if (token == null) return;
-      final data = await ServerService.getServerList(token);
+      final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
       _selectedTags.removeWhere((id) => !validTagIds.contains(id));
@@ -599,137 +603,77 @@ class _ServersScreenState extends State<ServersScreen> {
     ]);
   }
 
-  int _effectiveColumns(int wanted) {
-    return wanted.clamp(2, 4);
-  }
+  static const double _gridSpacing = 8;
+  static const double _minGridCardWidth = 104;
 
-  double _gridRatio(int columns) {
-    if (columns <= 2) return 0.78;
-    if (columns == 3) return 0.64;
-    return 0.54;
-  }
-
-  Widget _buildServerGrid(List<Server> servers, int depth) {
-    final columns = _effectiveColumns(widget.serverViewSettings.gridColumns);
-    final cappedDepth = depth.clamp(0, 2);
-    return Padding(
-      padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12, top: 4, bottom: 4),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: EdgeInsets.zero,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: columns,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: _gridRatio(columns),
-        ),
-        itemCount: servers.length,
-        itemBuilder: (_, i) => _buildServerGridCard(servers[i], compact: columns >= 3, key: ValueKey('grid:${servers[i].id ?? servers[i].name}')),
-      ),
+  int _effectiveColumns(int wanted, double availableWidth) {
+    final fit =
+        ((availableWidth + _gridSpacing) / (_minGridCardWidth + _gridSpacing))
+            .floor();
+    return math.min(
+      wanted,
+      math.max(2, math.min(fit, ServerViewSettings.maxColumns)),
     );
   }
 
-  Widget _buildServerGridCard(Server server, {Key? key, bool compact = false}) {
-    final cs = Theme.of(context).colorScheme;
-    final offline = !server.isRunning || server.disabled;
-    final pve = server.isPve;
-    final icon = _serverIcon(server);
-    final (bg, fg) = offline
-        ? (cs.surfaceContainerHighest, cs.outline)
-        : pve ? (cs.tertiaryContainer, cs.onTertiaryContainer) : (cs.primaryContainer, cs.onPrimaryContainer);
-    String? sub;
-    final ip = server.ip.trim();
-    if (server.disabled) {
-      sub = ip.isNotEmpty && ip != 'N/A' ? 'Disabled · $ip' : 'Disabled';
-    } else if (pve && server.status != null) {
-      sub = ip.isNotEmpty && ip != 'N/A' ? '${server.status} · $ip' : server.status;
-    } else if (ip.isNotEmpty && ip != 'N/A') {
-      sub = ip;
-    }
-    final tags = server.tags ?? const <Tag>[];
-    final statusLabel = server.disabled ? 'Disabled' : (offline ? 'Offline' : 'Online');
-    return Semantics(
-      key: key,
-      button: true,
-      label: '${server.name}, $statusLabel${sub != null ? ', $sub' : ''}',
-      child: Material(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _connectToServer(server),
-          onLongPress: () => _showServerMenu(server),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Container(
-                width: compact ? 32 : 40, height: compact ? 32 : 40,
-                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(compact ? 10 : 12)),
-                child: Center(child: Icon(icon, color: fg, size: compact ? 17 : 20)),
-              ),
-              SizedBox(height: compact ? 8 : 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text(server.name,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: offline ? cs.outline : cs.onSurface),
-                    maxLines: compact ? 1 : 2, overflow: TextOverflow.ellipsis),
-                  if (sub != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(sub, style: TextStyle(fontSize: 11, color: cs.outline), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
-                ]),
-              ),
-              SizedBox(
-                height: 24,
-                child: tags.isEmpty
-                    ? const SizedBox.shrink()
-                    : ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                          colors: [Colors.white, Colors.white, Colors.transparent],
-                          stops: [0.0, 0.88, 1.0],
-                        ).createShader(bounds),
-                        blendMode: BlendMode.dstIn,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              for (final t in tags)
-                                Semantics(
-                                  button: true,
-                                  label: 'Filter by ${t.name}',
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onTap: () => setState(() {
-                                      _selectedTags.contains(t.id) ? _selectedTags.remove(t.id) : _selectedTags.add(t.id);
-                                      _filterFolders();
-                                    }),
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 4),
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: _parseColor(t.color).withValues(alpha: 0.12),
-                                        borderRadius: BorderRadius.circular(7),
-                                        border: Border.all(color: _parseColor(t.color).withValues(alpha: 0.5), width: 1),
-                                      ),
-                                      child: Text(t.name,
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _parseColor(t.color)),
-                                        maxLines: 1, softWrap: false),
-                                    ),
-                                  ),
+  Widget _buildServerGrid(List<Server> servers, int depth) {
+    final cappedDepth = depth.clamp(0, 2);
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 12.0 + cappedDepth * 16,
+        right: 12,
+        top: 4,
+        bottom: 4,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns = _effectiveColumns(
+            widget.serverViewSettings.gridColumns,
+            constraints.maxWidth,
+          );
+          final dense = columns >= 3;
+          final rows = <Widget>[];
+          for (var start = 0; start < servers.length; start += columns) {
+            rows.add(
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var column = 0; column < columns; column++) ...[
+                      if (column > 0) const SizedBox(width: _gridSpacing),
+                      Expanded(
+                        child: start + column < servers.length
+                            ? ServerGridCard(
+                                key: ValueKey(
+                                  'grid:${servers[start + column].id ?? servers[start + column].name}',
                                 ),
-                            ],
-                          ),
-                        ),
+                                server: servers[start + column],
+                                icon: _serverIcon(servers[start + column]),
+                                dense: dense,
+                                onTap: () =>
+                                    _connectToServer(servers[start + column]),
+                                onLongPress: () =>
+                                    _showServerMenu(servers[start + column]),
+                                onTagTap: (tag) => setState(() {
+                                  _selectedTags.contains(tag.id)
+                                      ? _selectedTags.remove(tag.id)
+                                      : _selectedTags.add(tag.id);
+                                  _filterFolders();
+                                }),
+                              )
+                            : const SizedBox.shrink(),
                       ),
+                    ],
+                  ],
+                ),
               ),
-            ]),
-          ),
-        ),
+            );
+            if (start + columns < servers.length) {
+              rows.add(const SizedBox(height: _gridSpacing));
+            }
+          }
+          return Column(children: rows);
+        },
       ),
     );
   }
@@ -1346,20 +1290,6 @@ class _ServersScreenState extends State<ServersScreen> {
     return AppIcons.brandServer;
   }
 
-  Color _parseColor(String c) {
-    if (c.startsWith('#')) {
-      try {
-        final hex = c.substring(1);
-        if (hex.length == 3) {
-          final r = hex[0] + hex[0];
-          final g = hex[1] + hex[1];
-          final b = hex[2] + hex[2];
-          return Color(int.parse('FF$r$g$b', radix: 16));
-        }
-        if (hex.length == 6) return Color(int.parse('FF$hex', radix: 16));
-        if (hex.length == 8) return Color(int.parse(hex, radix: 16));
-      } catch (_) {}
-    }
-    return Theme.of(context).colorScheme.outlineVariant;
-  }
+  Color _parseColor(String c) =>
+      parseTagColor(c, fallback: Theme.of(context).colorScheme.outlineVariant);
 }
