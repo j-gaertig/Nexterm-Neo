@@ -145,6 +145,7 @@ export const Servers = () => {
                 connectionGeneration: session.connectionGeneration ?? 0,
                 server,
                 identity: session.configuration.identityId,
+                connectionReason: session.configuration.connectionReason || null,
                 isHibernated: session.isHibernated,
                 lastActivity: session.lastActivity,
                 type: session.configuration.type || undefined,
@@ -311,7 +312,7 @@ export const Servers = () => {
     };
 
     const performConnection = async (options, connectionReason = null) => {
-        const { server, identity = null, type = null, directIdentity = null, scriptId = null, scriptName = null, placement = null, reconnectSessionId = null, reconnectKey: existingReconnectKey = null } = options;
+        const { server, identity = null, type = null, directIdentity = null, scriptId = null, scriptName = null, placement = null, reconnectSessionId = null, reconnectKey: existingReconnectKey = null, connectionGeneration = null } = options;
         if (server?.disabled) {
             if (!reconnectSessionId) notifyServerDisabled(server);
             return false;
@@ -362,7 +363,7 @@ export const Servers = () => {
                 browserId: getBrowserId(),
                 displayDpi: scaleToDpi(resolveScale(resolveScaleSetting(server.id, server.displayScale, defaultDisplayScaleRef.current))),
                 ...(displaySize && { displayWidth: displaySize.width, displayHeight: displaySize.height }),
-                ...(reconnectSessionId && { connectionGeneration: existingSession?.connectionGeneration ?? 0 }),
+                ...(reconnectSessionId && { connectionGeneration: connectionGeneration ?? existingSession?.connectionGeneration ?? 0 }),
             };
 
             if (directIdentity) payload.directIdentity = directIdentity;
@@ -385,6 +386,7 @@ export const Servers = () => {
             const sessionData = {
                 server,
                 identity: identity?.id,
+                connectionReason: connectionReason || null,
                 id: session.sessionId,
                 type: type || undefined,
                 organizationId: organizationId,
@@ -446,13 +448,13 @@ export const Servers = () => {
         }
 
         const requiresReason = checkConnectionReasonRequired(options.server.id, servers);
-        if (requiresReason) {
+        if (requiresReason && !options.connectionReason) {
             setPendingConnection(options);
             setConnectionReasonDialogOpen(true);
             return { connected: false, deferred: true };
         }
 
-        const connected = await performConnection(options);
+        const connected = await performConnection(options, options.connectionReason ?? null);
         return { connected, deferred: false };
     };
 
@@ -569,6 +571,8 @@ export const Servers = () => {
             scriptName: session.scriptName ?? null,
             reconnectSessionId: sessionId,
             reconnectKey: session.reconnectKey,
+            connectionReason: session.connectionReason,
+            connectionGeneration: session.connectionGeneration ?? 0,
         });
         if (!result.connected && !result.deferred) {
             reconnectingKeysRef.current.delete(session.reconnectKey);
