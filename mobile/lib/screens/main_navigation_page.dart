@@ -13,8 +13,10 @@ import '../utils/ai_manager.dart';
 import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
+import '../utils/navigation_bar_settings.dart';
 import '../utils/server_view_settings.dart';
 import '../utils/tab_fade_switcher.dart';
+import '../widgets/floating_navigation_bar.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
 import 'monitoring_screen.dart';
@@ -29,6 +31,7 @@ class MainNavigationPage extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
+  final NavigationBarSettings navigationBarSettings;
   final ScreenLockSettings screenLockSettings;
   final ScreenLockService screenLockService;
 
@@ -42,6 +45,7 @@ class MainNavigationPage extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
+    required this.navigationBarSettings,
     required this.screenLockSettings,
     required this.screenLockService,
   });
@@ -61,13 +65,21 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   void initState() {
     super.initState();
     widget.sessionManager.addListener(_onSessionsChanged);
+    widget.navigationBarSettings.addListener(_onNavigationBarSettingsChanged);
   }
 
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
+    widget.navigationBarSettings.removeListener(
+      _onNavigationBarSettingsChanged,
+    );
     _tabSwitcher.dispose();
     super.dispose();
+  }
+
+  void _onNavigationBarSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   void _switchTab(int index) {
@@ -120,6 +132,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
   @override
   Widget build(BuildContext context) {
     final hasSessions = _hasSessions;
+    final useFloatingBar = widget.navigationBarSettings.useFloating;
     final isOnSessionsTab = hasSessions && _selectedIndex == 1;
     final attentionSession = _attentionSession;
     final activeSessionId = widget.sessionManager.activeSessionId;
@@ -155,6 +168,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         terminalSettings: widget.terminalSettings,
         sftpSettings: widget.sftpSettings,
         serverViewSettings: widget.serverViewSettings,
+        navigationBarSettings: widget.navigationBarSettings,
         screenLockSettings: widget.screenLockSettings,
         screenLockService: widget.screenLockService,
       ),
@@ -232,12 +246,20 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         ),
         bottomNavigationBar: isOnSessionsTab
             ? null
-            : _buildBottomNavigationBar(context, hasSessions),
+            : _buildBottomNavigationBar(context, hasSessions, useFloatingBar),
       ),
     );
   }
 
-  Widget _buildBottomNavigationBar(BuildContext context, bool hasSessions) {
+  Widget _buildBottomNavigationBar(
+    BuildContext context,
+    bool hasSessions,
+    bool useFloatingBar,
+  ) {
+    if (useFloatingBar) {
+      return _buildFloatingNavigationBar(hasSessions);
+    }
+
     final materialNavigationBar = _buildMaterialNavigationBar(hasSessions);
 
     if (!Platform.isIOS) {
@@ -261,6 +283,36 @@ class _MainNavigationPageState extends State<MainNavigationPage>
           ),
         const NativeGlassNavBarItem(label: 'Monitoring', symbol: 'chart.bar'),
         const NativeGlassNavBarItem(label: 'Settings', symbol: 'gear'),
+      ],
+    );
+  }
+
+  Widget _buildFloatingNavigationBar(bool hasSessions) {
+    final sessionCount = widget.sessionManager.sessionCount;
+    final waitingCount = widget.sessionManager.waitingInputCount;
+    return FloatingNavigationBar(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: _switchTab,
+      destinations: [
+        const FloatingNavigationDestination(
+          icon: AppIcons.dns,
+          label: 'Servers',
+        ),
+        if (hasSessions)
+          FloatingNavigationDestination(
+            icon: AppIcons.monitorMultiple,
+            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
+            badgeText: waitingCount > 0 ? '!' : '$sessionCount',
+            badgeIsAlert: waitingCount > 0,
+          ),
+        const FloatingNavigationDestination(
+          icon: AppIcons.chartBoxOutline,
+          label: 'Monitoring',
+        ),
+        const FloatingNavigationDestination(
+          icon: AppIcons.cog,
+          label: 'Settings',
+        ),
       ],
     );
   }

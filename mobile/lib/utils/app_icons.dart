@@ -46,6 +46,7 @@ class AppIcons {
   static const IconData deleteOutline = LucideIcons.trash2;
   static const IconData devices = LucideIcons.monitorSmartphone;
   static const IconData dns = LucideIcons.server;
+  static const IconData dock = LucideIcons.dock;
   static const IconData dotsVertical = LucideIcons.ellipsisVertical;
   static const IconData downloadOutline = LucideIcons.download;
   static const IconData dragHorizontalVariant = LucideIcons.gripHorizontal;
