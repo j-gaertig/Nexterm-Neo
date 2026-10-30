@@ -414,6 +414,10 @@ export const Servers = () => {
             setActiveSessionId(session.sessionId);
             return true;
         } catch (error) {
+            if (reconnectSessionId && error?.code === "SESSION_CLOSED") {
+                disconnectFromServer(reconnectSessionId, { force: true });
+                return false;
+            }
             if (pendingId) {
                 cancelledPendingRef.current.delete(pendingId);
                 setActiveSessions(prev => {
