@@ -192,7 +192,6 @@ static guac_client* guac_setup_client(nexterm_session_t* session,
     }
 
     client->log_handler = nexterm_guac_log_handler;
-    guac_socket_require_keep_alive(client->socket);
 
     if (guac_client_load_plugin(client, protocol_name)) {
         const char* detail = guac_error_message ? guac_error_message : guac_status_string(guac_error);
