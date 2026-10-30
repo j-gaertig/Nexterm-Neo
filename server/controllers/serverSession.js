@@ -9,7 +9,7 @@ const { validateEntryAccess } = require("./entry");
 const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
 const Integration = require("../models/Integration");
 const { getIdentityCredentials, getIdentity } = require("./identity");
-const { getOrganizationAuditSettingsInternal, createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES } = require("./audit");
+const { getOrganizationAuditSettingsInternal, createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES, CONNECTION_REASON_REQUIRED } = require("./audit");
 const { resolveIdentity } = require("../utils/identityResolver");
 const { Permission } = require("../permissions/registry");
 const Organization = require('../models/Organization');
@@ -130,7 +130,7 @@ const createSession = async ({
     if (entry.organizationId) {
         const auditSettings = await getOrganizationAuditSettingsInternal(entry.organizationId);
         if (auditSettings?.requireConnectionReason && !connectionReason) {
-            return { code: 400, message: "Connection reason required" };
+            return CONNECTION_REASON_REQUIRED;
         }
     }
 
