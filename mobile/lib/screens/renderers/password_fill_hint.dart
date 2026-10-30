@@ -47,41 +47,70 @@ class PasswordFillHint extends StatelessWidget {
       liveRegion: true,
       label: strings.pasteFor(item.username.isNotEmpty ? item.username : null),
       hint: canCycle ? strings.cycleLongPress : null,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.18),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (item.username.isNotEmpty) ...[
+            Container(
+              constraints: const BoxConstraints(maxWidth: 180),
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
+              child: Text(
+                item.username,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
             ),
           ],
-        ),
-        child: Material(
-          // Deliberately translucent so the terminal stays visible behind it.
-          color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
-          borderRadius: radius,
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => onFill(item.id),
-            onLongPress: canCycle ? onCycle : null,
-            // Keep the terminal focused so tapping the button does not close
-            // the keyboard or make the toolbar disappear.
-            canRequestFocus: false,
-            borderRadius: radius,
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Icon(
-                AppIcons.key,
-                size: 20,
-                color: cs.onSurface.withValues(alpha: 0.9),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(
+                color: cs.outlineVariant.withValues(alpha: 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Material(
+              // Keep the terminal visible behind the translucent button.
+              color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
+              borderRadius: radius,
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => onFill(item.id),
+                onLongPress: canCycle ? onCycle : null,
+                // Keep the terminal focused so the keyboard stays open.
+                canRequestFocus: false,
+                borderRadius: radius,
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: Icon(
+                    AppIcons.key,
+                    size: 20,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
