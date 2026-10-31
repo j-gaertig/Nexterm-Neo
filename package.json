@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.71",
-    "@ai-sdk/openai": "^4.0.80",
+    "@ai-sdk/openai": "^4.0.104",
     "@ai-sdk/openai-compatible": "^3.0.62",
     "@inquirer/password": "^5.2.2",
     "@simplewebauthn/server": "^14.0.3",
@@ -49,7 +49,7 @@
     "nodemon": "^3.1.11"
   },
   "scripts": {
-    "test": "node --test server/tests/*.test.js",
+    "test": "node --test --test-force-exit server/tests/*.test.js",
     "dev:server": "nodemon --ignore vendor --ignore client --ignore mobile --ignore data server/index.js",
     "dev:client": "cd client && yarn run dev",
     "dev:guacd": "./scripts/build-guacd.sh",
@@ -58,5 +58,10 @@
     "schema:generate": "flatc --ts --ts-flat-files -o server/lib/generated schema/control_plane.fbs schema/sftp_protocol.fbs && esbuild server/lib/generated/nexterm/control-plane.ts --bundle --format=cjs --outfile=server/lib/generated/control_plane_generated.js --allow-overwrite --platform=node --external:flatbuffers && esbuild server/lib/generated/nexterm/sftp-protocol.ts --bundle --format=cjs --outfile=server/lib/generated/sftp_protocol_generated.js --allow-overwrite --platform=node --external:flatbuffers && rm -rf server/lib/generated/nexterm",
     "schema:watch": "nodemon --watch schema -e fbs --exec 'yarn schema:generate'",
     "build:sea": "./scripts/build-sea.sh"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "sqlite3@6.0.1": true,
+    "bcrypt@6.0.0": true
   }
 }

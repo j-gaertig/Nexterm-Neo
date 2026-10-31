@@ -8,6 +8,7 @@ const { Op } = require("sequelize");
 const { validateEntryAccess } = require("./entry");
 const { validateIntegrationAccess } = require("./integration");
 const { isPolicyInactive, checkEntryAccessPolicy } = require("../utils/accessPolicy");
+const { getEffectiveEntryConfig } = require("../utils/folderInheritance");
 
 const TIME_RANGES = { "1h": { ms: 3600000, points: 60 }, "6h": { ms: 21600000, points: 360 }, "24h": { ms: 86400000, points: 720 } };
 
@@ -57,8 +58,10 @@ module.exports.getServerMonitoring = async (accountId, entryId, timeRange = "1h"
         const entry = await Entry.findByPk(entryId);
         const access = await validateEntryAccess(accountId, entry);
         if (!access.valid) return access;
+        const config = await getEffectiveEntryConfig(entry);
+        const effectiveEntry = { ...entry, config };
         const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
-        const verdict = await checkEntryAccessPolicy(accountId, entry, integration);
+        const verdict = await checkEntryAccessPolicy(accountId, effectiveEntry, integration);
         if (!verdict.allowed)
             return {
                 code: 403,
@@ -67,13 +70,13 @@ module.exports.getServerMonitoring = async (accountId, entryId, timeRange = "1h"
                     : "Access denied: this server IP is not allowed for your account",
             };
         const { data, latest } = await fetchMonitoringData({ entryId }, timeRange);
-        if (!entry.disabled && !latest.osInfo?.name && entry.config?.protocol === "ssh") {
+        if (!entry.disabled && !latest.osInfo?.name && config.protocol === "ssh") {
             const { detectServerOS } = require("../utils/monitoringService");
-            const detectedOsInfo = await detectServerOS(entry);
+            const detectedOsInfo = await detectServerOS(effectiveEntry);
             if (detectedOsInfo) latest.osInfo = detectedOsInfo;
         }
         return {
-            server: { id: entry.id, name: entry.name, ip: entry.config?.ip, port: entry.config?.port, status: entry.status, monitoringEnabled: entry.config?.monitoringEnabled },
+            server: { id: entry.id, name: entry.name, ip: config.ip, port: config.port, status: entry.status, monitoringEnabled: config.monitoringEnabled },
             data, timeRange, latest,
         };
     } catch (error) {
@@ -95,8 +98,12 @@ module.exports.getAllServersMonitoring = async (accountId) => {
         const policies = await getEffectivePolicies(accountId);
         const policyActive = policies.some((p) => !isPolicyInactive(p));
         const entries = await Entry.findAll({ where: { type: "server" } });
-        const accessChecks = await Promise.all(entries.map(e => validateEntryAccess(accountId, e).then(r => ({ item: e, valid: r.valid }))));
-        const accessibleEntries = accessChecks.filter(({ item, valid }) => valid && !item.disabled && item.config?.monitoringEnabled && item.config?.protocol === "ssh").map(({ item }) => item);
+        const cache = new Map();
+        const accessChecks = await Promise.all(entries.map(async (entry) => {
+            const valid = (await validateEntryAccess(accountId, entry)).valid;
+            return { item: entry, valid, config: valid ? await getEffectiveEntryConfig(entry, { cache }) : null };
+        }));
+        const accessibleEntries = accessChecks.filter(({ item, valid, config }) => valid && !item.disabled && config.monitoringEnabled && config.protocol === "ssh").map(({ item, config }) => ({ ...toJson(item), config }));
 
         const integrations = await Integration.findAll({ where: { type: "proxmox" } });
         const intAccessChecks = await Promise.all(integrations.map(i => validateIntegrationAccess(accountId, i).then(r => ({ item: i, valid: r.valid }))));

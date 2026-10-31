@@ -1,6 +1,5 @@
 const logger = require("./logger");
 const Entry = require("../models/Entry");
-const EntryIdentity = require("../models/EntryIdentity");
 const MonitoringData = require("../models/MonitoringData");
 const MonitoringSnapshot = require("../models/MonitoringSnapshot");
 const Identity = require("../models/Identity");
@@ -10,6 +9,7 @@ const { getMonitoringSettingsInternal } = require("../controllers/monitoring");
 const controlPlane = require("../lib/controlPlane/ControlPlaneServer");
 const { buildSSHParams, resolveJumpHosts } = require("../lib/ConnectionService");
 const { buildWindowsMonitoringCommand, isWindowsProbeResult, isPowerShellProbeResult, parseWindowsMonitoringOutput } = require("./windowsMonitoring");
+const { getEffectiveEntryConfig, getEntryIdentityIds } = require("./folderInheritance");
 const { parseCPUUsage } = require("./cpuUsage");
 const { COMMANDS, WINDOWS_OS_COMMAND, parseMeminfo, parseMemoryUsage, parseDiskUsage, parseUptime, parseLoadAverage, parseProcessCount, parseProcessList, parseOSInfo, parseNetworkInterfaces } = require("./monitoringParsers");
 
@@ -46,23 +46,30 @@ const runMonitoring = async () => {
         }
 
         const entries = await Entry.findAll({ where: { type: "server" } });
-        const toMonitor = entries.filter(e => !e.disabled && e.config?.protocol === "ssh" && e.config?.monitoringEnabled);
-        if (toMonitor.length) await Promise.allSettled(toMonitor.map(monitorEntry));
+        const cache = new Map();
+        const toMonitor = await Promise.all(entries.filter(e => !e.disabled).map(async (entry) => ({ entry, config: await getEffectiveEntryConfig(entry, { cache }) })));
+        const configuredEntries = toMonitor.filter(({ config }) => config.protocol === "ssh" && config.monitoringEnabled);
+        if (configuredEntries.length) await Promise.allSettled(configuredEntries.map(({ entry, config }) => monitorEntry(entry, config, cache)));
     } catch (error) {
         logger.error("Error running monitoring", { error: error.message });
     }
 };
 
-const monitorEntry = async (entry) => {
+const monitorEntry = async (entry, config, cache) => {
     try {
-        const entryIdentities = await EntryIdentity.findAll({ where: { entryId: entry.id }, order: [["isDefault", "DESC"]] });
-        if (!entryIdentities?.length) return saveMonitoringData(entry.id, { status: "error", errorMessage: "No identities configured" });
+        const identityIds = await getEntryIdentityIds(entry, {
+            cache,
+            sharedOnly: true,
+            organizationId: entry.organizationId,
+            ownerAccountId: entry.accountId,
+        });
+        if (!identityIds.length) return saveMonitoringData(entry.id, { status: "error", errorMessage: "No identities configured" });
 
-        const identities = await Identity.findAll({ where: { id: entryIdentities.map(ei => ei.identityId) } });
+        const identities = await Identity.findAll({ where: { id: identityIds } });
         if (!identities?.length) return saveMonitoringData(entry.id, { status: "error", errorMessage: "No valid identities found" });
 
         const credentials = await getIdentityCredentials(identities[0].id);
-        const data = await collectServerData(entry, identities[0], credentials);
+        const data = await collectServerData({ ...entry, config }, identities[0], credentials);
         await saveMonitoringData(entry.id, data);
     } catch (error) {
         logger.error("Error monitoring entry", { entryId: entry.id, error: error.message });
@@ -84,7 +91,11 @@ const collectServerData = async (entry, identity, credentials) => {
     }
 
     const params = buildSSHParams(identity, credentials);
-    const jumpHosts = await resolveJumpHosts(entry);
+    const jumpHosts = await resolveJumpHosts(entry, null, {
+        sharedOnly: true,
+        organizationId: entry.organizationId,
+        ownerAccountId: entry.accountId,
+    });
 
     try {
         const platformProbe = await controlPlane.execCommand(host, port, params, "cmd /c echo NEXTERM_WINDOWS", jumpHosts);
@@ -147,9 +158,13 @@ const detectServerOS = async (entry) => {
 
     const promise = (async () => {
         if (!controlPlane.hasEngine()) return null;
-        const entryIdentities = await EntryIdentity.findAll({ where: { entryId: entry.id }, order: [["isDefault", "DESC"]] });
-        if (!entryIdentities?.length) return null;
-        const identity = await Identity.findByPk(entryIdentities[0].identityId);
+        const identityIds = await getEntryIdentityIds(entry, {
+            sharedOnly: true,
+            organizationId: entry.organizationId,
+            ownerAccountId: entry.accountId,
+        });
+        if (!identityIds.length) return null;
+        const identity = await Identity.findByPk(identityIds[0]);
         if (!identity) return null;
         const credentials = await getIdentityCredentials(identity.id);
         const host = entry.config?.ip;
@@ -163,7 +178,11 @@ const detectServerOS = async (entry) => {
                 { id: "linuxOS", command: "cat /etc/os-release" },
                 { id: "windowsOS", command: WINDOWS_OS_COMMAND },
             ],
-            await resolveJumpHosts(entry),
+            await resolveJumpHosts(entry, null, {
+                sharedOnly: true,
+                organizationId: entry.organizationId,
+                ownerAccountId: entry.accountId,
+            }),
             entry.config?.engineId,
         );
         if (!batch.success) return null;

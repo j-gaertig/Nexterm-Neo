@@ -13,6 +13,7 @@ import { useDrag, useDrop } from "react-dnd";
 import { patchRequest } from "@/common/utils/RequestUtil.js";
 import { DropIndicator } from "../DropIndicator";
 import { usePreferences } from "@/common/contexts/PreferencesContext.jsx";
+import { useInheritancePolicyMove } from "@/pages/Servers/components/InheritancePolicyDialog/useInheritancePolicyMove.jsx";
 
 const SCROLL_SPEED = 24;
 const SCROLL_START_PAUSE_MS = 2000;
@@ -159,6 +160,7 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
     const { serverNoteScrollMode } = usePreferences();
     const [dropPlacement, setDropPlacement] = useState(null);
     const [isServerHovered, setIsServerHovered] = useState(false);
+    const { runMove, policyDialog } = useInheritancePolicyMove();
     const elementRef = useRef(null);
 
     const isIntegrationEntry = Boolean(type?.startsWith("pve-"));
@@ -189,14 +191,13 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
             if (item.id === id) return;
             
             try {
-                await patchRequest(`entries/${item.id}/reposition`, {
+                await runMove((inheritancePolicy) => patchRequest(`entries/${item.id}/reposition`, {
                     targetId: id,
                     placement: dropPlacement || 'after',
                     folderId: folderId,
                     organizationId: organizationId,
-                });
-                
-                loadServers();
+                    ...(inheritancePolicy ? { inheritancePolicy } : {}),
+                }), loadServers);
             } catch (error) {
                 console.error("Failed to reposition entry", error);
             }
@@ -231,7 +232,7 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
         ? (server?.notes || "").split(/\r?\n/)[0].trim()
         : "";
 
-    return (
+    return <>
         <div 
             className={"server-object" + (disabled ? " server-disabled" : "") + (accessBlocked ? " server-access-blocked" : "")}
             style={{ paddingLeft: `${15 + (nestedLevel * 15)}px`, opacity, position: 'relative' }} 
@@ -281,5 +282,6 @@ export const ServerObject = ({ id, name, position, folderId, organizationId, nes
             )}
             <DropIndicator show={isOver && dropPlacement === 'after'} placement="after" />
         </div>
-    );
+        {policyDialog}
+    </>;
 };

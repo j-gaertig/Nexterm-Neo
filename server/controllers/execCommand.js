@@ -6,6 +6,7 @@ const { validateEntryAccess } = require("./entry");
 const { checkEntryAccessPolicy } = require("../utils/accessPolicy");
 const Integration = require("../models/Integration");
 const controlPlane = require("../lib/controlPlane/ControlPlaneServer");
+const { applyEffectiveEntryConfig } = require("../utils/folderInheritance");
 const { isConnectionReasonRequired, createAuditLog, AUDIT_ACTIONS, RESOURCE_TYPES, CONNECTION_REASON_REQUIRED } = require("./audit");
 
 const execCommand = async (accountId, entryId, identityId, command, { connectionReason = null, ipAddress = null, userAgent = null } = {}) => {
@@ -18,6 +19,8 @@ const execCommand = async (accountId, entryId, identityId, command, { connection
     if (!accessResult.valid) {
         return { code: 403, message: "Access denied" };
     }
+
+    const effectiveConfig = await applyEffectiveEntryConfig(entry);
 
     if (entry.disabled) {
         return { code: 403, message: "Server is disabled" };
@@ -34,7 +37,7 @@ const execCommand = async (accountId, entryId, identityId, command, { connection
         };
     }
 
-    if (entry.config?.protocol !== "ssh") {
+    if (effectiveConfig.protocol !== "ssh") {
         return { code: 400, message: "Command execution is only supported for SSH entries" };
     }
 
@@ -77,7 +80,7 @@ const execCommand = async (accountId, entryId, identityId, command, { connection
         userAgent,
     });
 
-    const jumpHosts = await resolveJumpHosts(entry);
+    const jumpHosts = await resolveJumpHosts(entry, accountId);
     const execResult = await controlPlane.execCommand(host, port, params, command, jumpHosts);
 
     return {

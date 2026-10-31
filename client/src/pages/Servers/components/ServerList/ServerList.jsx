@@ -1,6 +1,6 @@
 import "./styles.sass";
 import ServerSearch from "./components/ServerSearch";
-import { useContext, useEffect, useState, useRef } from "react";
+import { useCallback, useContext, useEffect, useState, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ServerContext } from "@/common/contexts/ServerContext.jsx";
 import { useLiveSessions } from "@/common/contexts/LiveSessionContext.jsx";
@@ -45,6 +45,7 @@ import {
     mdiWeb,
     mdiNoteEditOutline,
     mdiPause,
+    mdiContentDuplicate,
 } from "@mdi/js";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, useContextMenu } from "@/common/components/ContextMenu";
 import { useDrop, useDragLayer } from "react-dnd";
@@ -58,6 +59,8 @@ import { useToast } from "@/common/contexts/ToastContext.jsx";
 import ActionConfirmDialog from "@/common/components/ActionConfirmDialog";
 import { UserContext } from "@/common/contexts/UserContext.jsx";
 import { Permission } from "@/common/utils/permissions.js";
+import FolderInheritanceDialog from "@/pages/Servers/components/FolderInheritanceDialog/FolderInheritanceDialog.jsx";
+import { useInheritancePolicyMove } from "@/pages/Servers/components/InheritancePolicyDialog/useInheritancePolicyMove.jsx";
 
 const flattenEntries = (entries, path = []) => entries.flatMap(entry =>
     entry.type === "folder" || entry.type === "organization"
@@ -147,6 +150,9 @@ export const ServerList = ({
     const [isMobile, setIsMobile] = useState(false);
     const [deleteConfirmDialog, setDeleteConfirmDialog] = useState({ open: false, name: "", id: null, isFolder: false });
     const longPressFiredAtRef = useRef(0);
+    const [inheritanceFolderId, setInheritanceFolderId] = useState(null);
+    const closeInheritanceSettings = useCallback(() => setInheritanceFolderId(null), []);
+    const { runMove, policyDialog } = useInheritancePolicyMove();
 
     const contextMenu = useContextMenu();
 
@@ -270,18 +276,20 @@ export const ServerList = ({
 
             try {
                 if (item.type === "server") {
-                    await patchRequest(`entries/${item.id}/reposition`, {
+                    await runMove((inheritancePolicy) => patchRequest(`entries/${item.id}/reposition`, {
                         targetId: null,
                         placement: "after",
                         folderId: null,
-                    });
-                    loadServers();
+                        ...(inheritancePolicy ? { inheritancePolicy } : {}),
+                    }), loadServers);
                     return {};
                 }
 
                 if (item.type === "folder") {
-                    await patchRequest(`folders/${item.id}`, { parentId: null });
-                    loadServers();
+                    await runMove((inheritancePolicy) => patchRequest(`folders/${item.id}`, {
+                        parentId: null,
+                        ...(inheritancePolicy ? { inheritancePolicy } : {}),
+                    }), loadServers);
                     return {};
                 }
             } catch (error) {
@@ -770,12 +778,17 @@ export const ServerList = ({
                                         <ContextMenuSeparator />
                                     </>
                                 )}
-                                <ContextMenuItem
-                                    icon={mdiFormTextbox}
-                                    label={t("servers.contextMenu.renameFolder")}
-                                    onClick={() => setRenameStateId(contextClickedId)}
-                                />
-                                <ContextMenuSeparator />
+                                        <ContextMenuItem
+                                            icon={mdiFormTextbox}
+                                            label={t("servers.contextMenu.renameFolder")}
+                                            onClick={() => setRenameStateId(contextClickedId)}
+                                        />
+                                        <ContextMenuItem
+                                            icon={mdiContentDuplicate}
+                                            label={t("servers.contextMenu.folderSettings", "Folder Settings")}
+                                            onClick={() => setInheritanceFolderId(contextClickedId)}
+                                        />
+                                        <ContextMenuSeparator />
                                 <ContextMenuItem
                                     icon={mdiFolderRemove}
                                     label={t("servers.contextMenu.deleteFolder")}
@@ -1090,6 +1103,13 @@ export const ServerList = ({
                         text={t("servers.contextMenu.deleteConfirm", { name: deleteConfirmDialog.name })}
                     />
 
+                    <FolderInheritanceDialog
+                        open={Boolean(inheritanceFolderId)}
+                        onClose={closeInheritanceSettings}
+                        folderId={inheritanceFolderId}
+                        organizationId={contextFolder?.organizationId || null}
+                    />
+
                     <ScriptsMenu
                         visible={scriptsMenuOpen}
                         onClose={closeScriptsMenu}
@@ -1103,6 +1123,7 @@ export const ServerList = ({
             )}
             {!isMobile && !isCollapsed && <div className={`resizer${isResizing ? " is-resizing" : ""}`} onMouseDown={startResizing} />}
         </div>
+        {policyDialog}
         </>
     );
 };

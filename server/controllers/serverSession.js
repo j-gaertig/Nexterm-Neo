@@ -17,6 +17,7 @@ const OrganizationMember = require("../models/OrganizationMember");
 const { getScript } = require("./script");
 const logger = require("../utils/logger");
 const stateBroadcaster = require("../lib/StateBroadcaster");
+const { getEffectiveEntryConfig } = require("../utils/folderInheritance");
 const reconnectOperations = new Map();
 const {
     getSessionAccessError,
@@ -108,11 +109,12 @@ const createSession = async ({
     if (!entry) {
         return { code: 404, message: "Entry not found" };
     }
+    const effectiveEntry = { ...entry, config: await getEffectiveEntryConfig(entry) };
 
-    const scriptConnectionError = getScriptConnectionError(entry, type, scriptId);
+    const scriptConnectionError = getScriptConnectionError(effectiveEntry, type, scriptId);
     if (scriptConnectionError) return scriptConnectionError;
 
-    const requiredPermission = getRequiredConnectPermission(entry, type, scriptId);
+    const requiredPermission = getRequiredConnectPermission(effectiveEntry, type, scriptId);
     const accessResult = await validateEntryAccess(accountId, entry, "Access denied", requiredPermission);
     if (!accessResult.valid) {
         return { code: 403, message: "Access denied" };
@@ -123,7 +125,7 @@ const createSession = async ({
     }
 
     const integration = entry.integrationId ? await Integration.findByPk(entry.integrationId) : null;
-    const policyCheck = await checkEntryAccessPolicy(accountId, entry, integration);
+    const policyCheck = await checkEntryAccessPolicy(accountId, effectiveEntry, integration);
     if (!policyCheck.allowed) {
         logger.info("Connection blocked by access policy", { accountId, entryId, reason: policyCheck.reason });
         return {
@@ -171,7 +173,7 @@ const createSession = async ({
     const auditLogId = await createAuditLog({
         accountId,
         organizationId: entry.organizationId,
-        action: getAuditAction(entry, type, scriptId),
+        action: getAuditAction(effectiveEntry, type, scriptId),
         resource: scriptId ? RESOURCE_TYPES.SCRIPT : RESOURCE_TYPES.ENTRY,
         resourceId: scriptId || entry.id,
         details: { connectionReason, ...(scriptId && { serverId: entry.id }) },
