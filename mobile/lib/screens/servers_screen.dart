@@ -13,6 +13,7 @@ import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
 import '../utils/server_view_settings.dart';
 import '../utils/tag_color.dart';
+import '../widgets/floating_navigation_bar.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/server_grid_card.dart';
 import 'widgets/connection_reason_dialog.dart';
@@ -306,6 +307,7 @@ class _ServersScreenState extends State<ServersScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final navInset = FloatingNavigationBarInset.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -321,9 +323,12 @@ class _ServersScreenState extends State<ServersScreen> {
           ),
         ]),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createServer,
-        child: Icon(AppIcons.plus),
+      floatingActionButton: Padding(
+        padding: EdgeInsets.only(bottom: navInset),
+        child: FloatingActionButton(
+          onPressed: _createServer,
+          child: Icon(AppIcons.plus),
+        ),
       ),
     );
   }
@@ -496,12 +501,13 @@ class _ServersScreenState extends State<ServersScreen> {
   );
 
   Widget _buildList(ColorScheme cs) {
+    final navInset = FloatingNavigationBarInset.of(context);
     if (!widget.serverViewSettings.isGrid) {
       return RefreshIndicator(
         onRefresh: _refreshData,
         child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16, top: 4),
+          padding: EdgeInsets.only(left: 8, right: 8, bottom: 16 + navInset, top: 4),
           itemCount: filteredFolders.length,
           itemBuilder: (_, i) {
             final e = filteredFolders[i];
@@ -522,7 +528,7 @@ class _ServersScreenState extends State<ServersScreen> {
       onRefresh: _refreshData,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(left: 8, right: 8, bottom: 16, top: 4),
+        padding: EdgeInsets.only(left: 8, right: 8, bottom: 16 + navInset, top: 4),
         itemCount: (topServers.isNotEmpty ? 1 : 0) + rest.length,
         itemBuilder: (_, i) {
           if (topServers.isNotEmpty && i == 0) return _buildServerGrid(topServers, 0);
