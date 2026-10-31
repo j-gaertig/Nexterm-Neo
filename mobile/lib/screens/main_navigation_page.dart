@@ -15,8 +15,8 @@ import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/navigation_bar_settings.dart';
 import '../utils/server_view_settings.dart';
-import '../utils/tab_fade_switcher.dart';
 import '../widgets/floating_navigation_bar.dart';
+import '../widgets/tab_crossfade.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
 import 'monitoring_screen.dart';
@@ -54,16 +54,16 @@ class MainNavigationPage extends StatefulWidget {
   State<MainNavigationPage> createState() => _MainNavigationPageState();
 }
 
-class _MainNavigationPageState extends State<MainNavigationPage>
-    with SingleTickerProviderStateMixin {
+class _MainNavigationPageState extends State<MainNavigationPage> {
   int _selectedIndex = 0;
+  bool _hadSessions = false;
   final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
-  late final _tabSwitcher = TabFadeSwitcher(vsync: this);
 
   @override
   void initState() {
     super.initState();
+    _hadSessions = widget.sessionManager.hasActiveSessions;
     widget.sessionManager.addListener(_onSessionsChanged);
     widget.navigationBarSettings.addListener(_onNavigationBarSettingsChanged);
   }
@@ -74,7 +74,6 @@ class _MainNavigationPageState extends State<MainNavigationPage>
     widget.navigationBarSettings.removeListener(
       _onNavigationBarSettingsChanged,
     );
-    _tabSwitcher.dispose();
     super.dispose();
   }
 
@@ -84,17 +83,7 @@ class _MainNavigationPageState extends State<MainNavigationPage>
 
   void _switchTab(int index) {
     if (index == _selectedIndex) return;
-    // The sessions destination only exists while sessions are active, so index
-    // 1 is the Monitoring tab otherwise. Resolve the tapped destination before
-    // the fade starts, otherwise the guard below also blocks Monitoring.
-    final isSessionsTab = _hasSessions && index == 1;
-    _tabSwitcher.switchTab(
-      canApply: () => mounted && (!isSessionsTab || _hasSessions),
-      apply: () {
-        if (!mounted) return;
-        setState(() => _selectedIndex = index);
-      },
-    );
+    setState(() => _selectedIndex = index);
   }
 
   void _onSessionsChanged() {
@@ -105,16 +94,23 @@ class _MainNavigationPageState extends State<MainNavigationPage>
           !(widget.sessionManager.getSession(id)?.scriptNeedsInput ?? false),
     );
 
-    if (!widget.sessionManager.hasActiveSessions) {
+    final hasSessions = widget.sessionManager.hasActiveSessions;
+    if (_hadSessions && !hasSessions) {
+      // The Sessions destination disappeared. Keep the user on the same
+      // logical tab instead of silently jumping to a different one.
       if (_selectedIndex == 1) {
         _selectedIndex = 0;
       } else if (_selectedIndex > 1) {
         _selectedIndex -= 1;
       }
       _dismissedAttentionSessionIds.clear();
+    } else if (!_hadSessions && hasSessions && _selectedIndex >= 1) {
+      // The Sessions destination was inserted at index 1.
+      _selectedIndex += 1;
     }
+    _hadSessions = hasSessions;
+
     setState(() {});
-    _tabSwitcher.resetFadeIfIdle();
   }
 
   AppSession? get _attentionSession {
@@ -140,47 +136,81 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         attentionSession != null &&
         !(isOnSessionsTab && activeSessionId == attentionSession.sessionId);
 
+    // Stable page keys let TabCrossfade keep each page's state attached to the
+    // page itself when the Sessions destination is inserted or removed.
     final List<Widget> pages = [
-      ServersScreen(
-        authManager: widget.authManager,
-        snippetManager: widget.snippetManager,
-        sessionManager: widget.sessionManager,
-        serverViewSettings: widget.serverViewSettings,
-        onSwitchToSessions: () {
-          if (_hasSessions) _switchTab(1);
-        },
-      ),
-      if (hasSessions)
-        ActiveSessionsScreen(
-          sessionManager: widget.sessionManager,
+      KeyedSubtree(
+        key: const ValueKey('tab-page-servers'),
+        child: ServersScreen(
           authManager: widget.authManager,
           snippetManager: widget.snippetManager,
-          aiManager: widget.aiManager,
+          sessionManager: widget.sessionManager,
+          serverViewSettings: widget.serverViewSettings,
+          onSwitchToSessions: () {
+            if (_hasSessions) _switchTab(1);
+          },
+        ),
+      ),
+      if (hasSessions)
+        KeyedSubtree(
+          key: const ValueKey('tab-page-sessions'),
+          child: ActiveSessionsScreen(
+            sessionManager: widget.sessionManager,
+            authManager: widget.authManager,
+            snippetManager: widget.snippetManager,
+            aiManager: widget.aiManager,
+            terminalSettings: widget.terminalSettings,
+            sftpSettings: widget.sftpSettings,
+            onExitFullscreen: () => _switchTab(0),
+            isVisible: isOnSessionsTab,
+          ),
+        ),
+      KeyedSubtree(
+        key: const ValueKey('tab-page-monitoring'),
+        child: MonitoringScreen(
+          key: _monitoringKey,
+          authManager: widget.authManager,
+        ),
+      ),
+      KeyedSubtree(
+        key: const ValueKey('tab-page-settings'),
+        child: SettingsScreen(
+          themeManager: widget.themeManager,
+          authManager: widget.authManager,
           terminalSettings: widget.terminalSettings,
           sftpSettings: widget.sftpSettings,
-          onExitFullscreen: () => _switchTab(0),
-          isVisible: isOnSessionsTab,
+          serverViewSettings: widget.serverViewSettings,
+          navigationBarSettings: widget.navigationBarSettings,
+          screenLockSettings: widget.screenLockSettings,
+          screenLockService: widget.screenLockService,
         ),
-      MonitoringScreen(key: _monitoringKey, authManager: widget.authManager),
-      SettingsScreen(
-        themeManager: widget.themeManager,
-        authManager: widget.authManager,
-        terminalSettings: widget.terminalSettings,
-        sftpSettings: widget.sftpSettings,
-        serverViewSettings: widget.serverViewSettings,
-        navigationBarSettings: widget.navigationBarSettings,
-        screenLockSettings: widget.screenLockSettings,
-        screenLockService: widget.screenLockService,
       ),
     ];
 
     if (_selectedIndex >= pages.length) _selectedIndex = 0;
 
     final monitoringIndex = hasSessions ? 2 : 1;
-    final pageStack = FadeTransition(
-      opacity: _tabSwitcher.opacity,
-      child: IndexedStack(index: _selectedIndex, children: pages),
+    final showFloatingBar = useFloatingBar && !isOnSessionsTab;
+    final media = MediaQuery.of(context);
+    final pageStack = MediaQuery(
+      data: showAttentionBanner ? media.removePadding(removeTop: true) : media,
+      child: TabCrossfade(index: _selectedIndex, children: pages),
     );
+
+    final theme = Theme.of(context);
+    final pageTheme = showFloatingBar
+        ? theme.copyWith(
+            snackBarTheme: theme.snackBarTheme.copyWith(
+              behavior: SnackBarBehavior.floating,
+              insetPadding: const EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                FloatingNavigationBar.contentInset + 8,
+              ),
+            ),
+          )
+        : theme;
 
     return PopScope(
       canPop: false,
@@ -210,56 +240,62 @@ class _MainNavigationPageState extends State<MainNavigationPage>
         SystemNavigator.pop();
       },
       child: Scaffold(
-        body: Column(
+        body: Stack(
+          fit: StackFit.expand,
           children: [
-            if (showAttentionBanner)
-              _ScriptAttentionBanner(
-                session: attentionSession,
-                waitingCount: widget.sessionManager.waitingInputCount,
-                onOpen: () {
-                  setState(
-                    () => _dismissedAttentionSessionIds.remove(
-                      attentionSession.sessionId,
-                    ),
-                  );
-                  widget.sessionManager.setActive(attentionSession.sessionId);
-                  if (!isOnSessionsTab) _switchTab(1);
-                },
-                onDismiss: () {
-                  setState(
-                    () => _dismissedAttentionSessionIds.add(
-                      attentionSession.sessionId,
-                    ),
-                  );
-                },
-              ),
-            Expanded(
-              child: showAttentionBanner
-                  ? MediaQuery.removePadding(
-                      context: context,
-                      removeTop: true,
-                      child: pageStack,
-                    )
-                  : pageStack,
+            Column(
+              children: [
+                if (showAttentionBanner)
+                  _ScriptAttentionBanner(
+                    session: attentionSession,
+                    waitingCount: widget.sessionManager.waitingInputCount,
+                    onOpen: () {
+                      setState(
+                        () => _dismissedAttentionSessionIds.remove(
+                          attentionSession.sessionId,
+                        ),
+                      );
+                      widget.sessionManager.setActive(
+                        attentionSession.sessionId,
+                      );
+                      if (!isOnSessionsTab) _switchTab(1);
+                    },
+                    onDismiss: () {
+                      setState(
+                        () => _dismissedAttentionSessionIds.add(
+                          attentionSession.sessionId,
+                        ),
+                      );
+                    },
+                  ),
+                Expanded(
+                  child: FloatingNavigationBarInset(
+                    bottom: showFloatingBar
+                        ? FloatingNavigationBar.contentInset
+                        : 0,
+                    child: Theme(data: pageTheme, child: pageStack),
+                  ),
+                ),
+              ],
             ),
+            if (showFloatingBar)
+              Positioned(
+                key: const ValueKey('floating-navigation-overlay'),
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildFloatingNavigationBar(hasSessions),
+              ),
           ],
         ),
-        bottomNavigationBar: isOnSessionsTab
+        bottomNavigationBar: isOnSessionsTab || useFloatingBar
             ? null
-            : _buildBottomNavigationBar(context, hasSessions, useFloatingBar),
+            : _buildClassicNavigationBar(context, hasSessions),
       ),
     );
   }
 
-  Widget _buildBottomNavigationBar(
-    BuildContext context,
-    bool hasSessions,
-    bool useFloatingBar,
-  ) {
-    if (useFloatingBar) {
-      return _buildFloatingNavigationBar(hasSessions);
-    }
-
+  Widget _buildClassicNavigationBar(BuildContext context, bool hasSessions) {
     final materialNavigationBar = _buildMaterialNavigationBar(hasSessions);
 
     if (!Platform.isIOS) {

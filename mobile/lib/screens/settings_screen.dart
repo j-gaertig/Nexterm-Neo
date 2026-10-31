@@ -11,6 +11,7 @@ import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
+import '../widgets/floating_navigation_bar.dart';
 import '../services/api_config.dart';
 import '../services/screen_lock_service.dart';
 import 'sessions_screen.dart';
@@ -279,6 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final navInset = FloatingNavigationBarInset.of(context);
     final server = ApiConfig.baseUrl
         .replaceFirst(RegExp(r'^https?://'), '')
         .replaceFirst(RegExp(r'/api/?$'), '');
@@ -287,7 +289,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SafeArea(
         child: ListView(
           key: const ValueKey('settings-list'),
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: EdgeInsets.only(bottom: 24 + navInset),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -457,7 +459,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       style: TextStyle(fontSize: 15),
                     ),
                     subtitle: Text(
-                      'Translucent One UI-style bar over content',
+                      'Floating, draggable bar over content',
                       style: TextStyle(fontSize: 12, color: cs.outline),
                     ),
                     value: widget.navigationBarSettings.useFloating,

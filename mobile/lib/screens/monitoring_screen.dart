@@ -4,6 +4,7 @@ import '../utils/app_icons.dart';
 import '../models/monitoring.dart';
 import '../services/monitoring_service.dart';
 import '../utils/auth_manager.dart';
+import '../widgets/floating_navigation_bar.dart';
 
 class MonitoringScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -145,7 +146,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   Widget _listView() => RefreshIndicator(
     onRefresh: _load,
     child: ListView.builder(
-      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 16, top: 4),
+      padding: EdgeInsets.only(left: 12, right: 12, bottom: 16 + FloatingNavigationBarInset.of(context), top: 4),
       itemCount: _servers.length,
       itemBuilder: (_, i) => _serverCard(_servers[i]),
     ),
@@ -268,7 +269,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
 
   Widget _detailsContent() {
     final d = _details, latest = d?.sub('latest'), os = latest?.sub('osInfo'), s = _selected!;
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+    return ListView(padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + FloatingNavigationBarInset.of(context)), children: [
       _section(s.isPVE ? 'Cluster Info' : 'System Info', s.isPVE ? [
         _row('Nodes', '${os?.n('onlineNodes') ?? 0} / ${os?.n('totalNodes') ?? 0} online'),
         _row('Total CPU', '${os?.n('totalCpu') ?? 0} cores'),
