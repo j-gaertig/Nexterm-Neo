@@ -5,7 +5,9 @@ import 'package:nexterm/models/server_account.dart';
 import 'package:nexterm/screens/servers_screen.dart';
 import 'package:nexterm/screens/widgets/server_grid_card.dart';
 import 'package:nexterm/services/session_manager.dart';
+import 'package:nexterm/utils/app_themes.dart';
 import 'package:nexterm/utils/auth_manager.dart';
+import 'package:nexterm/utils/muted_colors.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
 import 'package:nexterm/utils/server_view_settings.dart';
 import 'package:nexterm/utils/snippet_manager.dart';
@@ -47,6 +49,47 @@ void main() {
     // Tags are filtered through the filter button next to the search field.
     expect(find.byKey(const ValueKey('tag-filter-button')), findsOneWidget);
   });
+
+  for (final mode in [ServerViewMode.grid, ServerViewMode.list]) {
+    testWidgets('disabled servers stay muted in the ${mode.name} view', (
+      tester,
+    ) async {
+      await _pumpGrid(
+        tester,
+        viewMode: mode,
+        appTheme: AppThemes.blossom,
+        brightness: Brightness.light,
+        entries: [
+          _server(id: 1, name: 'active-server', ip: '10.0.0.1'),
+          _server(
+            id: 2,
+            name: 'disabled-server',
+            ip: '10.0.0.2',
+            disabled: true,
+          ),
+        ],
+      );
+
+      final cs = Theme.of(
+        tester.element(find.text('active-server')),
+      ).colorScheme;
+      final active = tester.widget<Text>(find.text('active-server'));
+      final disabled = tester.widget<Text>(find.text('disabled-server'));
+
+      expect(active.style?.color, cs.onSurface);
+      expect(disabled.style?.color, mutedServerText(cs));
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Container &&
+              widget.decoration is BoxDecoration &&
+              (widget.decoration! as BoxDecoration).color ==
+                  mutedTileBackground(cs),
+        ),
+        findsOneWidget,
+      );
+    });
+  }
 
   testWidgets('grid adapts the requested columns to the available width', (
     tester,
@@ -227,9 +270,12 @@ Future<void> _pumpGrid(
   WidgetTester tester, {
   required List<dynamic> entries,
   int columns = 2,
+  ServerViewMode viewMode = ServerViewMode.grid,
+  AppThemeDefinition? appTheme,
+  Brightness brightness = Brightness.dark,
 }) async {
   SharedPreferences.setMockInitialValues({
-    'server_view_mode': ServerViewMode.grid.name,
+    'server_view_mode': viewMode.name,
     'server_view_columns': columns,
   });
 
@@ -249,14 +295,19 @@ Future<void> _pumpGrid(
   final snippetManager = SnippetManager();
   final sessionManager = SessionManager();
   final viewSettings = await ServerViewSettings.load();
-  final themeManager = ThemeManager(ThemeMode.dark, useDynamicColor: false);
+  final themeManager = ThemeManager(
+    brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+    theme: appTheme,
+  );
 
   await tester.binding.setSurfaceSize(const Size(390, 844));
   addTearDown(() => tester.binding.setSurfaceSize(null));
 
   await tester.pumpWidget(
     MaterialApp(
-      theme: themeManager.darkTheme(),
+      theme: brightness == Brightness.dark
+          ? themeManager.darkTheme()
+          : themeManager.lightTheme(),
       home: ServersScreen(
         authManager: authManager,
         snippetManager: snippetManager,
@@ -315,7 +366,7 @@ Future<void> _pumpWithAccounts(
   final snippetManager = SnippetManager();
   final sessionManager = SessionManager();
   final viewSettings = await ServerViewSettings.load();
-  final themeManager = ThemeManager(ThemeMode.dark, useDynamicColor: false);
+  final themeManager = ThemeManager(ThemeMode.dark);
 
   await tester.binding.setSurfaceSize(surfaceSize);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -351,6 +402,7 @@ Server _server({
   String? protocol = 'ssh',
   String? status = 'online',
   List<Tag> tags = const [],
+  bool disabled = false,
 }) {
   return Server(
     id: id,
@@ -360,6 +412,7 @@ Server _server({
     protocol: type == null ? protocol : null,
     status: status,
     tags: tags,
+    disabled: disabled,
   );
 }
 

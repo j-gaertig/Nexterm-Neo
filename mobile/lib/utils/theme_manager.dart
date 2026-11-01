@@ -2,37 +2,22 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ThemeManager extends ChangeNotifier {
-  static const Color fallbackSeedColor = Colors.deepPurple;
-  static const String _themeModeKey = 'themeMode';
-  static const String _accentColorKey = 'accentColor';
-  static const String _useDynamicColorKey = 'useDynamicColor';
+import 'app_themes.dart';
 
-  static const List<Color> accentColorOptions = [
-    Colors.deepPurple,
-    Colors.blue,
-    Colors.teal,
-    Colors.green,
-    Colors.amber,
-    Colors.orange,
-    Colors.red,
-    Colors.pink,
-    Colors.indigo,
-    Colors.cyan,
-  ];
+class ThemeManager extends ChangeNotifier {
+  static const String _themeModeKey = 'themeMode';
+  static const String _appThemeKey = 'appTheme';
+  static const String _legacyUseDynamicColorKey = 'useDynamicColor';
 
   ThemeMode _themeMode;
-  Color _accentColor;
-  bool _useDynamicColor;
+  AppThemeDefinition _theme;
 
   ThemeMode get themeMode => _themeMode;
-  Color get accentColor => _accentColor;
-  bool get useDynamicColor => _useDynamicColor;
+  AppThemeDefinition get theme => _theme;
 
-  ThemeManager(ThemeMode themeMode, {Color? accentColor, bool? useDynamicColor})
-      : _themeMode = themeMode,
-        _accentColor = accentColor ?? fallbackSeedColor,
-        _useDynamicColor = useDynamicColor ?? true;
+  ThemeManager(ThemeMode themeMode, {AppThemeDefinition? theme})
+    : _themeMode = themeMode,
+      _theme = theme ?? AppThemes.graphite;
 
   static ThemeMode parseStoredThemeMode(String? storedMode) {
     switch (storedMode) {
@@ -46,14 +31,14 @@ class ThemeManager extends ChangeNotifier {
     }
   }
 
-  static Future<({Color accentColor, bool useDynamicColor})> loadAccentSettings() async {
+  static Future<AppThemeDefinition> loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    final colorValue = prefs.getInt(_accentColorKey);
-    final useDynamic = prefs.getBool(_useDynamicColorKey) ?? true;
-    return (
-      accentColor: colorValue != null ? Color(colorValue) : fallbackSeedColor,
-      useDynamicColor: useDynamic,
-    );
+    final storedTheme = prefs.getString(_appThemeKey);
+    if (storedTheme != null) return AppThemes.byId(storedTheme);
+
+    // Migrate the old "Dynamic Color" switch to the Adaptive palette.
+    final legacyDynamicColor = prefs.getBool(_legacyUseDynamicColorKey);
+    return legacyDynamicColor == true ? AppThemes.adaptive : AppThemes.graphite;
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -65,21 +50,13 @@ class ThemeManager extends ChangeNotifier {
     );
   }
 
-  Future<void> setAccentColor(Color color) async {
-    _accentColor = color;
+  Future<void> setTheme(AppThemeDefinition theme) async {
+    if (_theme.id == theme.id) return;
+    _theme = theme;
     notifyListeners();
-    await (await SharedPreferences.getInstance()).setInt(
-      _accentColorKey,
-      color.toARGB32(),
-    );
-  }
-
-  Future<void> setUseDynamicColor(bool value) async {
-    _useDynamicColor = value;
-    notifyListeners();
-    await (await SharedPreferences.getInstance()).setBool(
-      _useDynamicColorKey,
-      value,
+    await (await SharedPreferences.getInstance()).setString(
+      _appThemeKey,
+      theme.id,
     );
   }
 
@@ -97,22 +74,53 @@ class ThemeManager extends ChangeNotifier {
     },
   );
 
-  ColorScheme _buildScheme(ColorScheme? dynamicColorScheme, Brightness brightness) {
-    final seed = (_useDynamicColor && dynamicColorScheme != null)
-        ? dynamicColorScheme.primary
-        : _accentColor;
-    return ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+  ColorScheme _buildScheme(
+    Brightness brightness,
+    ColorScheme? dynamicColorScheme,
+  ) {
+    if (_theme.usesSystemColor &&
+        dynamicColorScheme != null &&
+        dynamicColorScheme.brightness == brightness) {
+      return dynamicColorScheme;
+    }
+    return _theme.palette(brightness).toColorScheme(brightness);
   }
 
-  ThemeData lightTheme({ColorScheme? dynamicColorScheme}) => ThemeData(
-    colorScheme: _buildScheme(dynamicColorScheme, Brightness.light),
-    useMaterial3: true,
-    pageTransitionsTheme: _pageTransitions,
-  );
+  ThemeData _buildTheme(
+    Brightness brightness,
+    ColorScheme? dynamicColorScheme,
+  ) {
+    final scheme = _buildScheme(brightness, dynamicColorScheme);
+    return ThemeData(
+      colorScheme: scheme,
+      useMaterial3: true,
+      pageTransitionsTheme: _pageTransitions,
+      scaffoldBackgroundColor: scheme.surface,
+      canvasColor: scheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerHigh,
+        surfaceTintColor: Colors.transparent,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainerHigh,
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: scheme.inverseSurface,
+        contentTextStyle: TextStyle(color: scheme.onInverseSurface),
+      ),
+    );
+  }
 
-  ThemeData darkTheme({ColorScheme? dynamicColorScheme}) => ThemeData(
-    colorScheme: _buildScheme(dynamicColorScheme, Brightness.dark),
-    useMaterial3: true,
-    pageTransitionsTheme: _pageTransitions,
-  );
+  ThemeData lightTheme({ColorScheme? dynamicColorScheme}) =>
+      _buildTheme(Brightness.light, dynamicColorScheme);
+
+  ThemeData darkTheme({ColorScheme? dynamicColorScheme}) =>
+      _buildTheme(Brightness.dark, dynamicColorScheme);
 }

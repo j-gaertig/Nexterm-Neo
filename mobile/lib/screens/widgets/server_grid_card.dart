@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/server.dart';
+import '../../utils/muted_colors.dart';
 import '../../utils/tag_color.dart';
 
 /// Grid tile that keeps the existing server card language.
@@ -31,11 +32,16 @@ class ServerGridCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final offline = !server.isRunning || server.disabled;
     final pve = server.isPve;
-    final (bg, fg) = offline
-        ? (cs.surfaceContainerHighest, cs.outline)
+    final bg = offline
+        ? mutedTileBackground(cs)
         : pve
-        ? (cs.tertiaryContainer, cs.onTertiaryContainer)
-        : (cs.primaryContainer, cs.onPrimaryContainer);
+        ? cs.tertiaryContainer
+        : cs.primaryContainer;
+    final fg = offline
+        ? mutedTileForeground(cs)
+        : pve
+        ? cs.onTertiaryContainer
+        : cs.onPrimaryContainer;
 
     String? sub;
     final ip = server.ip.trim();
@@ -93,7 +99,7 @@ class ServerGridCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: offline ? cs.outline : cs.onSurface,
+                        color: offline ? mutedServerText(cs) : cs.onSurface,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -103,7 +109,10 @@ class ServerGridCard extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           sub,
-                          style: TextStyle(fontSize: 11, color: cs.outline),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: offline ? mutedServerText(cs) : cs.outline,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),

@@ -315,7 +315,7 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
         ? cs.surfaceContainerHigh
         : cs.surfaceContainerLow;
     final indicatorColor = Color.alphaBlend(
-      cs.onSurface.withValues(alpha: isDark ? 0.20 : 0.17),
+      cs.primary.withValues(alpha: isDark ? 0.30 : 0.14),
       surfaceColor,
     );
     const selectionPadding = FloatingNavigationBar._selectionPadding;
@@ -395,6 +395,7 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
                                   destination: widget.destinations[i],
                                   selected: widget.selectedIndex == i,
                                   surfaceColor: surfaceColor,
+                                  selectionColor: indicatorColor,
                                   onTap: () => _handleTap(i),
                                 ),
                               ),
@@ -416,8 +417,8 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
 /// A compact action button that can be passed as [FloatingNavigationBar.trailing].
 ///
 /// It keeps the look of the previous floating action button: a 56dp rounded
-/// square with the theme's contrast colour and elevation, only moved down next
-/// to the bar.
+/// square in the theme's accent colour with elevation, only moved down next to
+/// the bar.
 class FloatingNavigationAction extends StatelessWidget {
   static const double radius = 16;
 
@@ -425,8 +426,8 @@ class FloatingNavigationAction extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
 
-  /// Uses the theme's soft error container so the action still reads as
-  /// destructive without the intensity of a solid error surface.
+  /// Uses the theme's solid error colour so the action still reads as
+  /// destructive while sitting beside the accent-coloured primary action.
   final bool destructive;
 
   const FloatingNavigationAction({
@@ -440,10 +441,8 @@ class FloatingNavigationAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final background = destructive ? cs.errorContainer : cs.primaryContainer;
-    final foreground = destructive
-        ? cs.onErrorContainer
-        : cs.onPrimaryContainer;
+    final background = destructive ? cs.error : cs.primary;
+    final foreground = destructive ? cs.onError : cs.onPrimary;
 
     return Semantics(
       container: true,
@@ -483,12 +482,14 @@ class _DestinationButton extends StatelessWidget {
   final FloatingNavigationDestination destination;
   final bool selected;
   final Color surfaceColor;
+  final Color selectionColor;
   final VoidCallback onTap;
 
   const _DestinationButton({
     required this.destination,
     required this.selected,
     required this.surfaceColor,
+    required this.selectionColor,
     required this.onTap,
   });
 
@@ -524,7 +525,7 @@ class _DestinationButton extends StatelessWidget {
                 child: Icon(
                   destination.icon,
                   size: FloatingNavigationBar.iconSize,
-                  color: cs.onSurface,
+                  color: selected ? cs.primary : cs.onSurface,
                 ),
               ),
               if (badgeText != null)
@@ -534,7 +535,7 @@ class _DestinationButton extends StatelessWidget {
                   child: _NavigationBadge(
                     text: badgeText,
                     isAlert: destination.badgeIsAlert,
-                    borderColor: surfaceColor,
+                    borderColor: selected ? selectionColor : surfaceColor,
                   ),
                 ),
             ],
