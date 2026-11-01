@@ -191,11 +191,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
     final monitoringIndex = hasSessions ? 2 : 1;
     final showFloatingBar = useFloatingBar && !isOnSessionsTab;
-    final media = MediaQuery.of(context);
-    final pageStack = MediaQuery(
-      data: showAttentionBanner ? media.removePadding(removeTop: true) : media,
-      child: TabCrossfade(index: _selectedIndex, children: pages),
-    );
 
     final theme = Theme.of(context);
     final pageTheme = showFloatingBar
@@ -273,7 +268,28 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                     bottom: showFloatingBar
                         ? FloatingNavigationBar.contentInset
                         : 0,
-                    child: Theme(data: pageTheme, child: pageStack),
+                    child: Theme(
+                      data: pageTheme,
+                      // Resolve the MediaQuery below the Scaffold: it has
+                      // already consumed the keyboard inset, so forwarding the
+                      // one from above the Scaffold would make the pages' own
+                      // Scaffolds subtract the keyboard height a second time.
+                      child: Builder(
+                        builder: (context) {
+                          final stack = TabCrossfade(
+                            index: _selectedIndex,
+                            children: pages,
+                          );
+                          if (!showAttentionBanner) return stack;
+                          return MediaQuery(
+                            data: MediaQuery.of(
+                              context,
+                            ).removePadding(removeTop: true),
+                            child: stack,
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ],
