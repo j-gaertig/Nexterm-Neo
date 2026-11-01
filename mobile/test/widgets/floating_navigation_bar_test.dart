@@ -149,7 +149,7 @@ void main() {
     expect(find.text('3'), findsNothing);
   });
 
-  testWidgets('uses the T3 One UI dimensions and stays centred', (
+  testWidgets('uses the T3 One UI dimensions and stays left-aligned', (
     tester,
   ) async {
     await _pumpBar(tester, selectedIndex: 0);
@@ -162,7 +162,8 @@ void main() {
 
     expect(surface.height, FloatingNavigationBar.barHeight);
     expect(surface.width, 4 * FloatingNavigationBar.itemExtent);
-    expect(surface.center.dx, closeTo(screenWidth / 2, 0.5));
+    expect(surface.left, FloatingNavigationBar.edgeMargin);
+    expect(surface.right, lessThan(screenWidth / 2));
 
     final indicator = tester.getRect(
       find.byKey(FloatingNavigationBar.indicatorKey),
@@ -172,6 +173,58 @@ void main() {
 
     final icon = tester.widget<Icon>(find.byIcon(AppIcons.dns));
     expect(icon.size, FloatingNavigationBar.iconSize);
+  });
+
+  testWidgets('a trailing action sits at the right at the same height', (
+    tester,
+  ) async {
+    await _pumpBar(
+      tester,
+      selectedIndex: 0,
+      trailing: FloatingNavigationAction(
+        icon: AppIcons.plus,
+        tooltip: 'Add server',
+        onPressed: () {},
+      ),
+    );
+
+    final surface = tester.getRect(
+      find.byKey(FloatingNavigationBar.surfaceKey),
+    );
+    final action = tester.getRect(find.byTooltip('Add server'));
+
+    expect(action.top, surface.top);
+    expect(action.height, surface.height);
+    expect(action.width, FloatingNavigationBar.actionSize);
+    expect(
+      action.left - surface.right,
+      greaterThanOrEqualTo(FloatingNavigationBar.actionGap),
+    );
+
+    final screenWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(
+      action.right,
+      closeTo(screenWidth - FloatingNavigationBar.edgeMargin, 0.5),
+    );
+
+    // The action keeps the previous floating action button's contrast style:
+    // theme primary container, elevated, and only slightly rounded corners.
+    final material = tester.widget<Material>(
+      find.descendant(
+        of: find.byTooltip('Add server'),
+        matching: find.byType(Material),
+      ),
+    );
+    final cs = Theme.of(
+      tester.element(find.byTooltip('Add server')),
+    ).colorScheme;
+    expect(material.color, cs.primaryContainer);
+    expect(material.elevation, 6);
+    expect(
+      material.borderRadius,
+      BorderRadius.circular(FloatingNavigationAction.radius),
+    );
   });
 
   testWidgets('a third destination shrinks the bar instead of stretching it', (
@@ -210,12 +263,14 @@ Future<void> _pumpBar(
   List<FloatingNavigationDestination> destinations = _destinations,
   ValueChanged<int>? onDestinationSelected,
   bool disableAnimations = false,
+  Widget? trailing,
 }) async {
   final ValueChanged<int> onSelected = onDestinationSelected ?? (int _) {};
   final bar = FloatingNavigationBar(
     selectedIndex: selectedIndex,
     onDestinationSelected: onSelected,
     destinations: destinations,
+    trailing: trailing,
   );
 
   await tester.pumpWidget(

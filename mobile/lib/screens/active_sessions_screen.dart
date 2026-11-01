@@ -219,7 +219,9 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     }
   }
 
-  Future<void> _closeAllSessions() async {
+  /// Asks for confirmation and closes every open session. Triggered by the
+  /// close-all action next to the floating navigation bar.
+  Future<void> closeAllSessions() async {
     if (_closingAll) return;
     final sm = widget.sessionManager;
     final token = widget.authManager.sessionToken;
@@ -317,8 +319,6 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                       previews: _previews,
                       onOpenSession: _openSession,
                       onCloseSession: _closeSession,
-                      onCloseAll: _closeAllSessions,
-                      isClosingAll: _closingAll,
                     ),
                   ],
                 ),

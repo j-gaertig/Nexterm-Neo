@@ -65,21 +65,6 @@ void main() {
     expect(opened, ['one']);
   });
 
-  testWidgets('keeps a close-all action in the header', (tester) async {
-    var closeAll = 0;
-    await _pumpOverview(
-      tester,
-      sessions: [
-        _session('one', 'edge-gateway', 'ssh', ConnectionType.terminal),
-        _session('two', 'vault', 'sftp', ConnectionType.sftp),
-      ],
-      onCloseAll: () => closeAll++,
-    );
-
-    await tester.tap(find.text('Close all'));
-    expect(closeAll, 1);
-  });
-
   testWidgets('shows an empty state without a back-to-servers action', (
     tester,
   ) async {
@@ -109,7 +94,6 @@ Future<void> _pumpOverview(
   required List<AppSession> sessions,
   ValueChanged<String>? onOpenSession,
   ValueChanged<String>? onCloseSession,
-  VoidCallback? onCloseAll,
 }) async {
   tester.view.physicalSize = const Size(800, 1400);
   tester.view.devicePixelRatio = 1.0;
@@ -129,7 +113,6 @@ Future<void> _pumpOverview(
         previews: const {},
         onOpenSession: onOpenSession ?? (_) {},
         onCloseSession: onCloseSession ?? (_) {},
-        onCloseAll: onCloseAll,
       ),
     ),
   );

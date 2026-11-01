@@ -12,14 +12,13 @@ import 'widgets/session_grid_card.dart';
 /// This is the Sessions destination of the main navigation. It intentionally
 /// mirrors the Servers, Monitoring, and Settings pages: a normal page header,
 /// scrollable content, and the floating navigation bar. Selecting a card opens
-/// that session; closing is handled per card or for all sessions at once.
+/// that session; closing is handled per card or for all sessions at once
+/// through the action next to the navigation bar.
 class SessionsOverviewScreen extends StatelessWidget {
   final SessionManager sessionManager;
   final Map<String, Uint8List> previews;
   final ValueChanged<String> onOpenSession;
   final ValueChanged<String> onCloseSession;
-  final VoidCallback? onCloseAll;
-  final bool isClosingAll;
 
   const SessionsOverviewScreen({
     super.key,
@@ -27,8 +26,6 @@ class SessionsOverviewScreen extends StatelessWidget {
     required this.previews,
     required this.onOpenSession,
     required this.onCloseSession,
-    this.onCloseAll,
-    this.isClosingAll = false,
   });
 
   @override
@@ -45,7 +42,7 @@ class SessionsOverviewScreen extends StatelessWidget {
             bottom: false,
             child: Column(
               children: [
-                _buildHeader(context, sessions.length, cs, tt),
+                _buildHeader(sessions.length, cs, tt),
                 Expanded(
                   child: sessions.isEmpty
                       ? _buildEmpty(cs, tt)
@@ -59,66 +56,26 @@ class SessionsOverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context,
-    int count,
-    ColorScheme cs,
-    TextTheme tt,
-  ) {
+  Widget _buildHeader(int count, ColorScheme cs, TextTheme tt) {
     final countLabel = count == 1
         ? '1 active session'
         : '$count active sessions';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sessions',
-                  style: tt.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Text(
-                    countLabel,
-                    style: tt.bodySmall?.copyWith(color: cs.outline),
-                  ),
-                ),
-              ],
+          Text(
+            'Sessions',
+            style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              countLabel,
+              style: tt.bodySmall?.copyWith(color: cs.outline),
             ),
           ),
-          if (count > 0 && onCloseAll != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: TextButton.icon(
-                onPressed: isClosingAll ? null : onCloseAll,
-                icon: isClosingAll
-                    ? SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: cs.error,
-                        ),
-                      )
-                    : const Icon(AppIcons.close, size: 18),
-                label: const Text('Close all'),
-                style: TextButton.styleFrom(
-                  foregroundColor: cs.error,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                ),
-              ),
-            ),
         ],
       ),
     );
