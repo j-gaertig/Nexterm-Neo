@@ -79,6 +79,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
   static const MethodChannel _editChannel = MethodChannel('nexterm/edit');
   List<SftpEntry> _entries = [];
   String _currentPath = '/';
+  String _listedPath = '/';
   String _rootPath = '/';
   List<String> _history = ['/'];
   int _historyIndex = 0;
@@ -171,6 +172,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
     widget.session.handleBack = _handleBack;
     unawaited(_sweepStaleEditTemps());
     _currentPath = widget.session.sftpPath ?? '/';
+    _listedPath = _currentPath;
     _rootPath = widget.session.sftpRootPath ?? '/';
     _lastShowHiddenFiles = widget.sftpSettings.showHiddenFiles;
     _lastSortFoldersFirst = widget.sftpSettings.sortFoldersFirst;
@@ -429,6 +431,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
           final payload = json.decode(jsonPayload) as Map<String, dynamic>;
           final path = payload['path'] as String?;
           if (path != null && path != _currentPath && mounted) {
+            _rememberScrollOffset(_currentPath);
             setState(() {
               _currentPath = path;
               widget.session.sftpPath = path;
@@ -501,6 +504,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       });
       setState(() {
         _entries = entries;
+        _listedPath = _currentPath;
         _loading = false;
         _errorMessage = null;
         _selectedIndices.clear();
@@ -541,7 +545,18 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
 
   String _lastRequestedPath = '/';
   double? _savedOffset;
+  final Map<String, double> _scrollOffsets = {};
   final List<bool> _listBusyQueue = [];
+
+  /// Remembers the list position of the directory that is being left so
+  /// navigating back (including the system back gesture) returns to it.
+  void _rememberScrollOffset(String path) {
+    // The visible list can still belong to the directory that was requested
+    // before this one while its listing is loading. Never attribute that
+    // position to the path we are about to show.
+    if (path != _listedPath || !_scrollController.hasClients) return;
+    _scrollOffsets[path] = _scrollController.offset;
+  }
 
   void _endListBusy() {
     if (_listBusyQueue.isNotEmpty) {
@@ -563,24 +578,22 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       return;
     }
     _lastRequestedPath = path;
+    _savedOffset = keepOffset
+        ? (_scrollController.hasClients ? _scrollController.offset : null)
+        : _scrollOffsets[path];
     if (_entries.isEmpty) {
-      _savedOffset = null;
       _listBusyQueue.add(false);
       if (!silent) {
         setState(() => _loading = true);
       }
     } else {
-      if (keepOffset && _scrollController.hasClients) {
-        _savedOffset = _scrollController.offset;
-      } else {
-        _savedOffset = null;
-      }
       _listBusyQueue.add(!silent);
     }
     _sendOperation(_SftpOps.listFiles, {'path': path});
   }
 
   void _navigateTo(String path) {
+    _rememberScrollOffset(_currentPath);
     setState(() {
       _currentPath = path;
       widget.session.sftpPath = path;
@@ -599,6 +612,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
 
   bool _goBack() {
     if (_historyIndex <= 0) return false;
+    _rememberScrollOffset(_currentPath);
     _historyIndex--;
     final path = _history[_historyIndex];
     setState(() {
@@ -1458,9 +1472,11 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
       _uploadingPaths.removeWhere((k) => k.startsWith('$oldSid|'));
       _entries = [];
       _currentPath = widget.session.sftpPath ?? '/';
+      _listedPath = _currentPath;
       _rootPath = widget.session.sftpRootPath ?? '/';
       _lastRequestedPath = _currentPath;
       _savedOffset = null;
+      _scrollOffsets.clear();
       _listBusyQueue.clear();
       _history = [_currentPath];
       _historyIndex = 0;
@@ -2174,7 +2190,7 @@ class _SftpRendererState extends State<SftpRenderer> with WidgetsBindingObserver
     return RefreshIndicator(
       onRefresh: () async => _refresh(),
       child: ListView.builder(
-        key: PageStorageKey<String>('sftp-list-$_sessionId-$_currentPath'),
+        key: PageStorageKey<String>('sftp-list-$_sessionId-$_listedPath'),
         controller: _scrollController,
         itemCount: _entries.length,
         itemBuilder: (ctx, index) => _buildEntryTile(index),
