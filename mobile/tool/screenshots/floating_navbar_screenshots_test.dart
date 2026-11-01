@@ -169,7 +169,7 @@ Future<void> _pumpServersPreview(
   final snippetManager = SnippetManager();
   final sessionManager = SessionManager();
   final viewSettings = await ServerViewSettings.load();
-  final themeManager = ThemeManager(themeMode, useDynamicColor: false);
+  final themeManager = ThemeManager(themeMode);
 
   final serversScreen = ServersScreen(
     authManager: authManager,
@@ -272,7 +272,7 @@ Future<void> _pumpSettingsPreview(
   await accountManager.switchAccount('preview-account');
 
   final authManager = AuthManager(accountManager);
-  final themeManager = ThemeManager(themeMode, useDynamicColor: false);
+  final themeManager = ThemeManager(themeMode);
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final viewSettings = await ServerViewSettings.load();
@@ -353,7 +353,7 @@ Future<void> _pumpMonitoringPreview(
   await accountManager.switchAccount('preview-account');
 
   final authManager = AuthManager(accountManager);
-  final themeManager = ThemeManager(themeMode, useDynamicColor: false);
+  final themeManager = ThemeManager(themeMode);
 
   final client = MockClient((request) async {
     if (request.url.path.endsWith('/monitoring')) {

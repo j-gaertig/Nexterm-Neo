@@ -11,6 +11,7 @@ import '../utils/api_exception.dart';
 import '../utils/auth_manager.dart';
 import '../utils/snippet_manager.dart';
 import '../utils/folder_state_manager.dart';
+import '../utils/muted_colors.dart';
 import '../utils/server_view_settings.dart';
 import '../utils/tag_color.dart';
 import '../widgets/floating_navigation_bar.dart';
@@ -739,9 +740,12 @@ class ServersScreenState extends State<ServersScreen> {
     final pve = server.isPve;
     final icon = _serverIcon(server);
 
-    final (bg, fg) = offline
-        ? (cs.surfaceContainerHighest, cs.outline)
-        : pve ? (cs.tertiaryContainer, cs.onTertiaryContainer) : (cs.primaryContainer, cs.onPrimaryContainer);
+    final bg = offline
+        ? mutedTileBackground(cs)
+        : pve ? cs.tertiaryContainer : cs.primaryContainer;
+    final fg = offline
+        ? mutedTileForeground(cs)
+        : pve ? cs.onTertiaryContainer : cs.onPrimaryContainer;
 
     String? sub;
     final ip = server.ip.trim();
@@ -780,9 +784,9 @@ class ServersScreenState extends State<ServersScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(server.name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: offline ? cs.outline : cs.onSurface), overflow: TextOverflow.ellipsis),
+                Text(server.name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: offline ? mutedServerText(cs) : cs.onSurface), overflow: TextOverflow.ellipsis),
                 if (sub != null) Padding(padding: const EdgeInsets.only(top: 2),
-                  child: Text(sub, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis)),
+                  child: Text(sub, style: TextStyle(fontSize: 12, color: offline ? mutedServerText(cs) : cs.outline), overflow: TextOverflow.ellipsis)),
               ])),
               if (tags.isNotEmpty)
                 Padding(padding: const EdgeInsets.only(right: 4),

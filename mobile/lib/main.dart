@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'screens/device_setup_screen.dart';
 import 'screens/main_navigation_page.dart';
 import 'screens/screen_lock_screen.dart';
 import 'services/screen_lock_service.dart';
 import 'services/session_manager.dart';
+import 'utils/app_themes.dart';
 import 'utils/screen_lock_coordinator.dart';
 import 'utils/screen_lock_settings.dart';
 import 'utils/theme_manager.dart';
@@ -23,7 +25,7 @@ void main() async {
   final themeMode = ThemeManager.parseStoredThemeMode(
     prefs.getString('themeMode'),
   );
-  final accentSettings = await ThemeManager.loadAccentSettings();
+  final appTheme = await ThemeManager.loadTheme();
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
@@ -32,23 +34,23 @@ void main() async {
   final accountManager = ServerAccountManager();
   await accountManager.load();
 
-  runApp(MyApp(
-    themeMode: themeMode,
-    accountManager: accountManager,
-    accentColor: accentSettings.accentColor,
-    useDynamicColor: accentSettings.useDynamicColor,
-    terminalSettings: terminalSettings,
-    sftpSettings: sftpSettings,
-    serverViewSettings: serverViewSettings,
-    screenLockSettings: screenLockSettings,
-  ));
+  runApp(
+    MyApp(
+      themeMode: themeMode,
+      appTheme: appTheme,
+      accountManager: accountManager,
+      terminalSettings: terminalSettings,
+      sftpSettings: sftpSettings,
+      serverViewSettings: serverViewSettings,
+      screenLockSettings: screenLockSettings,
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
   final ThemeMode themeMode;
+  final AppThemeDefinition appTheme;
   final ServerAccountManager accountManager;
-  final Color accentColor;
-  final bool useDynamicColor;
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
@@ -57,9 +59,8 @@ class MyApp extends StatefulWidget {
   const MyApp({
     super.key,
     required this.themeMode,
+    required this.appTheme,
     required this.accountManager,
-    required this.accentColor,
-    required this.useDynamicColor,
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
@@ -91,11 +92,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _themeManager = ThemeManager(
-      widget.themeMode,
-      accentColor: widget.accentColor,
-      useDynamicColor: widget.useDynamicColor,
-    );
+    _themeManager = ThemeManager(widget.themeMode, theme: widget.appTheme);
     _authManager = AuthManager(widget.accountManager);
     _snippetManager = SnippetManager();
     _aiManager = AIManager();
@@ -107,8 +104,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _screenLockService = ScreenLockService();
     _wasAuthenticated = _authManager.isAuthenticated;
     _activeAccountId = _authManager.accountManager.activeAccount?.id;
-    _showStartupLockCover =
-        _screenLockSettings.enabled && _wasAuthenticated;
+    _showStartupLockCover = _screenLockSettings.enabled && _wasAuthenticated;
     _screenLockCoordinator = ScreenLockCoordinator(
       navigatorKey: _navigatorKey,
       settings: _screenLockSettings,
@@ -227,7 +223,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               title: 'Nexterm',
               navigatorKey: _navigatorKey,
               theme: _themeManager.lightTheme(dynamicColorScheme: lightDynamic),
-              darkTheme: _themeManager.darkTheme(dynamicColorScheme: darkDynamic),
+              darkTheme: _themeManager.darkTheme(
+                dynamicColorScheme: darkDynamic,
+              ),
               themeMode: _themeManager.themeMode,
               home: _showStartupLockCover
                   ? const ScreenLockStartupCover()

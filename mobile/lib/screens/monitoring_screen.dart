@@ -4,6 +4,7 @@ import '../utils/app_icons.dart';
 import '../models/monitoring.dart';
 import '../services/monitoring_service.dart';
 import '../utils/auth_manager.dart';
+import '../utils/muted_colors.dart';
 import '../widgets/floating_navigation_bar.dart';
 
 class MonitoringScreen extends StatefulWidget {
@@ -189,10 +190,12 @@ class MonitoringScreenState extends State<MonitoringScreen> {
     final pve = s.isPVE;
     final hasErr = s.error != null && !s.hasData;
 
-    final (bg, fg) = hasErr
-        ? (cs.surfaceContainerHighest, cs.outline)
-        : pve ? (cs.tertiaryContainer, cs.onTertiaryContainer)
-        : (cs.primaryContainer, cs.onPrimaryContainer);
+    final bg = hasErr
+        ? mutedTileBackground(cs)
+        : pve ? cs.tertiaryContainer : cs.primaryContainer;
+    final fg = hasErr
+        ? mutedTileForeground(cs)
+        : pve ? cs.onTertiaryContainer : cs.onPrimaryContainer;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

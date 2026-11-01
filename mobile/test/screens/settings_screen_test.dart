@@ -5,6 +5,8 @@ import 'package:nexterm/models/server_account.dart';
 import 'package:nexterm/screens/server_accounts_screen.dart';
 import 'package:nexterm/screens/settings_screen.dart';
 import 'package:nexterm/services/screen_lock_service.dart';
+import 'package:nexterm/utils/app_icons.dart';
+import 'package:nexterm/utils/app_themes.dart';
 import 'package:nexterm/utils/auth_manager.dart';
 import 'package:nexterm/utils/screen_lock_settings.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
@@ -60,7 +62,7 @@ Future<_SettingsHarness> _pumpSettings(
   }
 
   final authManager = AuthManager(accountManager);
-  final themeManager = ThemeManager(themeMode, useDynamicColor: false);
+  final themeManager = ThemeManager(themeMode);
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
@@ -253,7 +255,7 @@ void main() {
   });
 
   testWidgets('fits a 320dp-wide screen at large text scales', (tester) async {
-    await _pumpSettings(tester, size: const Size(320, 6000), textScale: 2.0);
+    await _pumpSettings(tester, size: const Size(320, 8000), textScale: 2.0);
 
     expect(tester.takeException(), isNull);
     expect(find.text('File Manager'), findsOneWidget);
@@ -280,6 +282,34 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('File Manager'), findsOneWidget);
+  });
+
+  testWidgets('offers the renamed palettes and switches between them', (
+    tester,
+  ) async {
+    final harness = await _pumpSettings(tester);
+
+    expect(find.text('Color Theme'), findsOneWidget);
+    expect(
+      AppThemes.all.map((theme) => theme.label),
+      ['Graphite', 'Adaptive', 'Blossom', 'Meadow', 'Tide', 'Copper', 'Aurora'],
+    );
+    for (final theme in AppThemes.all) {
+      expect(find.text(theme.label), findsOneWidget);
+    }
+    expect(find.text('Dynamic Color'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-theme-blossom')));
+    await tester.pump();
+
+    expect(harness.themeManager.theme.id, 'blossom');
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('app-theme-blossom')),
+        matching: find.byIcon(AppIcons.checkCircle),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('terminal theme cards expose a semantics tap action', (

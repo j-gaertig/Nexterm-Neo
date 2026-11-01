@@ -145,14 +145,14 @@ void main() {
       expect(closeAll, findsOneWidget);
       expect(find.byTooltip('Add server'), findsNothing);
 
-      // The close-all action uses the soft error container like the previous
-      // header button, so it stays clearly destructive without a harsh red.
+      // The close-all action uses the solid error colour so it reads as
+      // destructive next to the accent-coloured add action.
       final closeAllMaterial = tester.widget<Material>(
         find.descendant(of: closeAll, matching: find.byType(Material)),
       );
       expect(
         closeAllMaterial.color,
-        Theme.of(tester.element(closeAll)).colorScheme.errorContainer,
+        Theme.of(tester.element(closeAll)).colorScheme.error,
       );
 
       final surface = tester.getRect(

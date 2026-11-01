@@ -91,7 +91,7 @@ Future<void> _pumpPreview(
   final snippetManager = SnippetManager();
   final sessionManager = SessionManager();
   final viewSettings = await ServerViewSettings.load();
-  final themeManager = ThemeManager(themeMode, useDynamicColor: false);
+  final themeManager = ThemeManager(themeMode);
 
   await tester.pumpWidget(
     RepaintBoundary(

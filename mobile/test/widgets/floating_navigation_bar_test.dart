@@ -173,6 +173,13 @@ void main() {
 
     final icon = tester.widget<Icon>(find.byIcon(AppIcons.dns));
     expect(icon.size, FloatingNavigationBar.iconSize);
+
+    final cs = Theme.of(tester.element(find.byIcon(AppIcons.dns))).colorScheme;
+    expect(icon.color, cs.primary);
+    expect(
+      tester.widget<Icon>(find.byIcon(AppIcons.chartBoxOutline)).color,
+      cs.onSurface,
+    );
   });
 
   testWidgets('a trailing action sits at the right at the same height', (
@@ -208,8 +215,8 @@ void main() {
       closeTo(screenWidth - FloatingNavigationBar.edgeMargin, 0.5),
     );
 
-    // The action keeps the previous floating action button's contrast style:
-    // theme primary container, elevated, and only slightly rounded corners.
+    // The action carries the theme accent colour, stays elevated, and keeps
+    // only slightly rounded corners.
     final material = tester.widget<Material>(
       find.descendant(
         of: find.byTooltip('Add server'),
@@ -219,7 +226,8 @@ void main() {
     final cs = Theme.of(
       tester.element(find.byTooltip('Add server')),
     ).colorScheme;
-    expect(material.color, cs.primaryContainer);
+    expect(material.color, cs.primary);
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.plus)).color, cs.onPrimary);
     expect(material.elevation, 6);
     expect(
       material.borderRadius,

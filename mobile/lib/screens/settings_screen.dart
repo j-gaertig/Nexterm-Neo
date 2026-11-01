@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../utils/app_icons.dart';
+import '../utils/app_themes.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/password_prompt_localizations.dart';
@@ -446,103 +448,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 _divider(cs),
+                _subsectionHeader('Color Theme', cs),
                 ListenableBuilder(
                   listenable: widget.themeManager,
-                  builder: (_, __) => Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SwitchListTile(
-                        contentPadding: const EdgeInsets.only(
-                          left: 16,
-                          right: 12,
-                        ),
-                        secondary: _iconBox(AppIcons.palette, cs),
-                        title: const Text(
-                          'Dynamic Color',
-                          style: TextStyle(fontSize: 15),
-                        ),
-                        subtitle: Text(
-                          'Use system accent color',
-                          style: TextStyle(fontSize: 12, color: cs.outline),
-                        ),
-                        value: widget.themeManager.useDynamicColor,
-                        onChanged: (v) =>
-                            widget.themeManager.setUseDynamicColor(v),
-                      ),
-                      if (!widget.themeManager.useDynamicColor) ...[
-                        _divider(cs),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Accent Color',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.outline,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Wrap(
-                                spacing: 10,
-                                runSpacing: 10,
-                                children: ThemeManager.accentColorOptions
-                                    .asMap()
-                                    .entries
-                                    .map((entry) {
-                                      final color = entry.value;
-                                      final selected =
-                                          widget.themeManager.accentColor
-                                              .toARGB32() ==
-                                          color.toARGB32();
-                                      return Semantics(
-                                        button: true,
-                                        selected: selected,
-                                        label: 'Accent color ${entry.key + 1}',
-                                        child: InkResponse(
-                                          onTap: () => widget.themeManager
-                                              .setAccentColor(color),
-                                          radius: 24,
-                                          child: SizedBox(
-                                            width: 48,
-                                            height: 48,
-                                            child: Center(
-                                              child: Container(
-                                                width: 38,
-                                                height: 38,
-                                                decoration: BoxDecoration(
-                                                  color: color,
-                                                  shape: BoxShape.circle,
-                                                  border: selected
-                                                      ? Border.all(
-                                                          color: cs.onSurface,
-                                                          width: 2.5,
-                                                        )
-                                                      : null,
-                                                ),
-                                                child: selected
-                                                    ? const Icon(
-                                                        AppIcons.check,
-                                                        color: Colors.white,
-                                                        size: 18,
-                                                      )
-                                                    : null,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    })
-                                    .toList(),
-                              ),
-                            ],
-                          ),
-                        ),
+                  builder: (_, __) {
+                    final selected = widget.themeManager.theme;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (var i = 0; i < AppThemes.all.length; i++) ...[
+                          if (i > 0) _divider(cs, indent: 16, endIndent: 16),
+                          _appThemeTile(AppThemes.all[i], selected, cs),
+                        ],
                       ],
-                    ],
-                  ),
+                    );
+                  },
                 ),
                 _divider(cs),
                 _subsectionHeader('Server List', cs),
@@ -814,7 +734,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                         ),
                         _divider(cs, indent: 16, endIndent: 16),
-                        _subsectionHeader('Color Theme', cs),
+                        _subsectionHeader('Terminal Theme', cs),
                         SizedBox(
                           height: 72 * themeCardScale,
                           child: ListView.builder(
@@ -1256,6 +1176,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ),
   );
+
+  Widget _appThemeTile(
+    AppThemeDefinition theme,
+    AppThemeDefinition selected,
+    ColorScheme cs,
+  ) {
+    final isSelected = theme.id == selected.id;
+    void select() => widget.themeManager.setTheme(theme);
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${theme.label} theme. ${theme.description}',
+      excludeSemantics: true,
+      onTap: select,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: ValueKey('app-theme-${theme.id}'),
+          onTap: select,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+            child: Row(
+              children: [
+                _themeSwatchPair(theme),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        theme.label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        theme.description,
+                        style: TextStyle(fontSize: 12, color: cs.outline),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (isSelected)
+                  Icon(AppIcons.checkCircle, size: 22, color: cs.primary)
+                else
+                  Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: cs.outlineVariant, width: 1.5),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _themeSwatchPair(AppThemeDefinition theme) {
+    return SizedBox(
+      width: 78,
+      height: 38,
+      child: Stack(
+        children: [
+          _themeSwatch(theme.light, AppIcons.lightMode),
+          Positioned(
+            left: 40,
+            child: _themeSwatch(theme.dark, AppIcons.darkMode),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _themeSwatch(AppThemePalette palette, IconData icon) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: palette.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: palette.border),
+      ),
+      child: Center(
+        child: Container(
+          width: 23,
+          height: 23,
+          decoration: BoxDecoration(
+            color: palette.accent,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 12, color: palette.onAccent),
+        ),
+      ),
+    );
+  }
 
   Widget _colorDot(Color color) => Container(
     width: 10,
