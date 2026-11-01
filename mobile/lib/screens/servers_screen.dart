@@ -20,6 +20,7 @@ import 'widgets/connection_reason_dialog.dart';
 import 'widgets/instance_switcher.dart';
 import 'widgets/server_actions_sheet.dart';
 import 'widgets/server_protocol_sheet.dart';
+import 'widgets/tag_filter_sheet.dart';
 import 'widgets/script/run_script_sheet.dart';
 import '../services/server_editor_service.dart';
 import 'server_accounts_screen.dart';
@@ -421,89 +422,112 @@ class _ServersScreenState extends State<ServersScreen> {
           ],
         ]),
         const SizedBox(height: 16),
-        Focus(
-          onFocusChange: (f) => setState(() => _searchFocused = f),
-          child: TextField(
-            controller: _search,
-            decoration: InputDecoration(
-              hintText: 'Search servers...',
-              prefixIcon: Icon(AppIcons.magnify, size: 22),
-              suffixIcon: _hasText
-                  ? IconButton(icon: Icon(AppIcons.close, size: 20), tooltip: 'Clear search', onPressed: _clearSearch)
-                  : null,
-              filled: true,
-              fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary, width: 1.5)),
-              contentPadding: EdgeInsets.zero,
-              isDense: true,
+        Row(children: [
+          Expanded(
+            child: Focus(
+              onFocusChange: (f) => setState(() => _searchFocused = f),
+              child: TextField(
+                controller: _search,
+                decoration: InputDecoration(
+                  hintText: 'Search servers...',
+                  prefixIcon: Icon(AppIcons.magnify, size: 22),
+                  suffixIcon: _hasText
+                      ? IconButton(icon: Icon(AppIcons.close, size: 20), tooltip: 'Clear search', onPressed: _clearSearch)
+                      : null,
+                  filled: true,
+                  fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary, width: 1.5)),
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
+                ),
+              ),
             ),
           ),
-        ),
-        if (_allTags.isNotEmpty) ...[const SizedBox(height: 8), _buildTagBar(cs)],
+          const SizedBox(width: 8),
+          _buildTagFilterButton(cs),
+        ]),
         const SizedBox(height: 8),
       ]),
     );
   }
 
-  Widget _buildTagBar(ColorScheme cs) => SizedBox(
-    height: 40,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      itemCount: _allTags.length + (_selectedTags.isNotEmpty ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(width: 6),
-      itemBuilder: (_, i) {
-        if (_selectedTags.isNotEmpty && i == 0) {
-          return Semantics(
-            button: true,
-            label: 'Clear tag filters',
-            child: InkWell(
-              onTap: () => setState(() { _selectedTags.clear(); _filterFolders(); }),
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(10)),
-                alignment: Alignment.center,
-                child: Icon(AppIcons.close, size: 16, color: cs.onErrorContainer),
-              ),
-            ),
-          );
-        }
-        final idx = _selectedTags.isNotEmpty ? i - 1 : i;
-        final tag = _allTags[idx];
-        final sel = _selectedTags.contains(tag.id);
-        final tagColor = _parseColor(tag.color);
-        return Semantics(
-          button: true,
-          selected: sel,
-          label: 'Filter by ${tag.name}',
+  Future<void> _openTagFilter() async {
+    if (_allTags.isEmpty) return;
+    final selection = await showTagFilterSheet(
+      context,
+      tags: _allTags,
+      selected: _selectedTags,
+    );
+    if (selection == null || !mounted) return;
+    setState(() {
+      _selectedTags
+        ..clear()
+        ..addAll(selection);
+      _filterFolders();
+    });
+  }
+
+  Widget _buildTagFilterButton(ColorScheme cs) {
+    final active = _selectedTags.isNotEmpty;
+    final enabled = _allTags.isNotEmpty;
+    final background = active
+        ? cs.primary
+        : (enabled ? cs.surfaceContainerHigh : cs.surfaceContainerLow);
+    final foreground = active
+        ? cs.onPrimary
+        : (enabled ? cs.onSurfaceVariant : cs.outline);
+    final count = _selectedTags.length;
+
+    return Tooltip(
+      message: active
+          ? 'Filter by tags ($count active)'
+          : (enabled ? 'Filter by tags' : 'No tags available'),
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        toggled: active,
+        label: 'Filter by tags',
+        child: Material(
+          color: background,
+          borderRadius: BorderRadius.circular(14),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: () => setState(() {
-              sel ? _selectedTags.remove(tag.id) : _selectedTags.add(tag.id);
-              _filterFolders();
-            }),
-            borderRadius: BorderRadius.circular(10),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: sel ? tagColor.withValues(alpha: 0.2) : cs.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(10),
-                border: sel ? Border.all(color: tagColor, width: 1.5) : Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
-              ),
-              alignment: Alignment.center,
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Container(width: 8, height: 8, decoration: BoxDecoration(color: tagColor, shape: BoxShape.circle)),
-                const SizedBox(width: 6),
-                Text(tag.name, style: TextStyle(fontSize: 12, fontWeight: sel ? FontWeight.w600 : FontWeight.w500, color: sel ? tagColor : cs.onSurface)),
+            key: const ValueKey('tag-filter-button'),
+            onTap: enabled ? _openTagFilter : null,
+            child: SizedBox.square(
+              dimension: 48,
+              child: Stack(alignment: Alignment.center, children: [
+                Icon(AppIcons.filterVariant, size: 20, color: foreground),
+                if (active)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: cs.onPrimary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          color: cs.primary,
+                        ),
+                      ),
+                    ),
+                  ),
               ]),
             ),
           ),
-        );
-      },
-    ),
-  );
+        ),
+      ),
+    );
+  }
 
   Widget _buildError(ColorScheme cs, TextTheme tt) => Center(
     child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

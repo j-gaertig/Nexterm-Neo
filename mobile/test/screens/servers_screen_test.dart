@@ -5,7 +5,6 @@ import 'package:nexterm/models/server_account.dart';
 import 'package:nexterm/screens/servers_screen.dart';
 import 'package:nexterm/screens/widgets/server_grid_card.dart';
 import 'package:nexterm/services/session_manager.dart';
-import 'package:nexterm/utils/app_icons.dart';
 import 'package:nexterm/utils/auth_manager.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
 import 'package:nexterm/utils/server_view_settings.dart';
@@ -45,8 +44,8 @@ void main() {
     expect(find.descendant(of: card, matching: find.text('+1')), findsOne);
     expect(find.descendant(of: card, matching: find.text('Web')), findsNothing);
 
-    // The tag bar still offers every tag as a filter.
-    expect(find.text('Production'), findsNWidgets(2));
+    // Tags are filtered through the filter button next to the search field.
+    expect(find.byKey(const ValueKey('tag-filter-button')), findsOneWidget);
   });
 
   testWidgets('grid adapts the requested columns to the available width', (
@@ -77,7 +76,7 @@ void main() {
     expect(fourth.dx, first.dx);
   });
 
-  testWidgets('selecting a tag filters the grid and can be cleared', (
+  testWidgets('selecting a tag on a card filters the grid and clear filter resets it', (
     tester,
   ) async {
     await _pumpGrid(
@@ -95,7 +94,7 @@ void main() {
 
     expect(find.byType(ServerGridCard), findsNWidgets(2));
 
-    // Tapping the tag on a card filters the grid, just like the tag bar.
+    // Tapping the tag on a card filters the grid.
     final card = find.byType(ServerGridCard).first;
     await tester.tap(
       find.descendant(of: card, matching: find.text('Production')),
@@ -105,12 +104,49 @@ void main() {
     expect(find.byType(ServerGridCard), findsOneWidget);
     expect(find.text('prod-web-01'), findsOneWidget);
     expect(find.text('db-primary'), findsNothing);
-    expect(find.byIcon(AppIcons.close), findsOneWidget);
 
-    await tester.tap(find.byIcon(AppIcons.close));
+    // Clear the tag selection from the filter sheet.
+    await tester.tap(find.byKey(const ValueKey('tag-filter-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Filter by tags'), findsOneWidget);
+    expect(find.text('1 of 2 tags selected'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('tag-filter-clear')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('tag-filter-apply')));
     await tester.pumpAndSettle();
 
     expect(find.byType(ServerGridCard), findsNWidgets(2));
+  });
+
+  testWidgets('filter sheet toggles tags before applying', (tester) async {
+    await _pumpGrid(
+      tester,
+      entries: [
+        _server(
+          id: 1,
+          name: 'prod-web-01',
+          ip: '10.20.0.11',
+          tags: [_production],
+        ),
+        _server(id: 2, name: 'db-primary', ip: '10.20.0.12', tags: [_database]),
+      ],
+    );
+
+    await tester.tap(find.byKey(const ValueKey('tag-filter-button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('tag-filter-option-3')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 of 2 tags selected'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('tag-filter-apply')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ServerGridCard), findsOneWidget);
+    expect(find.text('db-primary'), findsOneWidget);
+    expect(find.text('prod-web-01'), findsNothing);
   });
 
   testWidgets('cards in a row share the tallest card height', (tester) async {
