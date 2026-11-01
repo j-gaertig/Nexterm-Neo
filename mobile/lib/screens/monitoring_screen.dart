@@ -19,6 +19,8 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   bool _loading = true, _loadingDetails = false;
   String? _error;
   Timer? _timer;
+  String? _activeAccountId;
+  int _loadGeneration = 0;
 
   bool get hasDetails => _selected != null;
 
@@ -30,18 +32,48 @@ class MonitoringScreenState extends State<MonitoringScreen> {
     return false;
   }
 
-  @override void initState() { super.initState(); _load(); _timer = Timer.periodic(const Duration(seconds: 60), (_) => _load(silent: true)); }
-  @override void dispose() { _timer?.cancel(); super.dispose(); }
+  @override void initState() {
+    super.initState();
+    _activeAccountId = widget.authManager.accountManager.activeAccount?.id;
+    widget.authManager.addListener(_onAuthChanged);
+    _load();
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _load(silent: true));
+  }
+  @override void dispose() {
+    widget.authManager.removeListener(_onAuthChanged);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _onAuthChanged() {
+    final accountId = widget.authManager.accountManager.activeAccount?.id;
+    if (accountId == _activeAccountId) return;
+    _activeAccountId = accountId;
+    if (!mounted) return;
+    setState(() {
+      _servers = [];
+      _selected = null;
+      _details = null;
+      _error = null;
+      _loading = true;
+    });
+    _load();
+  }
 
   Future<void> _load({bool silent = false}) async {
+    final generation = ++_loadGeneration;
     if (!silent) setState(() => _loading = true);
     try {
       final token = widget.authManager.sessionToken ?? (throw Exception('Not authenticated'));
       final servers = await MonitoringService.getAll(token);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() { _servers = servers; _loading = false; _error = null; });
       if (_selected != null) _selected = servers.firstWhere((s) => s['id'] == _selected!['id'], orElse: () => _selected!);
-    } catch (e) { if (mounted) setState(() { _error = e.toString(); _loading = false; }); }
+    } catch (e) {
+      if (mounted && generation == _loadGeneration) {
+        setState(() { _error = e.toString(); _loading = false; });
+      }
+    }
   }
 
   Future<void> _loadDetails(M server) async {

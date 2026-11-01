@@ -85,6 +85,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   final _navigatorKey = GlobalKey<NavigatorState>();
   bool _showStartupLockCover = false;
   bool _wasAuthenticated = false;
+  String? _activeAccountId;
 
   @override
   void initState() {
@@ -105,6 +106,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _screenLockSettings = widget.screenLockSettings;
     _screenLockService = ScreenLockService();
     _wasAuthenticated = _authManager.isAuthenticated;
+    _activeAccountId = _authManager.accountManager.activeAccount?.id;
     _showStartupLockCover =
         _screenLockSettings.enabled && _wasAuthenticated;
     _screenLockCoordinator = ScreenLockCoordinator(
@@ -177,6 +179,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   void _onAuthChanged() {
     final authenticated = _authManager.isAuthenticated;
+    final accountId = _authManager.accountManager.activeAccount?.id;
+    final accountChanged = accountId != _activeAccountId;
+    _activeAccountId = accountId;
     final signedIn = authenticated && !_wasAuthenticated;
     _wasAuthenticated = authenticated;
 
@@ -184,15 +189,27 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       if (signedIn && _screenLockSettings.enabled) {
         _showStartupLockCover = true;
       }
-      _loadSnippets();
-      _loadAISettings();
-      _restoreSessions();
+      if (accountChanged) {
+        // Open sessions and loaded snippets belong to the previous instance.
+        // Drop the sessions locally so switching back can restore them from
+        // the old instance instead of closing them there.
+        _sessionManager.discardAll();
+        _snippetManager.clear();
+        _aiManager.clear();
+      }
+      if (signedIn || accountChanged) {
+        _loadSnippets();
+        _loadAISettings();
+        _restoreSessions();
+      }
     } else {
       _snippetManager.clear();
       _aiManager.clear();
       final token = _authManager.sessionToken;
       if (token != null) {
         _sessionManager.closeAll(token);
+      } else {
+        _sessionManager.discardAll();
       }
       _showStartupLockCover = false;
     }
