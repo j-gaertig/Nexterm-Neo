@@ -7,7 +7,6 @@ import 'screens/screen_lock_screen.dart';
 import 'services/screen_lock_service.dart';
 import 'services/session_manager.dart';
 import 'utils/screen_lock_coordinator.dart';
-import 'utils/navigation_bar_settings.dart';
 import 'utils/screen_lock_settings.dart';
 import 'utils/theme_manager.dart';
 import 'utils/auth_manager.dart';
@@ -28,7 +27,6 @@ void main() async {
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
-  final navigationBarSettings = await NavigationBarSettings.load();
   final screenLockSettings = await ScreenLockSettings.load();
 
   final accountManager = ServerAccountManager();
@@ -42,7 +40,6 @@ void main() async {
     terminalSettings: terminalSettings,
     sftpSettings: sftpSettings,
     serverViewSettings: serverViewSettings,
-    navigationBarSettings: navigationBarSettings,
     screenLockSettings: screenLockSettings,
   ));
 }
@@ -55,7 +52,6 @@ class MyApp extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
-  final NavigationBarSettings navigationBarSettings;
   final ScreenLockSettings screenLockSettings;
 
   const MyApp({
@@ -67,7 +63,6 @@ class MyApp extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
-    required this.navigationBarSettings,
     required this.screenLockSettings,
   });
 
@@ -84,7 +79,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late TerminalSettings _terminalSettings;
   late SftpSettings _sftpSettings;
   late ServerViewSettings _serverViewSettings;
-  late NavigationBarSettings _navigationBarSettings;
   late ScreenLockSettings _screenLockSettings;
   late ScreenLockService _screenLockService;
   late ScreenLockCoordinator _screenLockCoordinator;
@@ -108,7 +102,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _terminalSettings = widget.terminalSettings;
     _sftpSettings = widget.sftpSettings;
     _serverViewSettings = widget.serverViewSettings;
-    _navigationBarSettings = widget.navigationBarSettings;
     _screenLockSettings = widget.screenLockSettings;
     _screenLockService = ScreenLockService();
     _wasAuthenticated = _authManager.isAuthenticated;
@@ -178,7 +171,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _terminalSettings.dispose();
     _sftpSettings.dispose();
     _serverViewSettings.dispose();
-    _navigationBarSettings.dispose();
     _screenLockSettings.dispose();
     super.dispose();
   }
@@ -241,7 +233,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             terminalSettings: _terminalSettings,
             sftpSettings: _sftpSettings,
             serverViewSettings: _serverViewSettings,
-            navigationBarSettings: _navigationBarSettings,
             screenLockSettings: _screenLockSettings,
             screenLockService: _screenLockService,
           )
