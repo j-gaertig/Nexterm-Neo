@@ -32,14 +32,11 @@ class ServersScreen extends StatefulWidget {
   final SessionManager sessionManager;
   final ServerViewSettings serverViewSettings;
 
-  /// Opens the sessions overview without selecting a session.
-  final VoidCallback? onShowSessions;
-
   /// Opens the session that was just created from this screen.
   final ValueChanged<String>? onSessionOpened;
   final Future<List<dynamic>> Function(String token)? loadEntries;
 
-  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onShowSessions, this.onSessionOpened, this.loadEntries});
+  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSessionOpened, this.loadEntries});
 
   @override
   State<ServersScreen> createState() => _ServersScreenState();
@@ -375,7 +372,6 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Widget _buildHeader(ColorScheme cs, TextTheme tt) {
-    final sessions = widget.sessionManager.sessionCount;
     final total = _totalServers;
     final online = _onlineServers;
 
@@ -389,23 +385,6 @@ class _ServersScreenState extends State<ServersScreen> {
               Padding(padding: const EdgeInsets.only(top: 2),
                 child: Text('$online of $total online', style: tt.bodySmall?.copyWith(color: cs.outline))),
           ])),
-          if (sessions > 0)
-            ListenableBuilder(listenable: widget.sessionManager, builder: (_, __) {
-              final count = widget.sessionManager.sessionCount;
-              if (count == 0) return const SizedBox.shrink();
-              return GestureDetector(
-                onTap: () => widget.onShowSessions?.call(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(AppIcons.monitorMultiple, size: 16, color: cs.onPrimaryContainer),
-                    const SizedBox(width: 6),
-                    Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
-                  ]),
-                ),
-              );
-            }),
           if (widget.authManager.accountManager.accounts.isNotEmpty) ...[
             const SizedBox(width: 8),
             InstanceSwitcher(
