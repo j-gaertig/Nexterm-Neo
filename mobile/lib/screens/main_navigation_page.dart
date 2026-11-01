@@ -92,13 +92,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     });
   }
 
-  void _showSessionsOverview() {
-    setState(() {
-      _selectedIndex = 1;
-      _openSessionId = null;
-    });
-  }
-
   void _onSessionsChanged() {
     if (!mounted) return;
 
@@ -165,9 +158,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           snippetManager: widget.snippetManager,
           sessionManager: widget.sessionManager,
           serverViewSettings: widget.serverViewSettings,
-          onShowSessions: () {
-            if (_hasSessions) _showSessionsOverview();
-          },
           onSessionOpened: (sessionId) {
             if (_hasSessions) _openSession(sessionId);
           },
