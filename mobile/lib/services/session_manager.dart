@@ -684,6 +684,21 @@ class SessionManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Drops every local session without talking to the server.
+  ///
+  /// Used when the app switches to another Nexterm instance: the open sessions
+  /// belong to the previous instance and must not be shown again with the new
+  /// token. They remain on the old instance and are restored when the user
+  /// switches back.
+  void discardAll() {
+    for (final session in _sessions.values) {
+      _disconnectSession(session);
+    }
+    _sessions.clear();
+    _activeSessionId = null;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     for (final session in _sessions.values) {

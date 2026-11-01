@@ -133,6 +133,58 @@ void main() {
       tester.getSize(cards.at(1)).height,
     );
   });
+
+  testWidgets('shows the signed-in instance and reloads when switching', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    await _pumpWithAccounts(
+      tester,
+      entriesForToken: (token) async {
+        calls.add(token);
+        return [
+          _server(
+            id: token == 'token-home' ? 1 : 2,
+            name: token == 'token-home' ? 'home-server' : 'prod-server',
+            ip: token == 'token-home' ? '10.0.0.10' : '10.0.0.20',
+          ),
+        ];
+      },
+    );
+
+    expect(find.text('Home Lab'), findsOneWidget);
+    expect(find.text('home-server'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('instance-switcher')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Production'), findsOneWidget);
+    expect(find.text('Ben Operator'), findsOneWidget);
+
+    await tester.tap(find.text('Production'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Production'), findsOneWidget);
+    expect(find.text('prod-server'), findsOneWidget);
+    expect(find.text('home-server'), findsNothing);
+    expect(calls, contains('token-prod'));
+  });
+
+  testWidgets('instance switcher fits a narrow header', (tester) async {
+    await _pumpWithAccounts(
+      tester,
+      surfaceSize: const Size(320, 640),
+      entriesForToken: (_) async => [
+        _server(id: 1, name: 'home-server', ip: '10.0.0.10'),
+      ],
+    );
+
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('instance-switcher')));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.text('Production'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpGrid(
@@ -175,6 +227,72 @@ Future<void> _pumpGrid(
         sessionManager: sessionManager,
         serverViewSettings: viewSettings,
         loadEntries: (_) async => entries,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  addTearDown(() {
+    viewSettings.dispose();
+    themeManager.dispose();
+    authManager.dispose();
+    snippetManager.dispose();
+    sessionManager.dispose();
+  });
+}
+
+Future<void> _pumpWithAccounts(
+  WidgetTester tester, {
+  required Future<List<dynamic>> Function(String token) entriesForToken,
+  Size surfaceSize = const Size(390, 844),
+}) async {
+  SharedPreferences.setMockInitialValues({
+    'server_view_mode': ServerViewMode.grid.name,
+    'server_view_columns': 2,
+  });
+
+  final accountManager = ServerAccountManager();
+  await accountManager.load();
+  await accountManager.addAccount(
+    ServerAccount(
+      id: 'home',
+      label: 'Home Lab',
+      baseUrl: 'https://home.example.com/api',
+      token: 'token-home',
+      username: 'anna',
+      fullName: 'Anna Admin',
+    ),
+  );
+  await accountManager.addAccount(
+    ServerAccount(
+      id: 'prod',
+      label: 'Production',
+      baseUrl: 'https://prod.example.com/api',
+      token: 'token-prod',
+      username: 'ben',
+      fullName: 'Ben Operator',
+    ),
+  );
+  await accountManager.switchAccount('home');
+
+  final authManager = AuthManager(accountManager);
+  final snippetManager = SnippetManager();
+  final sessionManager = SessionManager();
+  final viewSettings = await ServerViewSettings.load();
+  final themeManager = ThemeManager(ThemeMode.dark, useDynamicColor: false);
+
+  await tester.binding.setSurfaceSize(surfaceSize);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: themeManager.darkTheme(),
+      home: ServersScreen(
+        authManager: authManager,
+        snippetManager: snippetManager,
+        sessionManager: sessionManager,
+        serverViewSettings: viewSettings,
+        loadEntries: entriesForToken,
       ),
     ),
   );

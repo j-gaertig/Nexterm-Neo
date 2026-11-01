@@ -17,10 +17,12 @@ import '../widgets/floating_navigation_bar.dart';
 import 'widgets/quick_connect_sheet.dart';
 import 'widgets/server_grid_card.dart';
 import 'widgets/connection_reason_dialog.dart';
+import 'widgets/instance_switcher.dart';
 import 'widgets/server_actions_sheet.dart';
 import 'widgets/server_protocol_sheet.dart';
 import 'widgets/script/run_script_sheet.dart';
 import '../services/server_editor_service.dart';
+import 'server_accounts_screen.dart';
 import 'server_editor_screen.dart';
 
 class ServersScreen extends StatefulWidget {
@@ -57,6 +59,8 @@ class _ServersScreenState extends State<ServersScreen> {
   final Set<int> _selectedTags = {};
   List<Tag> _allTags = [];
   late final ScriptManager _scriptManager;
+  String? _activeAccountId;
+  int _loadGeneration = 0;
 
   String _folderKey(ServerFolder folder) {
     final id = folder.id;
@@ -82,6 +86,8 @@ class _ServersScreenState extends State<ServersScreen> {
     super.initState();
     _hasText = _search.text.isNotEmpty;
     _search.addListener(_onSearch);
+    _activeAccountId = widget.authManager.accountManager.activeAccount?.id;
+    widget.authManager.addListener(_onAuthChanged);
     _scriptManager = ScriptManager();
     _initStateManager();
   }
@@ -89,10 +95,35 @@ class _ServersScreenState extends State<ServersScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    widget.authManager.removeListener(_onAuthChanged);
     _search.removeListener(_onSearch);
     _search.dispose();
     _scriptManager.dispose();
     super.dispose();
+  }
+
+  void _onAuthChanged() {
+    final accountId = widget.authManager.accountManager.activeAccount?.id;
+    if (accountId == _activeAccountId) return;
+    _activeAccountId = accountId;
+    _handleAccountSwitch();
+  }
+
+  void _handleAccountSwitch() {
+    _debounce?.cancel();
+    _search.clear();
+    if (!mounted) return;
+    setState(() {
+      folders = [];
+      filteredFolders = [];
+      _allTags = [];
+      _selectedTags.clear();
+      _query = '';
+      _hasText = false;
+      errorMessage = null;
+      isLoading = true;
+    });
+    _loadData();
   }
 
   void _onSearch() {
@@ -116,14 +147,15 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _loadData() async {
+    final generation = ++_loadGeneration;
     try {
       final token = widget.authManager.sessionToken;
       if (token == null) { if (mounted) setState(() { errorMessage = 'Not authenticated'; isLoading = false; }); return; }
       final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
+      if (!mounted || generation != _loadGeneration) return;
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
       _selectedTags.removeWhere((id) => !validTagIds.contains(id));
-      if (!mounted) return;
       setState(() {
         folders = data;
         _allTags = tags;
@@ -135,7 +167,9 @@ class _ServersScreenState extends State<ServersScreen> {
       });
       _pruneStaleFolderStates(data);
     } catch (e) {
-      if (mounted) setState(() { errorMessage = 'Failed to load servers: $e'; isLoading = false; });
+      if (mounted && generation == _loadGeneration) {
+        setState(() { errorMessage = 'Failed to load servers: $e'; isLoading = false; });
+      }
     }
   }
 
@@ -243,14 +277,15 @@ class _ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _refreshData() async {
+    final generation = ++_loadGeneration;
     try {
       final token = widget.authManager.sessionToken;
       if (token == null) return;
       final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
+      if (!mounted || generation != _loadGeneration) return;
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
       _selectedTags.removeWhere((id) => !validTagIds.contains(id));
-      if (!mounted) return;
       setState(() {
         folders = data;
         _allTags = tags;
@@ -261,7 +296,7 @@ class _ServersScreenState extends State<ServersScreen> {
       });
       _pruneStaleFolderStates(data);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to refresh: $e'), behavior: SnackBarBehavior.floating));
+      if (mounted && generation == _loadGeneration) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to refresh: $e'), behavior: SnackBarBehavior.floating));
     }
   }
 
@@ -370,6 +405,20 @@ class _ServersScreenState extends State<ServersScreen> {
                 ),
               );
             }),
+          if (widget.authManager.accountManager.accounts.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            InstanceSwitcher(
+              authManager: widget.authManager,
+              onManageInstances: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ServerAccountsScreen(
+                    authManager: widget.authManager,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ]),
         const SizedBox(height: 16),
         Focus(
