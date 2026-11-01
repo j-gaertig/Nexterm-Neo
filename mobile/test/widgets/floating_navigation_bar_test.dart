@@ -149,6 +149,46 @@ void main() {
     expect(find.text('3'), findsNothing);
   });
 
+  testWidgets('uses the T3 One UI dimensions and stays centred', (
+    tester,
+  ) async {
+    await _pumpBar(tester, selectedIndex: 0);
+
+    final surface = tester.getRect(
+      find.byKey(FloatingNavigationBar.surfaceKey),
+    );
+    final screenWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+
+    expect(surface.height, FloatingNavigationBar.barHeight);
+    expect(surface.width, 4 * FloatingNavigationBar.itemExtent);
+    expect(surface.center.dx, closeTo(screenWidth / 2, 0.5));
+
+    final indicator = tester.getRect(
+      find.byKey(FloatingNavigationBar.indicatorKey),
+    );
+    expect(indicator.height, FloatingNavigationBar.barHeight - 8);
+    expect(indicator.width, FloatingNavigationBar.itemExtent - 8);
+
+    final icon = tester.widget<Icon>(find.byIcon(AppIcons.dns));
+    expect(icon.size, FloatingNavigationBar.iconSize);
+  });
+
+  testWidgets('a third destination shrinks the bar instead of stretching it', (
+    tester,
+  ) async {
+    await _pumpBar(
+      tester,
+      selectedIndex: 0,
+      destinations: _destinations.take(3).toList(),
+    );
+
+    final surface = tester.getRect(
+      find.byKey(FloatingNavigationBar.surfaceKey),
+    );
+    expect(surface.width, 3 * FloatingNavigationBar.itemExtent);
+  });
+
   testWidgets('reduced motion jumps directly to the selection', (tester) async {
     await _pumpBar(tester, selectedIndex: 0, disableAnimations: true);
     await _pumpBar(tester, selectedIndex: 3, disableAnimations: true);

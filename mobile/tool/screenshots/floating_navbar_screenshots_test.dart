@@ -1,6 +1,6 @@
 // Renders the floating navigation bar in its light, dark, badge, attention,
-// drag, scrolled-content, and classic comparison states. Writes
-// full-resolution PNGs to docs/pr-assets/floating-navbar-v2.
+// drag, and scrolled-content states. Writes full-resolution PNGs to
+// docs/pr-assets/floating-navbar-v2.
 //
 // Run from the mobile/ directory:
 //   flutter test tool/screenshots/floating_navbar_screenshots_test.dart
@@ -28,7 +28,6 @@ import 'package:nexterm/services/screen_lock_service.dart';
 import 'package:nexterm/services/session_manager.dart';
 import 'package:nexterm/utils/app_icons.dart';
 import 'package:nexterm/utils/auth_manager.dart';
-import 'package:nexterm/utils/navigation_bar_settings.dart';
 import 'package:nexterm/utils/screen_lock_settings.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
 import 'package:nexterm/utils/server_view_settings.dart';
@@ -116,16 +115,6 @@ void main() {
     await _pumpSettingsPreview(tester, themeMode: ThemeMode.light);
     await _capture(tester, outputDir, '$prefix-light-settings');
 
-    await _pumpClassicPreview(tester);
-    await _capture(tester, outputDir, '$prefix-dark-classic');
-
-    await _pumpSettingsPreview(
-      tester,
-      themeMode: ThemeMode.dark,
-      scrollToAppearance: true,
-    );
-    await _capture(tester, outputDir, '$prefix-appearance-toggle');
-
     debugDisableShadows = true;
   });
 }
@@ -159,7 +148,6 @@ Future<void> _pumpServersPreview(
   required ThemeMode themeMode,
   int selectedIndex = 0,
   List<FloatingNavigationDestination>? destinations,
-  bool classic = false,
   double scrollBy = 0,
 }) async {
   // ignore: invalid_use_of_visible_for_testing_member
@@ -199,49 +187,27 @@ Future<void> _pumpServersPreview(
         theme: themeMode == ThemeMode.light
             ? themeManager.lightTheme()
             : themeManager.darkTheme(),
-        home: classic
-            ? Scaffold(
-                body: serversScreen,
-                bottomNavigationBar: NavigationBar(
+        home: Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              FloatingNavigationBarInset(
+                bottom: FloatingNavigationBar.contentInset,
+                child: serversScreen,
+              ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: FloatingNavigationBar(
                   selectedIndex: selectedIndex,
                   onDestinationSelected: (_) {},
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(AppIcons.dns),
-                      label: 'Servers',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(AppIcons.chartBoxOutline),
-                      label: 'Monitoring',
-                    ),
-                    NavigationDestination(
-                      icon: Icon(AppIcons.cog),
-                      label: 'Settings',
-                    ),
-                  ],
-                ),
-              )
-            : Scaffold(
-                body: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    FloatingNavigationBarInset(
-                      bottom: FloatingNavigationBar.contentInset,
-                      child: serversScreen,
-                    ),
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: FloatingNavigationBar(
-                        selectedIndex: selectedIndex,
-                        onDestinationSelected: (_) {},
-                        destinations: destinations ?? _destinations(),
-                      ),
-                    ),
-                  ],
+                  destinations: destinations ?? _destinations(),
                 ),
               ),
+            ],
+          ),
+        ),
       ),
     ),
   );
@@ -284,14 +250,9 @@ Future<TestGesture> _dragBar(
   return gesture;
 }
 
-Future<void> _pumpClassicPreview(WidgetTester tester) async {
-  await _pumpServersPreview(tester, themeMode: ThemeMode.dark, classic: true);
-}
-
 Future<void> _pumpSettingsPreview(
   WidgetTester tester, {
   required ThemeMode themeMode,
-  bool scrollToAppearance = false,
 }) async {
   // ignore: invalid_use_of_visible_for_testing_member
   SharedPreferences.setMockInitialValues({});
@@ -315,7 +276,6 @@ Future<void> _pumpSettingsPreview(
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final viewSettings = await ServerViewSettings.load();
-  final navigationBarSettings = await NavigationBarSettings.load();
   final screenLockSettings = await ScreenLockSettings.load();
   final screenLockService = ScreenLockService();
 
@@ -339,7 +299,6 @@ Future<void> _pumpSettingsPreview(
                   terminalSettings: terminalSettings,
                   sftpSettings: sftpSettings,
                   serverViewSettings: viewSettings,
-                  navigationBarSettings: navigationBarSettings,
                   screenLockSettings: screenLockSettings,
                   screenLockService: screenLockService,
                 ),
@@ -362,21 +321,12 @@ Future<void> _pumpSettingsPreview(
   );
   await tester.pumpAndSettle();
 
-  if (scrollToAppearance) {
-    await Scrollable.ensureVisible(
-      tester.element(find.text('Floating Navigation Bar')),
-      alignment: 0.38,
-    );
-    await tester.pumpAndSettle();
-  }
-
   addTearDown(() {
     viewSettings.dispose();
     themeManager.dispose();
     authManager.dispose();
     terminalSettings.dispose();
     sftpSettings.dispose();
-    navigationBarSettings.dispose();
     screenLockSettings.dispose();
   });
 }

@@ -8,7 +8,6 @@ import 'package:nexterm/services/screen_lock_service.dart';
 import 'package:nexterm/services/session_manager.dart';
 import 'package:nexterm/utils/ai_manager.dart';
 import 'package:nexterm/utils/auth_manager.dart';
-import 'package:nexterm/utils/navigation_bar_settings.dart';
 import 'package:nexterm/utils/screen_lock_settings.dart';
 import 'package:nexterm/utils/server_account_manager.dart';
 import 'package:nexterm/utils/server_view_settings.dart';
@@ -87,40 +86,6 @@ void main() {
       find.byType(FloatingNavigationBar),
     );
     expect(navigationBar.selectedIndex, 2);
-  });
-
-  testWidgets('switches between the floating and classic navigation bars', (
-    tester,
-  ) async {
-    final harness = await _pumpMainNavigation(tester);
-
-    expect(harness.navigationBarSettings.useFloating, isTrue);
-    expect(find.byType(FloatingNavigationBar), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
-    expect(
-      find.byKey(const ValueKey('floating-navigation-overlay')),
-      findsOneWidget,
-    );
-
-    await harness.navigationBarSettings.setUseFloating(false);
-    await tester.pump();
-
-    expect(find.byType(FloatingNavigationBar), findsNothing);
-    expect(find.byType(NavigationBar), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('floating-navigation-overlay')),
-      findsNothing,
-    );
-    expect(
-      tester.widget<Scaffold>(find.byType(Scaffold).first).bottomNavigationBar,
-      isNotNull,
-    );
-
-    await harness.navigationBarSettings.setUseFloating(true);
-    await tester.pump();
-
-    expect(find.byType(FloatingNavigationBar), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('floating bar shows session badges and attention state', (
@@ -272,7 +237,6 @@ Future<_MainNavigationHarness> _pumpMainNavigation(
   final terminalSettings = await TerminalSettings.load();
   final sftpSettings = await SftpSettings.load();
   final serverViewSettings = await ServerViewSettings.load();
-  final navigationBarSettings = await NavigationBarSettings.load();
   final screenLockSettings = await ScreenLockSettings.load();
   final screenLockService = ScreenLockService();
 
@@ -288,7 +252,6 @@ Future<_MainNavigationHarness> _pumpMainNavigation(
         terminalSettings: terminalSettings,
         sftpSettings: sftpSettings,
         serverViewSettings: serverViewSettings,
-        navigationBarSettings: navigationBarSettings,
         screenLockSettings: screenLockSettings,
         screenLockService: screenLockService,
       ),
@@ -303,21 +266,13 @@ Future<_MainNavigationHarness> _pumpMainNavigation(
     snippetManager.dispose();
     aiManager.dispose();
     sessionManager.dispose();
-    navigationBarSettings.dispose();
   });
 
-  return _MainNavigationHarness(
-    sessionManager: sessionManager,
-    navigationBarSettings: navigationBarSettings,
-  );
+  return _MainNavigationHarness(sessionManager: sessionManager);
 }
 
 class _MainNavigationHarness {
   final SessionManager sessionManager;
-  final NavigationBarSettings navigationBarSettings;
 
-  const _MainNavigationHarness({
-    required this.sessionManager,
-    required this.navigationBarSettings,
-  });
+  const _MainNavigationHarness({required this.sessionManager});
 }

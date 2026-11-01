@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/app_icons.dart';
-import 'package:native_glass_navbar/native_glass_navbar.dart';
 import '../services/screen_lock_service.dart';
 import '../services/session_manager.dart';
 import '../utils/theme_manager.dart';
@@ -13,7 +10,6 @@ import '../utils/ai_manager.dart';
 import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
-import '../utils/navigation_bar_settings.dart';
 import '../utils/server_view_settings.dart';
 import '../widgets/floating_navigation_bar.dart';
 import '../widgets/tab_crossfade.dart';
@@ -31,7 +27,6 @@ class MainNavigationPage extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
-  final NavigationBarSettings navigationBarSettings;
   final ScreenLockSettings screenLockSettings;
   final ScreenLockService screenLockService;
 
@@ -45,7 +40,6 @@ class MainNavigationPage extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
-    required this.navigationBarSettings,
     required this.screenLockSettings,
     required this.screenLockService,
   });
@@ -65,20 +59,12 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     super.initState();
     _hadSessions = widget.sessionManager.hasActiveSessions;
     widget.sessionManager.addListener(_onSessionsChanged);
-    widget.navigationBarSettings.addListener(_onNavigationBarSettingsChanged);
   }
 
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
-    widget.navigationBarSettings.removeListener(
-      _onNavigationBarSettingsChanged,
-    );
     super.dispose();
-  }
-
-  void _onNavigationBarSettingsChanged() {
-    if (mounted) setState(() {});
   }
 
   void _switchTab(int index) {
@@ -128,7 +114,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   Widget build(BuildContext context) {
     final hasSessions = _hasSessions;
-    final useFloatingBar = widget.navigationBarSettings.useFloating;
     final isOnSessionsTab = hasSessions && _selectedIndex == 1;
     final attentionSession = _attentionSession;
     final activeSessionId = widget.sessionManager.activeSessionId;
@@ -180,7 +165,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           terminalSettings: widget.terminalSettings,
           sftpSettings: widget.sftpSettings,
           serverViewSettings: widget.serverViewSettings,
-          navigationBarSettings: widget.navigationBarSettings,
           screenLockSettings: widget.screenLockSettings,
           screenLockService: widget.screenLockService,
         ),
@@ -190,10 +174,13 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     if (_selectedIndex >= pages.length) _selectedIndex = 0;
 
     final monitoringIndex = hasSessions ? 2 : 1;
-    final showFloatingBar = useFloatingBar && !isOnSessionsTab;
+    // Like T3 Code, the One UI bar disappears while the keyboard is open and
+    // while a fullscreen session is on screen.
+    final showNavigationBar =
+        !isOnSessionsTab && MediaQuery.viewInsetsOf(context).bottom == 0;
 
     final theme = Theme.of(context);
-    final pageTheme = showFloatingBar
+    final pageTheme = showNavigationBar
         ? theme.copyWith(
             snackBarTheme: theme.snackBarTheme.copyWith(
               behavior: SnackBarBehavior.floating,
@@ -265,7 +252,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                   ),
                 Expanded(
                   child: FloatingNavigationBarInset(
-                    bottom: showFloatingBar
+                    bottom: showNavigationBar
                         ? FloatingNavigationBar.contentInset
                         : 0,
                     child: Theme(
@@ -294,52 +281,21 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 ),
               ],
             ),
-            if (showFloatingBar)
+            if (showNavigationBar)
               Positioned(
                 key: const ValueKey('floating-navigation-overlay'),
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _buildFloatingNavigationBar(hasSessions),
+                child: _buildNavigationBar(hasSessions),
               ),
           ],
         ),
-        bottomNavigationBar: isOnSessionsTab || useFloatingBar
-            ? null
-            : _buildClassicNavigationBar(context, hasSessions),
       ),
     );
   }
 
-  Widget _buildClassicNavigationBar(BuildContext context, bool hasSessions) {
-    final materialNavigationBar = _buildMaterialNavigationBar(hasSessions);
-
-    if (!Platform.isIOS) {
-      return materialNavigationBar;
-    }
-
-    final sessionCount = widget.sessionManager.sessionCount;
-    final waitingCount = widget.sessionManager.waitingInputCount;
-    return NativeGlassNavBar(
-      currentIndex: _selectedIndex,
-      onTap: (index) => _switchTab(index),
-      tintColor: Theme.of(context).colorScheme.primary,
-      fallback: materialNavigationBar,
-      tabs: [
-        const NativeGlassNavBarItem(label: 'Servers', symbol: 'network'),
-        if (hasSessions)
-          NativeGlassNavBarItem(
-            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
-            symbol: 'display',
-            badgeValue: waitingCount > 0 ? '!' : '$sessionCount',
-          ),
-        const NativeGlassNavBarItem(label: 'Monitoring', symbol: 'chart.bar'),
-        const NativeGlassNavBarItem(label: 'Settings', symbol: 'gear'),
-      ],
-    );
-  }
-
-  Widget _buildFloatingNavigationBar(bool hasSessions) {
+  Widget _buildNavigationBar(bool hasSessions) {
     final sessionCount = widget.sessionManager.sessionCount;
     final waitingCount = widget.sessionManager.waitingInputCount;
     return FloatingNavigationBar(
@@ -363,48 +319,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         ),
         const FloatingNavigationDestination(
           icon: AppIcons.cog,
-          label: 'Settings',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMaterialNavigationBar(bool hasSessions) {
-    final sessionCount = widget.sessionManager.sessionCount;
-    final waitingCount = widget.sessionManager.waitingInputCount;
-    final cs = Theme.of(context).colorScheme;
-    final badgeColor = waitingCount > 0 ? cs.error : null;
-    return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: (index) => _switchTab(index),
-      destinations: [
-        NavigationDestination(
-          icon: Icon(AppIcons.dns),
-          selectedIcon: Icon(AppIcons.dns),
-          label: 'Servers',
-        ),
-        if (hasSessions)
-          NavigationDestination(
-            icon: Badge(
-              label: Text(waitingCount > 0 ? '!' : '$sessionCount'),
-              backgroundColor: badgeColor,
-              child: Icon(AppIcons.monitorMultiple),
-            ),
-            selectedIcon: Badge(
-              label: Text(waitingCount > 0 ? '!' : '$sessionCount'),
-              backgroundColor: badgeColor,
-              child: Icon(AppIcons.monitorMultiple),
-            ),
-            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
-          ),
-        NavigationDestination(
-          icon: Icon(AppIcons.chartBoxOutline),
-          selectedIcon: Icon(AppIcons.chartBox),
-          label: 'Monitoring',
-        ),
-        NavigationDestination(
-          icon: Icon(AppIcons.cogOutline),
-          selectedIcon: Icon(AppIcons.cog),
           label: 'Settings',
         ),
       ],

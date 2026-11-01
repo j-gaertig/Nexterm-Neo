@@ -6,7 +6,6 @@ import '../utils/app_icons.dart';
 import '../utils/theme_manager.dart';
 import '../utils/auth_manager.dart';
 import '../utils/password_prompt_localizations.dart';
-import '../utils/navigation_bar_settings.dart';
 import '../utils/screen_lock_settings.dart';
 import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
@@ -75,7 +74,6 @@ class SettingsScreen extends StatefulWidget {
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
-  final NavigationBarSettings navigationBarSettings;
   final ScreenLockSettings screenLockSettings;
   final ScreenLockService screenLockService;
 
@@ -86,7 +84,6 @@ class SettingsScreen extends StatefulWidget {
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
-    required this.navigationBarSettings,
     required this.screenLockSettings,
     required this.screenLockService,
   });
@@ -447,25 +444,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     );
                   },
-                ),
-                _divider(cs),
-                ListenableBuilder(
-                  listenable: widget.navigationBarSettings,
-                  builder: (_, __) => SwitchListTile(
-                    contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                    secondary: _iconBox(AppIcons.dock, cs),
-                    title: const Text(
-                      'Floating Navigation Bar',
-                      style: TextStyle(fontSize: 15),
-                    ),
-                    subtitle: Text(
-                      'Floating, draggable bar over content',
-                      style: TextStyle(fontSize: 12, color: cs.outline),
-                    ),
-                    value: widget.navigationBarSettings.useFloating,
-                    onChanged: (value) =>
-                        widget.navigationBarSettings.setUseFloating(value),
-                  ),
                 ),
                 _divider(cs),
                 ListenableBuilder(
