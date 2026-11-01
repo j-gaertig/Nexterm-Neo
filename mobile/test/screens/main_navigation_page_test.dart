@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kterm/kterm.dart';
 import 'package:nexterm/models/script_runtime.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/screens/main_navigation_page.dart';
@@ -216,6 +217,41 @@ void main() {
 
     expect(find.byType(FloatingNavigationBar), findsOneWidget);
     expect(harness.sessionManager.sessionCount, 1);
+  });
+
+  testWidgets('keyboard inset is applied once on the sessions tab', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+
+    await _pumpMainNavigation(
+      tester,
+      session: AppSession(
+        sessionId: 'terminal-session',
+        server: const Server(name: 'Shell', ip: '127.0.0.1'),
+        type: ConnectionType.terminal,
+        terminal: Terminal(maxLines: 100),
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Sessions'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final terminal = find.byType(TerminalView);
+    expect(tester.getRect(terminal).height, 800);
+
+    // A tall One UI keyboard (380 logical px) must shrink the page exactly
+    // once. The sessions page has its own Scaffold below the navigation
+    // Scaffold, so a re-applied MediaQuery used to subtract the keyboard
+    // height twice and collapse the terminal to a single line.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 1140);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(tester.getRect(terminal).height, 420);
   });
 }
 
