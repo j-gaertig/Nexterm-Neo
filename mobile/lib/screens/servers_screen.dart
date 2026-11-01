@@ -39,10 +39,10 @@ class ServersScreen extends StatefulWidget {
   const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSessionOpened, this.loadEntries});
 
   @override
-  State<ServersScreen> createState() => _ServersScreenState();
+  State<ServersScreen> createState() => ServersScreenState();
 }
 
-class _ServersScreenState extends State<ServersScreen> {
+class ServersScreenState extends State<ServersScreen> {
   List<dynamic> folders = [];
   List<dynamic> filteredFolders = [];
   bool isLoading = true;
@@ -345,7 +345,6 @@ class _ServersScreenState extends State<ServersScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
-    final navInset = FloatingNavigationBarInset.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -360,13 +359,6 @@ class _ServersScreenState extends State<ServersScreen> {
             ),
           ),
         ]),
-      ),
-      floatingActionButton: Padding(
-        padding: EdgeInsets.only(bottom: navInset),
-        child: FloatingActionButton(
-          onPressed: _createServer,
-          child: Icon(AppIcons.plus),
-        ),
       ),
     );
   }
@@ -1141,7 +1133,9 @@ class _ServersScreenState extends State<ServersScreen> {
     return search(folders);
   }
 
-  Future<void> _createServer() async {
+  /// Opens the protocol picker and the server editor. Used by the add action
+  /// next to the floating navigation bar.
+  Future<void> createServer() async {
     final token = widget.authManager.sessionToken;
     if (token == null) return;
     final protocol = await showServerProtocolSheet(context);

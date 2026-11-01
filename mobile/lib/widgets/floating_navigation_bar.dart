@@ -54,11 +54,15 @@ class FloatingNavigationBarInset extends InheritedWidget {
 /// behind it. It deliberately shows icons only; the labels are exposed to
 /// accessibility services and long-press tooltips.
 ///
-/// The bar uses a fixed slot width per destination and stays centred instead
-/// of stretching across the whole screen. Its active destination is marked by a
-/// compact capsule that slides between slots. Dragging anywhere on the bar
-/// moves the capsule with the finger; releasing it selects the nearest
-/// destination.
+/// The bar uses a fixed slot width per destination and stays left-aligned
+/// instead of stretching or centring across the whole screen. Its active
+/// destination is marked by a compact capsule that slides between slots.
+/// Dragging anywhere on the bar moves the capsule with the finger; releasing it
+/// selects the nearest destination.
+///
+/// A [trailing] action can be placed next to the bar. It is rendered at the
+/// same height as the bar on the right edge of the screen, with the bar
+/// shrinking its slots on narrow screens so both always fit.
 class FloatingNavigationBar extends StatefulWidget {
   /// Height of the visible bar surface, matching the T3 Code One UI bar.
   static const double barHeight = 56;
@@ -66,9 +70,15 @@ class FloatingNavigationBar extends StatefulWidget {
   static const double bottomMargin = 6;
 
   /// Width of one destination slot. The visible bar is `count * itemExtent`
-  /// wide, capped to the available width, and centred horizontally.
+  /// wide, capped to the available width, and left-aligned.
   static const double itemExtent = 72;
   static const double iconSize = 24;
+
+  /// Diameter of an optional [trailing] action, matching the bar height.
+  static const double actionSize = barHeight;
+
+  /// Minimum gap between the bar and a [trailing] action.
+  static const double actionGap = 10;
 
   /// Inset between a slot and the selection capsule, matching T3's 4dp tab
   /// padding. It keeps the capsule visually clear of the bar's rounded ends.
@@ -88,11 +98,15 @@ class FloatingNavigationBar extends StatefulWidget {
   final ValueChanged<int> onDestinationSelected;
   final List<FloatingNavigationDestination> destinations;
 
+  /// Optional action shown to the right of the bar at the same height.
+  final Widget? trailing;
+
   const FloatingNavigationBar({
     super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.destinations,
+    this.trailing,
   });
 
   @override
@@ -239,9 +253,16 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
 
     return LayoutBuilder(
       builder: (context, constraints) {
+        final trailing = widget.trailing;
+        final trailingSpace = trailing == null
+            ? 0.0
+            : FloatingNavigationBar.actionSize +
+                  FloatingNavigationBar.actionGap;
         final availableWidth = math.max(
           0.0,
-          constraints.maxWidth - 2 * FloatingNavigationBar.edgeMargin,
+          constraints.maxWidth -
+              2 * FloatingNavigationBar.edgeMargin -
+              trailingSpace,
         );
         final barWidth = math.min(
           count * FloatingNavigationBar.itemExtent,
@@ -255,18 +276,26 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
             FloatingNavigationBar.edgeMargin,
             bottomInset + FloatingNavigationBar.bottomMargin,
           ),
-          child: Center(
-            heightFactor: 1,
-            child: SizedBox(
-              width: barWidth,
-              height: FloatingNavigationBar.barHeight,
-              child: _buildSurface(
-                context,
-                cs: cs,
-                isDark: isDark,
-                count: count,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SizedBox(
+                width: barWidth,
+                height: FloatingNavigationBar.barHeight,
+                child: _buildSurface(
+                  context,
+                  cs: cs,
+                  isDark: isDark,
+                  count: count,
+                ),
               ),
-            ),
+              if (trailing != null)
+                SizedBox(
+                  width: FloatingNavigationBar.actionSize,
+                  height: FloatingNavigationBar.actionSize,
+                  child: trailing,
+                ),
+            ],
           ),
         );
       },
@@ -377,6 +406,72 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A compact action button that can be passed as [FloatingNavigationBar.trailing].
+///
+/// It keeps the look of the previous floating action button: a 56dp rounded
+/// square with the theme's contrast colour and elevation, only moved down next
+/// to the bar.
+class FloatingNavigationAction extends StatelessWidget {
+  static const double radius = 16;
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  /// Uses the theme's soft error container so the action still reads as
+  /// destructive without the intensity of a solid error surface.
+  final bool destructive;
+
+  const FloatingNavigationAction({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.onPressed,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final background = destructive ? cs.errorContainer : cs.primaryContainer;
+    final foreground = destructive
+        ? cs.onErrorContainer
+        : cs.onPrimaryContainer;
+
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: onPressed != null,
+      label: tooltip,
+      onTap: onPressed,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: tooltip,
+        excludeFromSemantics: true,
+        waitDuration: const Duration(milliseconds: 500),
+        child: Material(
+          color: background,
+          elevation: 6,
+          borderRadius: BorderRadius.circular(radius),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            splashColor: foreground.withValues(alpha: 0.10),
+            highlightColor: foreground.withValues(alpha: 0.06),
+            child: Center(
+              child: Icon(
+                icon,
+                size: FloatingNavigationBar.iconSize,
+                color: foreground,
+              ),
+            ),
           ),
         ),
       ),

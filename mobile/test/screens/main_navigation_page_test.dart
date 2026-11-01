@@ -90,6 +90,129 @@ void main() {
     expect(navigationBar.selectedIndex, 2);
   });
 
+  testWidgets('shows the add action next to the bar only on the servers tab', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(tester);
+
+    final addAction = find.byTooltip('Add server');
+    expect(addAction, findsOneWidget);
+
+    final surface = tester.getRect(
+      find.byKey(FloatingNavigationBar.surfaceKey),
+    );
+    final action = tester.getRect(addAction);
+    expect(action.top, closeTo(surface.top, 0.5));
+    expect(action.height, surface.height);
+    expect(action.left, greaterThan(surface.right));
+    expect(find.byTooltip('Close all sessions'), findsNothing);
+
+    await tester.tap(find.byTooltip('Monitoring'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Add server'), findsNothing);
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Add server'), findsNothing);
+
+    await tester.tap(find.byTooltip('Servers'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byTooltip('Add server'), findsOneWidget);
+  });
+
+  testWidgets(
+    'shows the close-all action next to the bar on the sessions tab',
+    (tester) async {
+      await _pumpMainNavigation(
+        tester,
+        session: AppSession(
+          sessionId: 'sftp-session',
+          server: const Server(name: 'Files', ip: '127.0.0.1'),
+          type: ConnectionType.sftp,
+        ),
+      );
+
+      expect(find.byTooltip('Close all sessions'), findsNothing);
+
+      await tester.tap(find.byTooltip('Sessions'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final closeAll = find.byTooltip('Close all sessions');
+      expect(closeAll, findsOneWidget);
+      expect(find.byTooltip('Add server'), findsNothing);
+
+      // The close-all action uses the soft error container like the previous
+      // header button, so it stays clearly destructive without a harsh red.
+      final closeAllMaterial = tester.widget<Material>(
+        find.descendant(of: closeAll, matching: find.byType(Material)),
+      );
+      expect(
+        closeAllMaterial.color,
+        Theme.of(tester.element(closeAll)).colorScheme.errorContainer,
+      );
+
+      final surface = tester.getRect(
+        find.byKey(FloatingNavigationBar.surfaceKey),
+      );
+      final action = tester.getRect(closeAll);
+      expect(action.top, closeTo(surface.top, 0.5));
+      expect(action.left, greaterThan(surface.right));
+    },
+  );
+
+  testWidgets('swipes between top-level pages and stops at the edges', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(tester);
+
+    // Servers is the first page, so swiping right must keep it in place.
+    await _swipeMainPage(tester, 300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 0);
+
+    // Without sessions, swiping left moves from Servers to Monitoring.
+    await _swipeMainPage(tester, -300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 1);
+
+    // Monitoring is in the middle and moves in both directions.
+    await _swipeMainPage(tester, -300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 2);
+
+    // Settings is the last page, so swiping left must keep it in place.
+    await _swipeMainPage(tester, -300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 2);
+
+    await _swipeMainPage(tester, 300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 1);
+  });
+
+  testWidgets('swipes through the sessions destination in both directions', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(
+      tester,
+      session: AppSession(
+        sessionId: 'sftp-session',
+        server: const Server(name: 'Files', ip: '127.0.0.1'),
+        type: ConnectionType.sftp,
+      ),
+    );
+
+    await _swipeMainPage(tester, -300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 1);
+
+    await _swipeMainPage(tester, -300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 2);
+
+    await _swipeMainPage(tester, 300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 1);
+
+    await _swipeMainPage(tester, 300);
+    expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 0);
+  });
   testWidgets('floating bar shows session badges and attention state', (
     tester,
   ) async {
@@ -184,9 +307,7 @@ void main() {
     await tester.tap(find.byTooltip('Sessions'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(
-      find.byKey(const ValueKey('session-card-sftp-session')),
-    );
+    await tester.tap(find.byKey(const ValueKey('session-card-sftp-session')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -274,6 +395,18 @@ void main() {
 
     expect(tester.getRect(terminal).height, 420);
   });
+}
+
+Future<void> _swipeMainPage(WidgetTester tester, double dx) async {
+  final center = tester.getCenter(find.byType(TabCrossfade));
+  final gesture = await tester.startGesture(center);
+  for (var i = 0; i < 4; i++) {
+    await gesture.moveBy(Offset(dx / 4, 0));
+    await tester.pump();
+  }
+  await gesture.up();
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 300));
 }
 
 Future<_MainNavigationHarness> _pumpMainNavigation(

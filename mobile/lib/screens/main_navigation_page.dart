@@ -55,6 +55,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
+  final _serversKey = GlobalKey<ServersScreenState>();
 
   @override
   void initState() {
@@ -154,6 +155,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       KeyedSubtree(
         key: const ValueKey('tab-page-servers'),
         child: ServersScreen(
+          key: _serversKey,
           authManager: widget.authManager,
           snippetManager: widget.snippetManager,
           sessionManager: widget.sessionManager,
@@ -299,17 +301,24 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                       // Scaffolds subtract the keyboard height a second time.
                       child: Builder(
                         builder: (context) {
-                          final stack = TabCrossfade(
+                          Widget stack = TabCrossfade(
                             index: _selectedIndex,
+                            // Swiping works between the top-level pages, but
+                            // not while a fullscreen session or the keyboard is
+                            // open. The edge destinations only move inwards.
+                            swipeEnabled: showNavigationBar && !isInSession,
+                            onSwipeIndexChanged: _switchTab,
                             children: pages,
                           );
-                          if (!showAttentionBanner) return stack;
-                          return MediaQuery(
-                            data: MediaQuery.of(
-                              context,
-                            ).removePadding(removeTop: true),
-                            child: stack,
-                          );
+                          if (showAttentionBanner) {
+                            stack = MediaQuery(
+                              data: MediaQuery.of(
+                                context,
+                              ).removePadding(removeTop: true),
+                              child: stack,
+                            );
+                          }
+                          return stack;
                         },
                       ),
                     ),
@@ -337,6 +346,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     return FloatingNavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _switchTab,
+      trailing: _buildNavigationAction(),
       destinations: [
         const FloatingNavigationDestination(
           icon: AppIcons.dns,
@@ -359,6 +369,31 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         ),
       ],
     );
+  }
+
+  /// Page-specific action shown to the right of the navigation bar.
+  ///
+  /// Servers adds a server, the sessions overview closes all sessions, and the
+  /// other destinations have no action of their own.
+  Widget? _buildNavigationAction() {
+    if (_selectedIndex == 0) {
+      return FloatingNavigationAction(
+        icon: AppIcons.plus,
+        tooltip: 'Add server',
+        onPressed: () => _serversKey.currentState?.createServer(),
+      );
+    }
+
+    if (_hasSessions && _selectedIndex == 1 && _openSessionId == null) {
+      return FloatingNavigationAction(
+        icon: AppIcons.close,
+        tooltip: 'Close all sessions',
+        destructive: true,
+        onPressed: () => _sessionsKey.currentState?.closeAllSessions(),
+      );
+    }
+
+    return null;
   }
 }
 
