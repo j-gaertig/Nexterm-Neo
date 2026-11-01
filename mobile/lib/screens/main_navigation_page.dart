@@ -51,8 +51,10 @@ class MainNavigationPage extends StatefulWidget {
 class _MainNavigationPageState extends State<MainNavigationPage> {
   int _selectedIndex = 0;
   bool _hadSessions = false;
+  String? _openSessionId;
   final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
+  final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
 
   @override
   void initState() {
@@ -68,12 +70,42 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   }
 
   void _switchTab(int index) {
-    if (index == _selectedIndex) return;
-    setState(() => _selectedIndex = index);
+    if (index == _selectedIndex) {
+      // Pressing the Sessions destination again always returns to the
+      // overview instead of re-opening the last session.
+      if (index == 1 && _openSessionId != null) {
+        setState(() => _openSessionId = null);
+      }
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+      _openSessionId = null;
+    });
+  }
+
+  void _openSession(String sessionId) {
+    widget.sessionManager.setActive(sessionId);
+    setState(() {
+      _selectedIndex = 1;
+      _openSessionId = sessionId;
+    });
+  }
+
+  void _showSessionsOverview() {
+    setState(() {
+      _selectedIndex = 1;
+      _openSessionId = null;
+    });
   }
 
   void _onSessionsChanged() {
     if (!mounted) return;
+
+    if (_openSessionId != null &&
+        widget.sessionManager.getSession(_openSessionId!) == null) {
+      _openSessionId = null;
+    }
 
     _dismissedAttentionSessionIds.removeWhere(
       (id) =>
@@ -81,6 +113,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     );
 
     final hasSessions = widget.sessionManager.hasActiveSessions;
+    if (!hasSessions) _openSessionId = null;
     if (_hadSessions && !hasSessions) {
       // The Sessions destination disappeared. Keep the user on the same
       // logical tab instead of silently jumping to a different one.
@@ -115,11 +148,12 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   Widget build(BuildContext context) {
     final hasSessions = _hasSessions;
     final isOnSessionsTab = hasSessions && _selectedIndex == 1;
+    final isInSession = isOnSessionsTab && _openSessionId != null;
     final attentionSession = _attentionSession;
     final activeSessionId = widget.sessionManager.activeSessionId;
     final showAttentionBanner =
         attentionSession != null &&
-        !(isOnSessionsTab && activeSessionId == attentionSession.sessionId);
+        !(isInSession && activeSessionId == attentionSession.sessionId);
 
     // Stable page keys let TabCrossfade keep each page's state attached to the
     // page itself when the Sessions destination is inserted or removed.
@@ -131,8 +165,11 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           snippetManager: widget.snippetManager,
           sessionManager: widget.sessionManager,
           serverViewSettings: widget.serverViewSettings,
-          onSwitchToSessions: () {
-            if (_hasSessions) _switchTab(1);
+          onShowSessions: () {
+            if (_hasSessions) _showSessionsOverview();
+          },
+          onSessionOpened: (sessionId) {
+            if (_hasSessions) _openSession(sessionId);
           },
         ),
       ),
@@ -140,13 +177,17 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         KeyedSubtree(
           key: const ValueKey('tab-page-sessions'),
           child: ActiveSessionsScreen(
+            key: _sessionsKey,
             sessionManager: widget.sessionManager,
             authManager: widget.authManager,
             snippetManager: widget.snippetManager,
             aiManager: widget.aiManager,
             terminalSettings: widget.terminalSettings,
             sftpSettings: widget.sftpSettings,
-            onExitFullscreen: () => _switchTab(0),
+            openSessionId: _openSessionId,
+            onOpenSessionChanged: (sessionId) {
+              setState(() => _openSessionId = sessionId);
+            },
             isVisible: isOnSessionsTab,
           ),
         ),
@@ -175,9 +216,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
 
     final monitoringIndex = hasSessions ? 2 : 1;
     // Like T3 Code, the One UI bar disappears while the keyboard is open and
-    // while a fullscreen session is on screen.
+    // while a fullscreen session is on screen. The overview keeps the bar so
+    // it behaves like every other top-level page.
     final showNavigationBar =
-        !isOnSessionsTab && MediaQuery.viewInsetsOf(context).bottom == 0;
+        !isInSession && MediaQuery.viewInsetsOf(context).bottom == 0;
 
     final theme = Theme.of(context);
     final pageTheme = showNavigationBar
@@ -199,12 +241,19 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
 
-        if (isOnSessionsTab) {
+        if (isInSession) {
           // Let the visible renderer handle in-session navigation (for example
-          // the SFTP directory history) before leaving the sessions view.
-          final handled =
-              widget.sessionManager.activeSession?.handleBack?.call() ?? false;
+          // the SFTP directory history) before returning to the overview.
+          final session = _openSessionId == null
+              ? null
+              : widget.sessionManager.getSession(_openSessionId!);
+          final handled = session?.handleBack?.call() ?? false;
           if (handled) return;
+          _sessionsKey.currentState?.showOverview();
+          return;
+        }
+
+        if (isOnSessionsTab) {
           _switchTab(0);
           return;
         }
@@ -237,10 +286,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                           attentionSession.sessionId,
                         ),
                       );
-                      widget.sessionManager.setActive(
-                        attentionSession.sessionId,
-                      );
-                      if (!isOnSessionsTab) _switchTab(1);
+                      _openSession(attentionSession.sessionId);
                     },
                     onDismiss: () {
                       setState(

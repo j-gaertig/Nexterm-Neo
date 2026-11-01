@@ -28,10 +28,15 @@ class ServersScreen extends StatefulWidget {
   final SnippetManager snippetManager;
   final SessionManager sessionManager;
   final ServerViewSettings serverViewSettings;
-  final VoidCallback? onSwitchToSessions;
+
+  /// Opens the sessions overview without selecting a session.
+  final VoidCallback? onShowSessions;
+
+  /// Opens the session that was just created from this screen.
+  final ValueChanged<String>? onSessionOpened;
   final Future<List<dynamic>> Function(String token)? loadEntries;
 
-  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSwitchToSessions, this.loadEntries});
+  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onShowSessions, this.onSessionOpened, this.loadEntries});
 
   @override
   State<ServersScreen> createState() => _ServersScreenState();
@@ -353,7 +358,7 @@ class _ServersScreenState extends State<ServersScreen> {
               final count = widget.sessionManager.sessionCount;
               if (count == 0) return const SizedBox.shrink();
               return GestureDetector(
-                onTap: () => widget.onSwitchToSessions?.call(),
+                onTap: () => widget.onShowSessions?.call(),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)),
@@ -803,8 +808,9 @@ class _ServersScreenState extends State<ServersScreen> {
     }
 
     try {
+      final AppSession opened;
       if (script != null) {
-        await widget.sessionManager.createScriptSession(
+        opened = await widget.sessionManager.createScriptSession(
           token: token,
           server: server,
           scriptId: script.scriptId,
@@ -813,31 +819,30 @@ class _ServersScreenState extends State<ServersScreen> {
           connectionReason: connectionReason,
         );
       } else {
-        switch (type) {
-          case ConnectionType.guacamole:
-            await widget.sessionManager.createGuacSession(
-              token: token,
-              server: server,
-              directIdentity: directIdentity,
-              connectionReason: connectionReason,
-            );
-          case ConnectionType.terminal:
-            await widget.sessionManager.createTerminalSession(
-              token: token,
-              server: server,
-              directIdentity: directIdentity,
-              connectionReason: connectionReason,
-            );
-          case ConnectionType.sftp:
-            await widget.sessionManager.createSftpSession(
-              token: token,
-              server: server,
-              directIdentity: directIdentity,
-              connectionReason: connectionReason,
-            );
-        }
+        opened = switch (type) {
+          ConnectionType.guacamole => await widget.sessionManager
+              .createGuacSession(
+                token: token,
+                server: server,
+                directIdentity: directIdentity,
+                connectionReason: connectionReason,
+              ),
+          ConnectionType.terminal => await widget.sessionManager
+              .createTerminalSession(
+                token: token,
+                server: server,
+                directIdentity: directIdentity,
+                connectionReason: connectionReason,
+              ),
+          ConnectionType.sftp => await widget.sessionManager.createSftpSession(
+            token: token,
+            server: server,
+            directIdentity: directIdentity,
+            connectionReason: connectionReason,
+          ),
+        };
       }
-      if (mounted) widget.onSwitchToSessions?.call();
+      if (mounted) widget.onSessionOpened?.call(opened.sessionId);
     } catch (e) {
       if (!mounted) return;
       final raw = e.toString();

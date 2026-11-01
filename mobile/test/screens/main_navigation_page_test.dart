@@ -4,6 +4,8 @@ import 'package:kterm/kterm.dart';
 import 'package:nexterm/models/script_runtime.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/screens/main_navigation_page.dart';
+import 'package:nexterm/screens/sessions_overview_screen.dart';
+import 'package:nexterm/screens/widgets/session_grid_card.dart';
 import 'package:nexterm/services/screen_lock_service.dart';
 import 'package:nexterm/services/session_manager.dart';
 import 'package:nexterm/utils/ai_manager.dart';
@@ -143,7 +145,31 @@ void main() {
     );
   });
 
-  testWidgets('system back lets the active session handle navigation first', (
+  testWidgets('sessions tab always starts on the full-screen overview', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(
+      tester,
+      session: AppSession(
+        sessionId: 'sftp-session',
+        server: const Server(name: 'Files', ip: '127.0.0.1'),
+        type: ConnectionType.sftp,
+      ),
+    );
+
+    await tester.tap(find.byTooltip('Sessions'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.byType(SessionsOverviewScreen), findsOneWidget);
+    expect(find.byType(SessionGridCard), findsOneWidget);
+    expect(find.text('Files'), findsOneWidget);
+    expect(find.text('SFTP'), findsOneWidget);
+    // The overview behaves like every other top-level page.
+    expect(find.byType(FloatingNavigationBar), findsOneWidget);
+  });
+
+  testWidgets('system back returns from a session to the overview first', (
     tester,
   ) async {
     final harness = await _pumpMainNavigation(
@@ -158,8 +184,13 @@ void main() {
     await tester.tap(find.byTooltip('Sessions'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(
+      find.byKey(const ValueKey('session-card-sftp-session')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    // The sessions tab is fullscreen and has no bottom navigation bar.
+    // The session is fullscreen and has no bottom navigation bar.
     expect(find.byType(FloatingNavigationBar), findsNothing);
 
     var handled = false;
@@ -179,9 +210,29 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.pumpAndSettle();
 
+    // Back from the session shows the overview, not the servers tab.
+    expect(find.byType(SessionsOverviewScreen), findsOneWidget);
     expect(find.byType(FloatingNavigationBar), findsOneWidget);
+    expect(
+      tester
+          .widget<FloatingNavigationBar>(find.byType(FloatingNavigationBar))
+          .selectedIndex,
+      1,
+    );
     expect(harness.sessionManager.sessionCount, 1);
+
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(
+      tester
+          .widget<FloatingNavigationBar>(find.byType(FloatingNavigationBar))
+          .selectedIndex,
+      0,
+    );
   });
 
   testWidgets('keyboard inset is applied once on the sessions tab', (
@@ -202,6 +253,11 @@ void main() {
     );
 
     await tester.tap(find.byTooltip('Sessions'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(
+      find.byKey(const ValueKey('session-card-terminal-session')),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
