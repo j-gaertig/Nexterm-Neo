@@ -3,6 +3,8 @@ import '../utils/app_icons.dart';
 import '../models/server_account.dart';
 import '../utils/auth_manager.dart';
 import '../screens/device_setup_screen.dart';
+import '../widgets/floating_navigation_bar.dart';
+import '../widgets/floating_navigation_scaffold.dart';
 
 class ServerAccountsScreen extends StatelessWidget {
   final AuthManager authManager;
@@ -10,23 +12,27 @@ class ServerAccountsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    return FloatingNavigationScaffold(
+      // The page's add action replaces the back action and sits next to the
+      // bar, matching the add action on the servers page.
+      trailing: FloatingNavigationAction(
+        icon: AppIcons.plus,
+        tooltip: 'Add server',
+        onPressed: () => _openAddServer(context),
+      ),
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final tt = Theme.of(context).textTheme;
+        final navInset = FloatingNavigationBarInset.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(AppIcons.arrowBack),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
+        return Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
                     child: Text(
                       'Server Connections',
                       style: tt.titleLarge?.copyWith(
@@ -34,57 +40,43 @@ class ServerAccountsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Material(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DeviceSetupScreen(
-                            authManager: authManager,
-                            isAddingServer: true,
-                          ),
+                ),
+                Expanded(
+                  child: ListenableBuilder(
+                    listenable: authManager.accountManager,
+                    builder: (_, __) {
+                      final accounts = authManager.accountManager.accounts;
+                      final activeId =
+                          authManager.accountManager.activeAccountId;
+                      if (accounts.isEmpty) return _empty(cs, tt);
+                      return ListView.builder(
+                        padding: EdgeInsets.fromLTRB(12, 4, 12, 16 + navInset),
+                        itemCount: accounts.length,
+                        itemBuilder: (_, i) => _accountTile(
+                          context,
+                          accounts[i],
+                          accounts[i].id == activeId,
+                          cs,
                         ),
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(
-                          AppIcons.plus,
-                          size: 20,
-                          color: cs.onPrimaryContainer,
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: authManager.accountManager,
-                builder: (_, __) {
-                  final accounts = authManager.accountManager.accounts;
-                  final activeId = authManager.accountManager.activeAccountId;
-                  if (accounts.isEmpty) return _empty(cs, tt);
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    itemCount: accounts.length,
-                    itemBuilder: (_, i) => _accountTile(
-                      context,
-                      accounts[i],
-                      accounts[i].id == activeId,
-                      cs,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _openAddServer(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DeviceSetupScreen(
+          authManager: authManager,
+          isAddingServer: true,
         ),
       ),
     );

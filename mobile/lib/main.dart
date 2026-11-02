@@ -18,6 +18,7 @@ import 'utils/server_account_manager.dart';
 import 'utils/terminal_settings.dart';
 import 'utils/sftp_settings.dart';
 import 'utils/server_view_settings.dart';
+import 'widgets/main_navigation_scope.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,6 +84,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   late ScreenLockSettings _screenLockSettings;
   late ScreenLockService _screenLockService;
   late ScreenLockCoordinator _screenLockCoordinator;
+  late final MainNavigationController _navigationController;
   final _navigatorKey = GlobalKey<NavigatorState>();
   bool _showStartupLockCover = false;
   bool _wasAuthenticated = false;
@@ -97,6 +99,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _snippetManager = SnippetManager();
     _aiManager = AIManager();
     _sessionManager = SessionManager();
+    _navigationController = MainNavigationController();
     _terminalSettings = widget.terminalSettings;
     _sftpSettings = widget.sftpSettings;
     _serverViewSettings = widget.serverViewSettings;
@@ -170,6 +173,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _sftpSettings.dispose();
     _serverViewSettings.dispose();
     _screenLockSettings.dispose();
+    _navigationController.dispose();
     super.dispose();
   }
 
@@ -227,6 +231,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 dynamicColorScheme: darkDynamic,
               ),
               themeMode: _themeManager.themeMode,
+              builder: (context, child) => MainNavigationScope(
+                controller: _navigationController,
+                sessionManager: _sessionManager,
+                enabled: _authManager.isAuthenticated,
+                child: child ?? const SizedBox.shrink(),
+              ),
               home: _showStartupLockCover
                   ? const ScreenLockStartupCover()
                   : _determineInitialScreen(),
@@ -245,6 +255,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             snippetManager: _snippetManager,
             aiManager: _aiManager,
             sessionManager: _sessionManager,
+            navigationController: _navigationController,
             terminalSettings: _terminalSettings,
             sftpSettings: _sftpSettings,
             serverViewSettings: _serverViewSettings,

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/app_icons.dart';
+import 'floating_navigation_bar.dart';
+import 'floating_navigation_scaffold.dart';
+import 'main_navigation_scope.dart';
 
 class QrScannerPage extends StatefulWidget {
   final String title;
@@ -51,90 +54,108 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final hasNavigation = MainNavigationScope.maybeOf(context)?.enabled == true;
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(AppIcons.arrowBack),
-                    onPressed: () => Navigator.pop(context),
+    return FloatingNavigationScaffold(
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final tt = Theme.of(context).textTheme;
+        final navInset = FloatingNavigationBarInset.of(context);
+
+        return Scaffold(
+          body: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    hasNavigation ? 20 : 8,
+                    hasNavigation ? 16 : 8,
+                    20,
+                    12,
                   ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  ValueListenableBuilder(
-                    valueListenable: _controller,
-                    builder: (_, state, __) => IconButton(
-                      icon: Icon(
-                        state.torchState == TorchState.on
-                            ? AppIcons.flashOn
-                            : AppIcons.flashOff,
-                      ),
-                      onPressed: () => _controller.toggleTorch(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
+                  child: Row(
                     children: [
-                      MobileScanner(
-                        controller: _controller,
-                        onDetect: _onDetect,
+                      // Signed-out setup flows have no main navigation bar to
+                      // carry the back action, so they keep the header button.
+                      if (!hasNavigation)
+                        IconButton(
+                          icon: const Icon(AppIcons.arrowBack),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      if (!hasNavigation) const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          style: tt.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      CustomPaint(
-                        painter: _OverlayPainter(cs.primary, Colors.black54),
-                        child: const SizedBox.expand(),
+                      ValueListenableBuilder(
+                        valueListenable: _controller,
+                        builder: (_, state, __) => IconButton(
+                          icon: Icon(
+                            state.torchState == TorchState.on
+                                ? AppIcons.flashOn
+                                : AppIcons.flashOff,
+                          ),
+                          onPressed: () => _controller.toggleTorch(),
+                        ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Column(
-                children: [
-                  Text(
-                    widget.hint,
-                    style: TextStyle(fontSize: 14, color: cs.outline),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _error!,
-                        style: TextStyle(fontSize: 13, color: cs.error),
-                        textAlign: TextAlign.center,
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Stack(
+                        children: [
+                          MobileScanner(
+                            controller: _controller,
+                            onDetect: _onDetect,
+                          ),
+                          CustomPaint(
+                            painter: _OverlayPainter(
+                              cs.primary,
+                              Colors.black54,
+                            ),
+                            child: const SizedBox.expand(),
+                          ),
+                        ],
                       ),
                     ),
-                ],
-              ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + navInset),
+                  child: Column(
+                    children: [
+                      Text(
+                        widget.hint,
+                        style: TextStyle(fontSize: 14, color: cs.outline),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (_error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(fontSize: 13, color: cs.error),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

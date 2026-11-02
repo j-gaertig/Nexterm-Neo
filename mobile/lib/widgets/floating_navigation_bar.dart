@@ -98,6 +98,9 @@ class FloatingNavigationBar extends StatefulWidget {
   final ValueChanged<int> onDestinationSelected;
   final List<FloatingNavigationDestination> destinations;
 
+  /// Called when the already selected destination is tapped again.
+  final VoidCallback? onDestinationReselected;
+
   /// Optional action shown to the right of the bar at the same height.
   final Widget? trailing;
 
@@ -106,6 +109,7 @@ class FloatingNavigationBar extends StatefulWidget {
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.destinations,
+    this.onDestinationReselected,
     this.trailing,
   });
 
@@ -176,7 +180,10 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
   }
 
   void _handleTap(int index) {
-    if (index == widget.selectedIndex) return;
+    if (index == widget.selectedIndex) {
+      widget.onDestinationReselected?.call();
+      return;
+    }
     HapticFeedback.selectionClick();
     widget.onDestinationSelected(index);
   }
