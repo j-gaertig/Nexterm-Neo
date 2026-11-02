@@ -8,8 +8,6 @@ import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
 import '../services/api_config.dart';
 import '../services/device_code_service.dart';
-import '../widgets/floating_navigation_bar.dart';
-import '../widgets/floating_navigation_scaffold.dart';
 
 class DeviceSetupScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -230,30 +228,15 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // The initial sign-in screen has no main navigation yet. Only the
-    // "Add Server" variant is a full page of the signed-in app and gets the
-    // floating bar with its back action.
-    if (!widget.isAddingServer) return _buildPage(context, 0);
-
-    return FloatingNavigationScaffold(
-      builder: (context) =>
-          _buildPage(context, FloatingNavigationBarInset.of(context)),
-    );
-  }
-
-  Widget _buildPage(BuildContext context, double navInset) {
     final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: widget.isAddingServer
-          ? AppBar(
-              automaticallyImplyLeading: false,
-              title: const Text('Add Server'),
-            )
+          ? AppBar(title: const Text('Add Server'))
           : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + navInset),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,

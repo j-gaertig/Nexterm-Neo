@@ -3,8 +3,6 @@ import '../utils/app_icons.dart';
 import '../models/session_model.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_manager.dart';
-import '../widgets/floating_navigation_bar.dart';
-import '../widgets/floating_navigation_scaffold.dart';
 
 class SessionsScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -130,55 +128,54 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FloatingNavigationScaffold(
-      builder: (context) {
-        final cs = Theme.of(context).colorScheme;
-        final tt = Theme.of(context).textTheme;
-        final navInset = FloatingNavigationBarInset.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
 
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 16, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Signed-in Devices',
-                          style: tt.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(AppIcons.refresh, size: 22),
-                        onPressed: _load,
-                      ),
-                    ],
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(AppIcons.arrowBack),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                ),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          child: _sessions == null || _sessions!.isEmpty
-                              ? _empty(cs, tt, navInset)
-                              : _list(cs, navInset),
-                        ),
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      'Signed-in Devices',
+                      style: tt.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(AppIcons.refresh, size: 22),
+                    onPressed: _load,
+                  ),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _load,
+                      child: _sessions == null || _sessions!.isEmpty
+                          ? _empty(cs, tt)
+                          : _list(cs),
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _empty(ColorScheme cs, TextTheme tt, double navInset) => ListView(
-    padding: EdgeInsets.only(bottom: navInset),
+  Widget _empty(ColorScheme cs, TextTheme tt) => ListView(
     children: [
       SizedBox(
         height: MediaQuery.of(context).size.height * 0.5,
@@ -211,8 +208,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
     ],
   );
 
-  Widget _list(ColorScheme cs, double navInset) => ListView.builder(
-    padding: EdgeInsets.fromLTRB(12, 4, 12, 16 + navInset),
+  Widget _list(ColorScheme cs) => ListView.builder(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
     itemCount: _sessions!.length,
     itemBuilder: (_, i) => _sessionTile(_sessions![i], cs),
   );
