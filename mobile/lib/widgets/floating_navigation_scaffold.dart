@@ -57,11 +57,11 @@ class FloatingNavigationScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scope = MainNavigationScope.maybeOf(context);
-    final showBar =
-        scope != null &&
-        scope.enabled &&
-        MediaQuery.viewInsetsOf(context).bottom == 0;
+    final showBar = scope != null && scope.enabled;
     final navInset = showBar ? FloatingNavigationBar.contentInset : 0.0;
+    // Full pages keep the bar while a form is being edited. Lift it above the
+    // keyboard instead of hiding it like the top-level lists do.
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
 
     final theme = Theme.of(context);
     final pageTheme = showBar
@@ -106,7 +106,7 @@ class FloatingNavigationScaffold extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 0,
+                bottom: keyboardInset,
                 child: ListenableBuilder(
                   listenable: Listenable.merge([
                     scope.controller,

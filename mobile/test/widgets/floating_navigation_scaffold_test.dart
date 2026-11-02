@@ -25,6 +25,22 @@ void main() {
     expect(harness.controller.selectedIndex, 0);
   });
 
+  testWidgets('keeps the bar above the keyboard on form pages', (tester) async {
+    await _pumpHarness(tester);
+
+    // FakeViewPadding is in physical pixels; at a device pixel ratio of 3 this
+    // is a 300 logical pixel keyboard on the 600 pixel tall test surface.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+    addTearDown(tester.view.reset);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(FloatingNavigationBar), findsOneWidget);
+    final surface = tester.getRect(
+      find.byKey(FloatingNavigationBar.surfaceKey),
+    );
+    expect(surface.bottom, lessThanOrEqualTo(600 - 300));
+  });
+
   testWidgets('a page-specific action replaces the back action', (
     tester,
   ) async {
