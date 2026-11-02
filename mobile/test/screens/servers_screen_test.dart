@@ -91,6 +91,21 @@ void main() {
     });
   }
 
+  testWidgets('keeps server rows borderless in the list view', (tester) async {
+    await _pumpGrid(
+      tester,
+      viewMode: ServerViewMode.list,
+      entries: [_server(id: 1, name: 'plain-server', ip: '10.0.0.1')],
+    );
+
+    final tile = tester.widget<Material>(
+      find.byKey(const ValueKey('server-tile-1')),
+    );
+
+    expect(tile.color, Colors.transparent);
+    expect(tile.shape, isNull);
+  });
+
   testWidgets('grid adapts the requested columns to the available width', (
     tester,
   ) async {
@@ -119,49 +134,55 @@ void main() {
     expect(fourth.dx, first.dx);
   });
 
-  testWidgets('selecting a tag on a card filters the grid and clear filter resets it', (
-    tester,
-  ) async {
-    await _pumpGrid(
-      tester,
-      entries: [
-        _server(
-          id: 1,
-          name: 'prod-web-01',
-          ip: '10.20.0.11',
-          tags: [_production],
-        ),
-        _server(id: 2, name: 'db-primary', ip: '10.20.0.12', tags: [_database]),
-      ],
-    );
+  testWidgets(
+    'selecting a tag on a card filters the grid and clear filter resets it',
+    (tester) async {
+      await _pumpGrid(
+        tester,
+        entries: [
+          _server(
+            id: 1,
+            name: 'prod-web-01',
+            ip: '10.20.0.11',
+            tags: [_production],
+          ),
+          _server(
+            id: 2,
+            name: 'db-primary',
+            ip: '10.20.0.12',
+            tags: [_database],
+          ),
+        ],
+      );
 
-    expect(find.byType(ServerGridCard), findsNWidgets(2));
+      expect(find.byType(ServerGridCard), findsNWidgets(2));
 
-    // Tapping the tag on a card filters the grid.
-    final card = find.byType(ServerGridCard).first;
-    await tester.tap(
-      find.descendant(of: card, matching: find.text('Production')),
-    );
-    await tester.pumpAndSettle();
+      // Tapping the tag on a card filters the grid.
+      final card = find.byType(ServerGridCard).first;
+      await tester.tap(
+        find.descendant(of: card, matching: find.text('Production')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byType(ServerGridCard), findsOneWidget);
-    expect(find.text('prod-web-01'), findsOneWidget);
-    expect(find.text('db-primary'), findsNothing);
+      expect(find.byType(ServerGridCard), findsOneWidget);
+      expect(find.text('prod-web-01'), findsOneWidget);
+      expect(find.text('db-primary'), findsNothing);
 
-    // Clear the tag selection from the filter sheet.
-    await tester.tap(find.byKey(const ValueKey('tag-filter-button')));
-    await tester.pumpAndSettle();
+      // Clear the tag selection from the filter sheet.
+      await tester.tap(find.byKey(const ValueKey('tag-filter-button')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Filter by tags'), findsOneWidget);
-    expect(find.text('1 of 2 tags selected'), findsOneWidget);
+      expect(find.text('Filter by tags'), findsOneWidget);
+      expect(find.text('1 of 2 tags selected'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('tag-filter-clear')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('tag-filter-apply')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-filter-clear')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('tag-filter-apply')));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(ServerGridCard), findsNWidgets(2));
-  });
+      expect(find.byType(ServerGridCard), findsNWidgets(2));
+    },
+  );
 
   testWidgets('filter sheet toggles tags before applying', (tester) async {
     await _pumpGrid(

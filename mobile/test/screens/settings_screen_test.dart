@@ -284,32 +284,72 @@ void main() {
     expect(find.text('File Manager'), findsOneWidget);
   });
 
-  testWidgets('offers the renamed palettes and switches between them', (
+  testWidgets('opens a compact palette gallery and applies a theme', (
     tester,
   ) async {
     final harness = await _pumpSettings(tester);
 
-    expect(find.text('Color Theme'), findsOneWidget);
-    expect(
-      AppThemes.all.map((theme) => theme.label),
-      ['Graphite', 'Adaptive', 'Blossom', 'Meadow', 'Tide', 'Copper', 'Aurora'],
-    );
+    expect(find.text('Themes'), findsOneWidget);
+    expect(find.text('Graphite'), findsOneWidget);
+    expect(find.byKey(const ValueKey('app-theme-picker')), findsOneWidget);
+    expect(AppThemes.all.map((theme) => theme.label), [
+      'Graphite',
+      'Adaptive',
+      'Blossom',
+      'Meadow',
+      'Tide',
+      'Copper',
+      'Aurora',
+    ]);
+    // The gallery only appears on demand; settings keeps a single row.
+    expect(find.byKey(const ValueKey('app-theme-graphite')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-theme-picker')));
+    await tester.pumpAndSettle();
+
+    final sheet = find.byKey(const ValueKey('theme-picker-sheet'));
+    expect(sheet, findsOneWidget);
     for (final theme in AppThemes.all) {
-      expect(find.text(theme.label), findsOneWidget);
+      expect(
+        find.descendant(of: sheet, matching: find.text(theme.label)),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(ValueKey('app-theme-preview-${theme.id}')),
+        findsOneWidget,
+      );
     }
     expect(find.text('Dynamic Color'), findsNothing);
 
     await tester.tap(find.byKey(const ValueKey('app-theme-blossom')));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(harness.themeManager.theme.id, 'blossom');
+    final selectedMaterial = tester.widget<Material>(
+      find.byKey(const ValueKey('app-theme-card-blossom')),
+    );
+    final selectedShape = selectedMaterial.shape! as RoundedRectangleBorder;
+    expect(
+      selectedShape.side.color,
+      Theme.of(
+        tester.element(find.byKey(const ValueKey('app-theme-card-blossom'))),
+      ).colorScheme.primary,
+    );
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('app-theme-blossom')),
         matching: find.byIcon(AppIcons.checkCircle),
       ),
-      findsOneWidget,
+      findsNothing,
     );
+
+    await tester.tap(find.byKey(const ValueKey('theme-picker-close')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('theme-picker-sheet')), findsNothing);
+    expect(find.text('Blossom · light & dark'), findsNothing);
+    expect(find.text('Themes'), findsOneWidget);
+    expect(find.text('Blossom'), findsOneWidget);
   });
 
   testWidgets('terminal theme cards expose a semantics tap action', (

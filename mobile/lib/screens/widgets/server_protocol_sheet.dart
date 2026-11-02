@@ -5,7 +5,9 @@ import '../../utils/server_field_config.dart';
 Future<String?> showServerProtocolSheet(BuildContext context) {
   return showModalBottomSheet<String>(
     context: context,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (_) => const ServerProtocolSheet(),
   );
 }
@@ -46,12 +48,18 @@ class ServerProtocolSheet extends StatelessWidget {
               margin: const EdgeInsets.only(top: 12, bottom: 4),
               width: 36,
               height: 4,
-              decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            child: Text('New server', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            child: Text(
+              'New server',
+              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -73,26 +81,52 @@ class ServerProtocolSheet extends StatelessWidget {
                   child: InkWell(
                     onTap: () => Navigator.pop(context, value),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                       child: Row(
                         children: [
                           Container(
                             width: 42,
                             height: 42,
-                            decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(12)),
-                            child: Icon(_iconFor(value), color: cs.onPrimaryContainer, size: 20),
+                            decoration: BoxDecoration(
+                              color: cs.primaryContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              _iconFor(value),
+                              color: cs.onPrimaryContainer,
+                              size: 20,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(p['label']!, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                                Text('Default port $port', style: TextStyle(fontSize: 12, color: cs.outline)),
+                                Text(
+                                  p['label']!,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  'Default port $port',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: cs.outline,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
+                          Icon(
+                            AppIcons.chevronRight,
+                            color: cs.outlineVariant,
+                            size: 18,
+                          ),
                         ],
                       ),
                     ),

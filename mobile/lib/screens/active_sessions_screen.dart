@@ -367,6 +367,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: cs.outlineVariant),
           boxShadow: const [
             BoxShadow(
               color: Colors.black26,

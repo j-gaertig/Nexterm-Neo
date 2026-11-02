@@ -15,7 +15,12 @@ class FolderOption {
   final String name;
   final String type;
   final dynamic organizationId;
-  const FolderOption({this.id, required this.name, this.type = 'folder', this.organizationId});
+  const FolderOption({
+    this.id,
+    required this.name,
+    this.type = 'folder',
+    this.organizationId,
+  });
 }
 
 class ServerEditorScreen extends StatefulWidget {
@@ -40,7 +45,8 @@ class ServerEditorScreen extends StatefulWidget {
   State<ServerEditorScreen> createState() => _ServerEditorScreenState();
 }
 
-class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTickerProviderStateMixin {
+class _ServerEditorScreenState extends State<ServerEditorScreen>
+    with TickerProviderStateMixin {
   late TabController _tabs;
   bool _loading = true;
   bool _saving = false;
@@ -96,7 +102,8 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   List<ManagedIdentity> _allIdentities = [];
 
   bool get _isEdit => widget.editServerId != null;
-  ServerFieldConfig get _fieldConfig => getServerFieldConfig('server', _protocol);
+  ServerFieldConfig get _fieldConfig =>
+      getServerFieldConfig('server', _protocol);
   List<String> get _allowedAuth => _fieldConfig.allowedAuthTypes;
 
   @override
@@ -137,7 +144,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   void _sanitizeDrafts() {
     for (final draft in _drafts.values) {
       if (!_allowedAuth.contains(draft.authType)) {
-        draft.authType = _allowedAuth.isNotEmpty ? _allowedAuth.first : 'password';
+        draft.authType = _allowedAuth.isNotEmpty
+            ? _allowedAuth.first
+            : 'password';
       }
     }
   }
@@ -146,11 +155,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     final text = _icon ?? '';
     if (_iconCustom.text != text) {
       _iconCustom.text = text;
-      _iconCustom.selection = TextSelection.fromPosition(TextPosition(offset: _iconCustom.text.length));
+      _iconCustom.selection = TextSelection.fromPosition(
+        TextPosition(offset: _iconCustom.text.length),
+      );
     }
   }
 
-  String _validOr(String value, List<Map<String, String>> options, String fallback) {
+  String _validOr(
+    String value,
+    List<Map<String, String>> options,
+    String fallback,
+  ) {
     return options.any((o) => o['value'] == value) ? value : fallback;
   }
 
@@ -162,7 +177,12 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     if (_protocol != null &&
         !ServerEditorConstants.protocols.any((p) => p['value'] == _protocol) &&
         _protocol!.isNotEmpty) {
-      items.add(DropdownMenuItem(value: _protocol, child: Text(_protocol!.toUpperCase())));
+      items.add(
+        DropdownMenuItem(
+          value: _protocol,
+          child: Text(_protocol!.toUpperCase()),
+        ),
+      );
     }
     return items;
   }
@@ -172,12 +192,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     setState(() {
       _protocol = value;
       if (value != null) {
-        final oldDefault = old == null ? '' : (ServerEditorConstants.defaultPorts[old] ?? '');
-        if (_port.text.isEmpty || (_port.text == oldDefault && oldDefault.isNotEmpty)) {
+        final oldDefault = old == null
+            ? ''
+            : (ServerEditorConstants.defaultPorts[old] ?? '');
+        if (_port.text.isEmpty ||
+            (_port.text == oldDefault && oldDefault.isNotEmpty)) {
           _port.text = ServerEditorConstants.defaultPorts[value] ?? _port.text;
         }
       }
-      if (value != null && (_icon == null || ServerEditorConstants.protocolIcons.containsValue(_icon))) {
+      if (value != null &&
+          (_icon == null ||
+              ServerEditorConstants.protocolIcons.containsValue(_icon))) {
         _icon = ServerEditorConstants.protocolIcons[value];
         _syncIconCustom();
       }
@@ -186,11 +211,15 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
         _drafts.clear();
       } else {
         _linkedIds = _linkedIds.where((id) {
-          final matches = _allIdentities.where((e) => e.id.toString() == id.toString());
+          final matches = _allIdentities.where(
+            (e) => e.id.toString() == id.toString(),
+          );
           if (matches.isEmpty) return true;
           return _allowedAuth.contains(matches.first.authType);
         }).toList();
-        _drafts.removeWhere((key, draft) => !_allowedAuth.contains(draft.authType));
+        _drafts.removeWhere(
+          (key, draft) => !_allowedAuth.contains(draft.authType),
+        );
       }
     });
     _sanitizeDrafts();
@@ -211,10 +240,15 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       final identities = await identitiesFuture;
       if (!mounted) return;
       if (_isEdit) {
-        final details = await ServerEditorService.getEntry(widget.token, widget.editServerId);
+        final details = await ServerEditorService.getEntry(
+          widget.token,
+          widget.editServerId,
+        );
         if (!mounted) return;
         _applyDetails(details);
-        _sshCandidates = sshCandidates.where((s) => s.id.toString() != widget.editServerId.toString()).toList();
+        _sshCandidates = sshCandidates
+            .where((s) => s.id.toString() != widget.editServerId.toString())
+            .toList();
         if (_engineId == null && engines.isNotEmpty) {
           _engineId = engines.first.id?.toString();
         }
@@ -254,7 +288,8 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     final out = <Server>[];
     for (final item in items) {
       if (item is Server) {
-        if (item.protocol?.toLowerCase() == 'ssh' && item.isServer) out.add(item);
+        if (item.protocol?.toLowerCase() == 'ssh' && item.isServer)
+          out.add(item);
       } else {
         try {
           final dyn = item as dynamic;
@@ -288,34 +323,64 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     _monitoringEnabled = (c['monitoringEnabled'] ?? true) == true;
     _wakeOnLanEnabled = c['wakeOnLanEnabled'] == true;
     if (c['enableAudio'] != null) _enableAudio = c['enableAudio'] == true;
-    if (c['enableWallpaper'] != null) _enableWallpaper = c['enableWallpaper'] == true;
+    if (c['enableWallpaper'] != null)
+      _enableWallpaper = c['enableWallpaper'] == true;
     if (c['enableTheming'] != null) _enableTheming = c['enableTheming'] == true;
-    if (c['enableFontSmoothing'] != null) _enableFontSmoothing = c['enableFontSmoothing'] == true;
-    if (c['enableFullWindowDrag'] != null) _enableFullWindowDrag = c['enableFullWindowDrag'] == true;
-    if (c['enableDesktopComposition'] != null) _enableDesktopComposition = c['enableDesktopComposition'] == true;
-    if (c['enableMenuAnimations'] != null) _enableMenuAnimations = c['enableMenuAnimations'] == true;
-    _colorDepth = _validOr(c['colorDepth']?.toString() ?? '', ServerEditorConstants.colorDepths, '');
-    _resizeMethod =
-        _validOr(c['resizeMethod']?.toString() ?? 'display-update', ServerEditorConstants.resizeMethods, 'display-update');
-    _rdpSecurity =
-        _validOr(c['rdpSecurity']?.toString() ?? '', ServerEditorConstants.rdpSecurityMethods, '');
-    _keyboardLayout = _validOr(c['keyboardLayout']?.toString() ?? 'en-us-qwerty',
-        ServerEditorConstants.keyboardLayouts, 'en-us-qwerty');
-    _backspaceMode =
-        _validOr(c['backspaceMode']?.toString() ?? 'del', ServerEditorConstants.backspaceModes, 'del');
-    _deleteMode = _validOr(c['deleteMode']?.toString() ?? 'vt', ServerEditorConstants.deleteModes, 'vt');
-    _functionKeyMode =
-        _validOr(c['functionKeyMode']?.toString() ?? 'xterm', ServerEditorConstants.functionKeyModes, 'xterm');
-    _preOrder = _validOr(
-        c['preOrder']?.toString() ?? 'local-first', const [
+    if (c['enableFontSmoothing'] != null)
+      _enableFontSmoothing = c['enableFontSmoothing'] == true;
+    if (c['enableFullWindowDrag'] != null)
+      _enableFullWindowDrag = c['enableFullWindowDrag'] == true;
+    if (c['enableDesktopComposition'] != null)
+      _enableDesktopComposition = c['enableDesktopComposition'] == true;
+    if (c['enableMenuAnimations'] != null)
+      _enableMenuAnimations = c['enableMenuAnimations'] == true;
+    _colorDepth = _validOr(
+      c['colorDepth']?.toString() ?? '',
+      ServerEditorConstants.colorDepths,
+      '',
+    );
+    _resizeMethod = _validOr(
+      c['resizeMethod']?.toString() ?? 'display-update',
+      ServerEditorConstants.resizeMethods,
+      'display-update',
+    );
+    _rdpSecurity = _validOr(
+      c['rdpSecurity']?.toString() ?? '',
+      ServerEditorConstants.rdpSecurityMethods,
+      '',
+    );
+    _keyboardLayout = _validOr(
+      c['keyboardLayout']?.toString() ?? 'en-us-qwerty',
+      ServerEditorConstants.keyboardLayouts,
+      'en-us-qwerty',
+    );
+    _backspaceMode = _validOr(
+      c['backspaceMode']?.toString() ?? 'del',
+      ServerEditorConstants.backspaceModes,
+      'del',
+    );
+    _deleteMode = _validOr(
+      c['deleteMode']?.toString() ?? 'vt',
+      ServerEditorConstants.deleteModes,
+      'vt',
+    );
+    _functionKeyMode = _validOr(
+      c['functionKeyMode']?.toString() ?? 'xterm',
+      ServerEditorConstants.functionKeyModes,
+      'xterm',
+    );
+    _preOrder = _validOr(c['preOrder']?.toString() ?? 'local-first', const [
       {'label': 'Local first', 'value': 'local-first'},
       {'label': 'Remote first', 'value': 'remote-first'},
     ], 'local-first');
     _afterOrder = _validOr(
-        c['afterOrder']?.toString() ?? 'remote-first', const [
-      {'label': 'Local first', 'value': 'local-first'},
-      {'label': 'Remote first', 'value': 'remote-first'},
-    ], 'remote-first');
+      c['afterOrder']?.toString() ?? 'remote-first',
+      const [
+        {'label': 'Local first', 'value': 'local-first'},
+        {'label': 'Remote first', 'value': 'remote-first'},
+      ],
+      'remote-first',
+    );
     _preLocal.text = (c['preLocalCommand'] ?? '').toString();
     _preRemote.text = (c['preRemoteCommand'] ?? '').toString();
     _afterLocal.text = (c['afterLocalCommand'] ?? '').toString();
@@ -333,7 +398,8 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       config['ip'] = _ip.text.trim();
       config['port'] = _port.text.trim();
       final engineValue = _engineValue();
-      if (engineValue != null && engineValue.isNotEmpty) config['engineId'] = engineValue;
+      if (engineValue != null && engineValue.isNotEmpty)
+        config['engineId'] = engineValue;
       if (_wakeOnLanEnabled || _mac.text.trim().isNotEmpty) {
         config['macAddress'] = _mac.text.trim();
       }
@@ -392,13 +458,19 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     final config = _buildConfig();
     if (!validateServerFields('server', _protocol, name, config)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('Please fill all required fields'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
     if (_drafts.values.any((d) => d.name.trim().isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Identity names must not be empty'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('Identity names must not be empty'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
@@ -424,7 +496,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           name: name,
           icon: _icon,
           config: config,
-          folderId: _folderId is int ? _folderId : int.tryParse((_folderId ?? '').toString()),
+          folderId: _folderId is int
+              ? _folderId
+              : int.tryParse((_folderId ?? '').toString()),
           organizationId: _organizationId is int
               ? _organizationId
               : int.tryParse((_organizationId ?? '').toString()),
@@ -435,7 +509,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Save failed: $e'), behavior: SnackBarBehavior.floating),
+          SnackBar(
+            content: Text('Save failed: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {
@@ -449,11 +526,13 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     final tt = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit
-            ? 'Edit server'
-            : (_protocol == null || _protocol!.isEmpty)
-                ? 'New server'
-                : 'New ${_protocol!.toUpperCase()} server'),
+        title: Text(
+          _isEdit
+              ? 'Edit server'
+              : (_protocol == null || _protocol!.isEmpty)
+              ? 'New server'
+              : 'New ${_protocol!.toUpperCase()} server',
+        ),
         bottom: _loading
             ? null
             : TabBar(
@@ -465,7 +544,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             TextButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Text('Save'),
             ),
         ],
@@ -473,25 +556,36 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(AppIcons.alertCircleOutline, size: 40, color: cs.error),
-                        const SizedBox(height: 12),
-                        Text(_error!, style: tt.bodyMedium, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Back')),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      AppIcons.alertCircleOutline,
+                      size: 40,
+                      color: cs.error,
                     ),
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabs,
-                  children: [for (final k in _tabKeys) _tabView(k)],
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: tt.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Back'),
+                    ),
+                  ],
                 ),
+              ),
+            )
+          : TabBarView(
+              controller: _tabs,
+              children: [for (final k in _tabKeys) _tabView(k)],
+            ),
     );
   }
 
@@ -526,17 +620,32 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       fillColor: cs.surfaceContainerHigh,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary, width: 1.5)),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.primary, width: 1.5),
+      ),
     );
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6, left: 2, top: 14),
-        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.outline)),
-      );
+    padding: const EdgeInsets.only(bottom: 6, left: 2, top: 14),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.outline,
+      ),
+    ),
+  );
 
   Widget _detailsTab() {
     final cs = Theme.of(context).colorScheme;
@@ -552,25 +661,41 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(12)),
+                color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.outlineVariant),
+              ),
               child: Row(
                 children: [
                   Icon(AppIcons.brandDomain, size: 20, color: cs.primary),
                   const SizedBox(width: 12),
-                  const Expanded(child: Text('Organization server', overflow: TextOverflow.ellipsis)),
+                  const Expanded(
+                    child: Text(
+                      'Organization server',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
             ),
           ],
-          if (!_isEdit && !(_organizationId != null && _folderId == null) && widget.folderOptions.isNotEmpty) ...[
+          if (!_isEdit &&
+              !(_organizationId != null && _folderId == null) &&
+              widget.folderOptions.isNotEmpty) ...[
             _label('Folder'),
             DropdownButtonFormField<String?>(
               initialValue: _folderId?.toString(),
               decoration: _dec(null, AppIcons.brandFolder),
               items: [
-                const DropdownMenuItem<String?>(value: null, child: Text('Root')),
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Root'),
+                ),
                 for (final f in widget.folderOptions)
-                  DropdownMenuItem<String?>(value: f.id?.toString(), child: Text(f.name, overflow: TextOverflow.ellipsis)),
+                  DropdownMenuItem<String?>(
+                    value: f.id?.toString(),
+                    child: Text(f.name, overflow: TextOverflow.ellipsis),
+                  ),
               ],
               onChanged: (v) {
                 setState(() {
@@ -578,15 +703,23 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                   if (v == null) {
                     _organizationId = null;
                   } else {
-                    final match = widget.folderOptions.where((f) => f.id?.toString() == v);
-                    _organizationId = match.isEmpty ? null : match.first.organizationId;
+                    final match = widget.folderOptions.where(
+                      (f) => f.id?.toString() == v,
+                    );
+                    _organizationId = match.isEmpty
+                        ? null
+                        : match.first.organizationId;
                   }
                 });
               },
             ),
           ],
           _label('Name'),
-          TextField(controller: _name, decoration: _dec('Server name', AppIcons.pencilOutline), textCapitalization: TextCapitalization.words),
+          TextField(
+            controller: _name,
+            decoration: _dec('Server name', AppIcons.pencilOutline),
+            textCapitalization: TextCapitalization.words,
+          ),
           _label('Icon'),
           Wrap(
             spacing: 8,
@@ -602,12 +735,22 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: _icon == iconName ? cs.primaryContainer : cs.surfaceContainerHigh,
+                      color: _icon == iconName
+                          ? cs.primaryContainer
+                          : cs.surfaceContainerHigh,
                       borderRadius: BorderRadius.circular(12),
-                      border: _icon == iconName ? Border.all(color: cs.primary, width: 1.5) : null,
+                      border: _icon == iconName
+                          ? Border.all(color: cs.primary, width: 1.5)
+                          : null,
                     ),
-                    child: Icon(AppIcons.resolveBackendIcon(_iconKey(iconName)) ?? AppIcons.brandServer,
-                        size: 20, color: _icon == iconName ? cs.onPrimaryContainer : cs.outline),
+                    child: Icon(
+                      AppIcons.resolveBackendIcon(_iconKey(iconName)) ??
+                          AppIcons.brandServer,
+                      size: 20,
+                      color: _icon == iconName
+                          ? cs.onPrimaryContainer
+                          : cs.outline,
+                    ),
                   ),
                 ),
             ],
@@ -616,7 +759,8 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           TextField(
             controller: _iconCustom,
             decoration: _dec('mdiServer', AppIcons.pencilOutline),
-            onChanged: (v) => setState(() => _icon = v.trim().isEmpty ? null : v.trim()),
+            onChanged: (v) =>
+                setState(() => _icon = v.trim().isEmpty ? null : v.trim()),
           ),
           if (_engines.length > 1) ...[
             _label('Engine'),
@@ -626,8 +770,12 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
               items: [
                 for (final e in _engines)
                   DropdownMenuItem(
-                      value: e.id?.toString(),
-                      child: Text(e.connected ? e.name : "${e.name} (offline)", overflow: TextOverflow.ellipsis)),
+                    value: e.id?.toString(),
+                    child: Text(
+                      e.connected ? e.name : "${e.name} (offline)",
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
               ],
               onChanged: (v) => setState(() => _engineId = v),
             ),
@@ -642,7 +790,14 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _label('Server IP'),
-                      TextField(controller: _ip, decoration: _dec('192.168.1.10', AppIcons.serverNetwork), keyboardType: TextInputType.text),
+                      TextField(
+                        controller: _ip,
+                        decoration: _dec(
+                          '192.168.1.10',
+                          AppIcons.serverNetwork,
+                        ),
+                        keyboardType: TextInputType.text,
+                      ),
                     ],
                   ),
                 ),
@@ -653,7 +808,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _label('Port'),
-                      TextField(controller: _port, decoration: _dec('22', AppIcons.connection), keyboardType: TextInputType.number),
+                      TextField(
+                        controller: _port,
+                        decoration: _dec('22', AppIcons.connection),
+                        keyboardType: TextInputType.number,
+                      ),
                     ],
                   ),
                 ),
@@ -670,9 +829,15 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             ],
             if (_wakeOnLanEnabled) ...[
               _label('MAC address'),
-              TextField(controller: _mac, decoration: _dec('AA:BB:CC:DD:EE:FF', AppIcons.serverNetwork)),
+              TextField(
+                controller: _mac,
+                decoration: _dec('AA:BB:CC:DD:EE:FF', AppIcons.serverNetwork),
+              ),
               _label('WoL broadcast address'),
-              TextField(controller: _wolBroadcast, decoration: _dec('192.168.1.255', AppIcons.serverNetwork)),
+              TextField(
+                controller: _wolBroadcast,
+                decoration: _dec('192.168.1.255', AppIcons.serverNetwork),
+              ),
             ],
           ] else ...[
             _label('Protocol'),
@@ -709,14 +874,22 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
               localController: _preLocal,
               remoteController: _preRemote,
               order: _preOrder,
-              onSwap: () => setState(() => _preOrder = _preOrder == 'local-first' ? 'remote-first' : 'local-first'),
+              onSwap: () => setState(
+                () => _preOrder = _preOrder == 'local-first'
+                    ? 'remote-first'
+                    : 'local-first',
+              ),
             ),
             _hookGroup(
               title: 'After disconnect',
               localController: _afterLocal,
               remoteController: _afterRemote,
               order: _afterOrder,
-              onSwap: () => setState(() => _afterOrder = _afterOrder == 'local-first' ? 'remote-first' : 'local-first'),
+              onSwap: () => setState(
+                () => _afterOrder = _afterOrder == 'local-first'
+                    ? 'remote-first'
+                    : 'local-first',
+              ),
             ),
           ],
           if (fc.showMonitoring)
@@ -737,26 +910,48 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             ),
           if (fc.showTerminalSettings) ...[
             _label('Terminal backspace'),
-            _optionDropdown(ServerEditorConstants.backspaceModes, _backspaceMode, (v) => setState(() => _backspaceMode = v)),
+            _optionDropdown(
+              ServerEditorConstants.backspaceModes,
+              _backspaceMode,
+              (v) => setState(() => _backspaceMode = v),
+            ),
             _label('Terminal delete'),
-            _optionDropdown(ServerEditorConstants.deleteModes, _deleteMode, (v) => setState(() => _deleteMode = v)),
+            _optionDropdown(
+              ServerEditorConstants.deleteModes,
+              _deleteMode,
+              (v) => setState(() => _deleteMode = v),
+            ),
             _label('Function keys'),
-            _optionDropdown(ServerEditorConstants.functionKeyModes, _functionKeyMode, (v) => setState(() => _functionKeyMode = v)),
+            _optionDropdown(
+              ServerEditorConstants.functionKeyModes,
+              _functionKeyMode,
+              (v) => setState(() => _functionKeyMode = v),
+            ),
           ],
           if (fc.showRdpSecurity) ...[
             _label('RDP security'),
-            _optionDropdown(ServerEditorConstants.rdpSecurityMethods, _rdpSecurity, (v) => setState(() => _rdpSecurity = v)),
+            _optionDropdown(
+              ServerEditorConstants.rdpSecurityMethods,
+              _rdpSecurity,
+              (v) => setState(() => _rdpSecurity = v),
+            ),
           ],
           if (fc.showKeyboardLayout) ...[
             _label('Keyboard layout'),
             DropdownButtonFormField<String>(
-              initialValue: ServerEditorConstants.keyboardLayouts.any((k) => k['value'] == _keyboardLayout)
+              initialValue:
+                  ServerEditorConstants.keyboardLayouts.any(
+                    (k) => k['value'] == _keyboardLayout,
+                  )
                   ? _keyboardLayout
                   : 'en-us-qwerty',
               decoration: _dec(null, AppIcons.keyboard),
               items: [
                 for (final k in ServerEditorConstants.keyboardLayouts)
-                  DropdownMenuItem(value: k['value'], child: Text(k['label']!, overflow: TextOverflow.ellipsis)),
+                  DropdownMenuItem(
+                    value: k['value'],
+                    child: Text(k['label']!, overflow: TextOverflow.ellipsis),
+                  ),
               ],
               onChanged: (v) {
                 if (v != null) setState(() => _keyboardLayout = v);
@@ -765,9 +960,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           ],
           if (fc.showDisplaySettings) ...[
             _label('Color depth'),
-            _optionDropdown(ServerEditorConstants.colorDepths, _colorDepth, (v) => setState(() => _colorDepth = v)),
+            _optionDropdown(
+              ServerEditorConstants.colorDepths,
+              _colorDepth,
+              (v) => setState(() => _colorDepth = v),
+            ),
             _label('Resize method'),
-            _optionDropdown(ServerEditorConstants.resizeMethods, _resizeMethod, (v) => setState(() => _resizeMethod = v)),
+            _optionDropdown(
+              ServerEditorConstants.resizeMethods,
+              _resizeMethod,
+              (v) => setState(() => _resizeMethod = v),
+            ),
           ],
           if (fc.showAudioSettings)
             _switchTile(
@@ -779,45 +982,71 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             ),
           if (fc.showPerformanceSettings) ...[
             _switchTile(
-                title: 'Wallpaper', subtitle: 'Show desktop wallpaper', icon: AppIcons.palette, value: _enableWallpaper, onChanged: (v) => setState(() => _enableWallpaper = v)),
+              title: 'Wallpaper',
+              subtitle: 'Show desktop wallpaper',
+              icon: AppIcons.palette,
+              value: _enableWallpaper,
+              onChanged: (v) => setState(() => _enableWallpaper = v),
+            ),
             _switchTile(
-                title: 'Theming', subtitle: 'Allow visual styles', icon: AppIcons.palette, value: _enableTheming, onChanged: (v) => setState(() => _enableTheming = v)),
+              title: 'Theming',
+              subtitle: 'Allow visual styles',
+              icon: AppIcons.palette,
+              value: _enableTheming,
+              onChanged: (v) => setState(() => _enableTheming = v),
+            ),
             _switchTile(
-                title: 'Font smoothing',
-                subtitle: 'Smooth fonts in session',
-                icon: AppIcons.formatSize,
-                value: _enableFontSmoothing,
-                onChanged: (v) => setState(() => _enableFontSmoothing = v)),
+              title: 'Font smoothing',
+              subtitle: 'Smooth fonts in session',
+              icon: AppIcons.formatSize,
+              value: _enableFontSmoothing,
+              onChanged: (v) => setState(() => _enableFontSmoothing = v),
+            ),
             _switchTile(
-                title: 'Full window drag',
-                subtitle: 'Show contents while dragging',
-                icon: AppIcons.cursorDefaultClick,
-                value: _enableFullWindowDrag,
-                onChanged: (v) => setState(() => _enableFullWindowDrag = v)),
+              title: 'Full window drag',
+              subtitle: 'Show contents while dragging',
+              icon: AppIcons.cursorDefaultClick,
+              value: _enableFullWindowDrag,
+              onChanged: (v) => setState(() => _enableFullWindowDrag = v),
+            ),
             _switchTile(
-                title: 'Desktop composition',
-                subtitle: 'Enable composition effects',
-                icon: AppIcons.monitorMultiple,
-                value: _enableDesktopComposition,
-                onChanged: (v) => setState(() => _enableDesktopComposition = v)),
+              title: 'Desktop composition',
+              subtitle: 'Enable composition effects',
+              icon: AppIcons.monitorMultiple,
+              value: _enableDesktopComposition,
+              onChanged: (v) => setState(() => _enableDesktopComposition = v),
+            ),
             _switchTile(
-                title: 'Menu animations',
-                subtitle: 'Animate menus and windows',
-                icon: AppIcons.creation,
-                value: _enableMenuAnimations,
-                onChanged: (v) => setState(() => _enableMenuAnimations = v)),
+              title: 'Menu animations',
+              subtitle: 'Animate menus and windows',
+              icon: AppIcons.creation,
+              value: _enableMenuAnimations,
+              onChanged: (v) => setState(() => _enableMenuAnimations = v),
+            ),
           ],
         ],
       ),
     );
   }
 
-  Widget _optionDropdown(List<Map<String, String>> options, String value, ValueChanged<String> onChanged) {
-    final valid = options.any((o) => o['value'] == value) ? value : (options.isNotEmpty ? options.first['value']! : '');
+  Widget _optionDropdown(
+    List<Map<String, String>> options,
+    String value,
+    ValueChanged<String> onChanged,
+  ) {
+    final valid = options.any((o) => o['value'] == value)
+        ? value
+        : (options.isNotEmpty ? options.first['value']! : '');
     return DropdownButtonFormField<String>(
       initialValue: valid,
       decoration: _dec(null, AppIcons.cogOutline),
-      items: [for (final o in options) DropdownMenuItem(value: o['value'], child: Text(o['label']!, overflow: TextOverflow.ellipsis))],
+      items: [
+        for (final o in options)
+          DropdownMenuItem(
+            value: o['value'],
+            child: Text(o['label']!, overflow: TextOverflow.ellipsis),
+          ),
+      ],
       onChanged: (v) {
         if (v != null) onChanged(v);
       },
@@ -835,7 +1064,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
       child: Row(
         children: [
           Icon(icon, size: 20, color: cs.primary),
@@ -844,8 +1077,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                Text(subtitle, style: TextStyle(fontSize: 12, color: cs.outline)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 12, color: cs.outline),
+                ),
               ],
             ),
           ),
@@ -860,7 +1102,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -868,10 +1114,16 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             children: [
               Icon(AppIcons.serverNetwork, size: 18, color: cs.primary),
               const SizedBox(width: 8),
-              const Text('Jump hosts', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              const Text(
+                'Jump hosts',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
             ],
           ),
-          Text('Route SSH through other servers in order', style: TextStyle(fontSize: 12, color: cs.outline)),
+          Text(
+            'Route SSH through other servers in order',
+            style: TextStyle(fontSize: 12, color: cs.outline),
+          ),
           const SizedBox(height: 8),
           for (int i = 0; i < _jumpHosts.length; i++)
             Padding(
@@ -882,8 +1134,18 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                     width: 26,
                     height: 26,
                     alignment: Alignment.center,
-                    decoration: BoxDecoration(color: cs.primaryContainer, shape: BoxShape.circle),
-                    child: Text('${i + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onPrimaryContainer)),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '${i + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onPrimaryContainer,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -892,12 +1154,25 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                       decoration: _dec(null, AppIcons.server),
                       items: [
                         for (final s in _availableJumpHosts(i))
-                          DropdownMenuItem(value: s.id.toString(), child: Text('${s.name} (${s.ip})', overflow: TextOverflow.ellipsis)),
-                        if (_jumpHosts[i] != null &&
-                            !_availableJumpHosts(i).any((s) => s.id.toString() == _jumpHosts[i].toString()))
                           DropdownMenuItem(
-                              value: _jumpHosts[i].toString(),
-                              child: Text('Server ${_jumpHosts[i]} (unavailable)', overflow: TextOverflow.ellipsis)),
+                            value: s.id.toString(),
+                            child: Text(
+                              '${s.name} (${s.ip})',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        if (_jumpHosts[i] != null &&
+                            !_availableJumpHosts(i).any(
+                              (s) =>
+                                  s.id.toString() == _jumpHosts[i].toString(),
+                            ))
+                          DropdownMenuItem(
+                            value: _jumpHosts[i].toString(),
+                            child: Text(
+                              'Server ${_jumpHosts[i]} (unavailable)',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                       ],
                       onChanged: (v) {
                         if (v == null) return;
@@ -931,7 +1206,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             )
           else
             Text(
-              _sshCandidates.isEmpty ? 'No SSH servers available' : 'All SSH servers already added',
+              _sshCandidates.isEmpty
+                  ? 'No SSH servers available'
+                  : 'All SSH servers already added',
               style: TextStyle(fontSize: 12, color: cs.outline),
             ),
         ],
@@ -945,7 +1222,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       if (i == index) continue;
       selected.add(_jumpHosts[i].toString());
     }
-    return _sshCandidates.where((s) => !selected.contains(s.id.toString())).toList();
+    return _sshCandidates
+        .where((s) => !selected.contains(s.id.toString()))
+        .toList();
   }
 
   String? _jumpHostValue(int index) {
@@ -980,39 +1259,68 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
-              IconButton(onPressed: onSwap, icon: Icon(AppIcons.refresh, size: 18, color: cs.primary)),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onSwap,
+                icon: Icon(AppIcons.refresh, size: 18, color: cs.primary),
+              ),
             ],
           ),
           _hookField(
-              label: firstIsLocal ? 'Local (1st)' : 'Remote (1st)',
-              controller: firstIsLocal ? localController : remoteController),
+            label: firstIsLocal ? 'Local (1st)' : 'Remote (1st)',
+            controller: firstIsLocal ? localController : remoteController,
+          ),
           const SizedBox(height: 8),
           _hookField(
-              label: firstIsLocal ? 'Remote (2nd)' : 'Local (2nd)',
-              controller: firstIsLocal ? remoteController : localController),
+            label: firstIsLocal ? 'Remote (2nd)' : 'Local (2nd)',
+            controller: firstIsLocal ? remoteController : localController,
+          ),
           if (_engineOffline)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: Text('Selected engine is offline, remote hooks run on fallback engine',
-                  style: TextStyle(fontSize: 11, color: cs.outline)),
+              child: Text(
+                'Selected engine is offline, remote hooks run on fallback engine',
+                style: TextStyle(fontSize: 11, color: cs.outline),
+              ),
             ),
         ],
       ),
     );
   }
 
-  Widget _hookField({required String label, required TextEditingController controller}) {
+  Widget _hookField({
+    required String label,
+    required TextEditingController controller,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline, fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.outline,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
@@ -1025,7 +1333,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
 
   List<ManagedIdentity> _linkedOrg() {
     return _linkedIds
-        .map((id) => _allIdentities.where((e) => e.id.toString() == id.toString()))
+        .map(
+          (id) => _allIdentities.where((e) => e.id.toString() == id.toString()),
+        )
         .where((it) => it.isNotEmpty)
         .map((it) => it.first)
         .where((e) => e.isOrg)
@@ -1034,7 +1344,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
 
   List<ManagedIdentity> _linkedPersonal() {
     return _linkedIds
-        .map((id) => _allIdentities.where((e) => e.id.toString() == id.toString()))
+        .map(
+          (id) => _allIdentities.where((e) => e.id.toString() == id.toString()),
+        )
         .where((it) => it.isNotEmpty)
         .map((it) => it.first)
         .where((e) => !e.isOrg)
@@ -1048,7 +1360,8 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       if (org) {
         if (!e.isOrg) return false;
         if (_organizationId != null) {
-          if (e.organizationId?.toString() != _organizationId.toString()) return false;
+          if (e.organizationId?.toString() != _organizationId.toString())
+            return false;
         }
       }
       if (!org && e.isOrg) return false;
@@ -1094,13 +1407,25 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700))),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               TextButton.icon(
                 onPressed: () => _addDraft(isOrg),
                 icon: Icon(AppIcons.plus, size: 16),
@@ -1109,24 +1434,39 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
             ],
           ),
           if (linked.isEmpty && available.isEmpty)
-            Text('No identities yet', style: TextStyle(fontSize: 12, color: cs.outline)),
+            Text(
+              'No identities yet',
+              style: TextStyle(fontSize: 12, color: cs.outline),
+            ),
           for (final m in linked) _linkedIdentityCard(m),
           if (available.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text('Available to link (${available.length})',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.outline)),
+            Text(
+              'Available to link (${available.length})',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: cs.outline,
+              ),
+            ),
             const SizedBox(height: 6),
             for (final m in available)
               Material(
                 color: Colors.transparent,
                 child: InkWell(
                   onTap: () => setState(() {
-                    final id = m.id is int ? m.id as int : int.tryParse(m.id.toString());
-                    if (id != null && !_linkedIds.contains(id)) _linkedIds.add(id);
+                    final id = m.id is int
+                        ? m.id as int
+                        : int.tryParse(m.id.toString());
+                    if (id != null && !_linkedIds.contains(id))
+                      _linkedIds.add(id);
                   }),
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 8,
+                      horizontal: 4,
+                    ),
                     child: Row(
                       children: [
                         Icon(AppIcons.linkVariant, size: 16, color: cs.primary),
@@ -1135,13 +1475,27 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(m.name.isEmpty ? 'Unnamed' : m.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                              Text(m.username.isEmpty ? 'No username' : m.username,
-                                  style: TextStyle(fontSize: 11, color: cs.outline)),
+                              Text(
+                                m.name.isEmpty ? 'Unnamed' : m.name,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                m.username.isEmpty ? 'No username' : m.username,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.outline,
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        Text(_authLabel(m.authType), style: TextStyle(fontSize: 11, color: cs.outline)),
+                        Text(
+                          _authLabel(m.authType),
+                          style: TextStyle(fontSize: 11, color: cs.outline),
+                        ),
                       ],
                     ),
                   ),
@@ -1154,11 +1508,20 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   }
 
   Widget _newDraftsSection() {
-    final news = _drafts.entries.where((e) => e.key.startsWith('new-')).toList();
+    final news = _drafts.entries
+        .where((e) => e.key.startsWith('new-'))
+        .toList();
     if (news.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [for (final e in news) _draftCard(e.key, e.value, isOrgScope: e.value.scope == 'organization')],
+      children: [
+        for (final e in news)
+          _draftCard(
+            e.key,
+            e.value,
+            isOrgScope: e.value.scope == 'organization',
+          ),
+      ],
     );
   }
 
@@ -1175,13 +1538,19 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
       setState(() => _allIdentities = identities);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Identity moved to organization'), behavior: SnackBarBehavior.floating),
+          const SnackBar(
+            content: Text('Identity moved to organization'),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Move failed: $e'), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text('Move failed: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -1192,16 +1561,29 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(m.name.isEmpty ? 'Unnamed' : m.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                child: Text(
+                  m.name.isEmpty ? 'Unnamed' : m.name,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-              Text(_authLabel(m.authType), style: TextStyle(fontSize: 11, color: cs.outline)),
+              Text(
+                _authLabel(m.authType),
+                style: TextStyle(fontSize: 11, color: cs.outline),
+              ),
               if (!m.isOrg && _organizationId != null)
                 IconButton(
                   icon: Icon(AppIcons.brandDomain, size: 18, color: cs.primary),
@@ -1210,7 +1592,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
               IconButton(
                 icon: Icon(AppIcons.cancel, size: 18, color: cs.outline),
                 onPressed: () => setState(() {
-                  _linkedIds.removeWhere((id) => id.toString() == m.id.toString());
+                  _linkedIds.removeWhere(
+                    (id) => id.toString() == m.id.toString(),
+                  );
                   _drafts.remove(m.id.toString());
                 }),
               ),
@@ -1229,15 +1613,24 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     );
   }
 
-  Widget _draftCard(String key, IdentityDraft draft, {required bool isOrgScope}) {
+  Widget _draftCard(
+    String key,
+    IdentityDraft draft, {
+    required bool isOrgScope,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final isNew = key.startsWith('new-');
     return Container(
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isNew ? cs.primaryContainer.withValues(alpha: 0.35) : cs.surfaceContainerHighest,
+        color: isNew
+            ? cs.primaryContainer.withValues(alpha: 0.35)
+            : cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isNew ? cs.primary.withValues(alpha: 0.45) : cs.outlineVariant,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1245,12 +1638,23 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           Row(
             children: [
               Expanded(
-                child: Text(isNew ? 'New identity${isOrgScope ? ' (org)' : ''}' : 'Edited identity',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                child: Text(
+                  isNew
+                      ? 'New identity${isOrgScope ? ' (org)' : ''}'
+                      : 'Edited identity',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               if (isNew)
                 IconButton(
-                  icon: Icon(AppIcons.trashCanOutline, size: 18, color: cs.outline),
+                  icon: Icon(
+                    AppIcons.trashCanOutline,
+                    size: 18,
+                    color: cs.outline,
+                  ),
                   onPressed: () => setState(() => _drafts.remove(key)),
                 ),
             ],
@@ -1262,11 +1666,18 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   }
 
   Widget _draftFields(String key, IdentityDraft draft) {
-    final options = ServerEditorConstants.authTypeLabels.where((o) => _allowedAuth.contains(o['value'])).toList();
+    final options = ServerEditorConstants.authTypeLabels
+        .where((o) => _allowedAuth.contains(o['value']))
+        .toList();
     final fallback = _allowedAuth.isNotEmpty ? _allowedAuth.first : 'password';
-    final selected = options.any((o) => o['value'] == draft.authType) ? draft.authType : fallback;
+    final selected = options.any((o) => o['value'] == draft.authType)
+        ? draft.authType
+        : fallback;
     final showUser = selected != 'password-only';
-    final showPassword = selected == 'password' || selected == 'password-only' || selected == 'both';
+    final showPassword =
+        selected == 'password' ||
+        selected == 'password-only' ||
+        selected == 'both';
     final showKey = selected == 'ssh' || selected == 'both';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1290,7 +1701,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           key: ValueKey('${key}_$selected'),
           initialValue: selected,
           decoration: _dec(null, AppIcons.shieldAccountOutline),
-          items: [for (final o in options) DropdownMenuItem(value: o['value'], child: Text(o['label']!))],
+          items: [
+            for (final o in options)
+              DropdownMenuItem(value: o['value'], child: Text(o['label']!)),
+          ],
           onChanged: (v) {
             if (v != null) setState(() => draft.authType = v);
           },
@@ -1333,11 +1747,16 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
     final cs = Theme.of(context).colorScheme;
     String? name;
     if (draft.sshKey != null && draft.sshKey!.isNotEmpty) {
-      name = draft.sshKey!.length > 40 ? 'Key loaded (${draft.sshKey!.length} chars)' : 'Key loaded';
+      name = draft.sshKey!.length > 40
+          ? 'Key loaded (${draft.sshKey!.length} chars)'
+          : 'Key loaded';
     }
     return Material(
       color: cs.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: cs.outlineVariant),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
@@ -1357,7 +1776,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
           } catch (e) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to read key: $e'), behavior: SnackBarBehavior.floating),
+                SnackBar(
+                  content: Text('Failed to read key: $e'),
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             }
           }
@@ -1369,10 +1791,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
               Icon(AppIcons.fileUploadOutline, size: 20, color: cs.outline),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(name ?? 'Select key file',
-                    style: TextStyle(fontSize: 14, color: name != null ? cs.onSurface : cs.outline), overflow: TextOverflow.ellipsis),
+                child: Text(
+                  name ?? 'Select key file',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: name != null ? cs.onSurface : cs.outline,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              if (name != null) Icon(AppIcons.checkCircle, size: 18, color: cs.primary),
+              if (name != null)
+                Icon(AppIcons.checkCircle, size: 18, color: cs.primary),
             ],
           ),
         ),
@@ -1395,7 +1824,9 @@ class _ServerEditorScreenState extends State<ServerEditorScreen> with SingleTick
   }
 
   String _authLabel(String value) {
-    final hit = ServerEditorConstants.authTypeLabels.where((o) => o['value'] == value);
+    final hit = ServerEditorConstants.authTypeLabels.where(
+      (o) => o['value'] == value,
+    );
     if (hit.isEmpty) return value;
     return hit.first['label']!;
   }

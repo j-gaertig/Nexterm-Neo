@@ -530,8 +530,8 @@ class _DestinationButton extends StatelessWidget {
               ),
               if (badgeText != null)
                 Positioned(
-                  right: 4,
-                  top: 4,
+                  right: 12,
+                  top: 6,
                   child: _NavigationBadge(
                     text: badgeText,
                     isAlert: destination.badgeIsAlert,
@@ -578,19 +578,19 @@ class _NavigationBadge extends StatelessWidget {
       },
       child: Container(
         key: ValueKey(text),
-        constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
-        padding: const EdgeInsets.symmetric(horizontal: 3.5),
+        constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(7.5),
-          border: Border.all(color: borderColor, width: 1.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor, width: 2),
         ),
         alignment: Alignment.center,
         child: Text(
           text,
           style: TextStyle(
             color: foreground,
-            fontSize: 9,
+            fontSize: 11,
             height: 1,
             fontWeight: FontWeight.w700,
           ),
