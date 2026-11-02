@@ -12,6 +12,7 @@ import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
 import '../widgets/floating_navigation_bar.dart';
+import '../widgets/main_navigation_scope.dart';
 import '../widgets/tab_crossfade.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
@@ -24,6 +25,7 @@ class MainNavigationPage extends StatefulWidget {
   final SnippetManager snippetManager;
   final AIManager aiManager;
   final SessionManager sessionManager;
+  final MainNavigationController? navigationController;
   final TerminalSettings terminalSettings;
   final SftpSettings sftpSettings;
   final ServerViewSettings serverViewSettings;
@@ -37,6 +39,7 @@ class MainNavigationPage extends StatefulWidget {
     required this.snippetManager,
     required this.aiManager,
     required this.sessionManager,
+    this.navigationController,
     required this.terminalSettings,
     required this.sftpSettings,
     required this.serverViewSettings,
@@ -52,6 +55,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   int _selectedIndex = 0;
   bool _hadSessions = false;
   String? _openSessionId;
+  late final MainNavigationController _navigationController;
+  late final bool _ownsNavigationController;
   final Set<String> _dismissedAttentionSessionIds = <String>{};
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
@@ -60,6 +65,13 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void initState() {
     super.initState();
+    _navigationController =
+        widget.navigationController ?? MainNavigationController();
+    _ownsNavigationController = widget.navigationController == null;
+    // A fresh shell always starts on Servers, even if the app-wide controller
+    // was left on another destination by a previous signed-in session.
+    _navigationController.select(0);
+    _navigationController.addListener(_onNavigationRequested);
     _hadSessions = widget.sessionManager.hasActiveSessions;
     widget.sessionManager.addListener(_onSessionsChanged);
   }
@@ -67,7 +79,31 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
+    _navigationController.removeListener(_onNavigationRequested);
+    if (_ownsNavigationController) _navigationController.dispose();
     super.dispose();
+  }
+
+  void _onNavigationRequested() {
+    if (!mounted) return;
+
+    final maxIndex = _hadSessions ? 3 : 2;
+    final requested = _navigationController.selectedIndex.clamp(0, maxIndex);
+    if (requested != _navigationController.selectedIndex) {
+      _navigationController.select(requested);
+    }
+    if (requested == _selectedIndex) return;
+
+    setState(() {
+      _selectedIndex = requested;
+      _openSessionId = null;
+    });
+  }
+
+  void _syncNavigationController() {
+    if (_navigationController.selectedIndex != _selectedIndex) {
+      _navigationController.select(_selectedIndex);
+    }
   }
 
   void _switchTab(int index) {
@@ -83,6 +119,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       _selectedIndex = index;
       _openSessionId = null;
     });
+    _syncNavigationController();
   }
 
   void _openSession(String sessionId) {
@@ -91,6 +128,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       _selectedIndex = 1;
       _openSessionId = sessionId;
     });
+    _syncNavigationController();
   }
 
   void _onSessionsChanged() {
@@ -124,6 +162,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     _hadSessions = hasSessions;
 
     setState(() {});
+    _syncNavigationController();
   }
 
   AppSession? get _attentionSession {
@@ -188,6 +227,9 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         child: MonitoringScreen(
           key: _monitoringKey,
           authManager: widget.authManager,
+          onDetailsChanged: () {
+            if (mounted) setState(() {});
+          },
         ),
       ),
       KeyedSubtree(
@@ -332,7 +374,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: _buildNavigationBar(hasSessions),
+                child: _buildNavigationBar(),
               ),
           ],
         ),
@@ -340,41 +382,19 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     );
   }
 
-  Widget _buildNavigationBar(bool hasSessions) {
-    final sessionCount = widget.sessionManager.sessionCount;
-    final waitingCount = widget.sessionManager.waitingInputCount;
+  Widget _buildNavigationBar() {
     return FloatingNavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _switchTab,
       trailing: _buildNavigationAction(),
-      destinations: [
-        const FloatingNavigationDestination(
-          icon: AppIcons.dns,
-          label: 'Servers',
-        ),
-        if (hasSessions)
-          FloatingNavigationDestination(
-            icon: AppIcons.monitorMultiple,
-            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
-            badgeText: waitingCount > 0 ? '!' : '$sessionCount',
-            badgeIsAlert: waitingCount > 0,
-          ),
-        const FloatingNavigationDestination(
-          icon: AppIcons.chartBoxOutline,
-          label: 'Monitoring',
-        ),
-        const FloatingNavigationDestination(
-          icon: AppIcons.cog,
-          label: 'Settings',
-        ),
-      ],
+      destinations: mainNavigationDestinations(widget.sessionManager),
     );
   }
 
   /// Page-specific action shown to the right of the navigation bar.
   ///
-  /// Servers adds a server, the sessions overview closes all sessions, and the
-  /// other destinations have no action of their own.
+  /// Servers adds a server, the sessions overview closes all sessions, and an
+  /// opened monitoring detail returns to the monitoring list.
   Widget? _buildNavigationAction() {
     if (_selectedIndex == 0) {
       return FloatingNavigationAction(
@@ -390,6 +410,16 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         tooltip: 'Close all sessions',
         destructive: true,
         onPressed: () => _sessionsKey.currentState?.closeAllSessions(),
+      );
+    }
+
+    final monitoringIndex = _hasSessions ? 2 : 1;
+    if (_selectedIndex == monitoringIndex &&
+        _monitoringKey.currentState?.hasDetails == true) {
+      return FloatingNavigationAction(
+        icon: AppIcons.arrowBack,
+        tooltip: 'Back',
+        onPressed: () => _monitoringKey.currentState?.goBack(),
       );
     }
 

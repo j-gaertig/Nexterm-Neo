@@ -4,6 +4,8 @@ import '../utils/app_icons.dart';
 import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
 import '../services/api_config.dart';
+import '../widgets/floating_navigation_bar.dart';
+import '../widgets/floating_navigation_scaffold.dart';
 import '../widgets/qr_scanner_page.dart';
 
 class QrScannerScreen extends StatefulWidget {
@@ -125,166 +127,169 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
     if (_code == null) return const Scaffold(body: SizedBox.shrink());
-    return Scaffold(body: SafeArea(child: _confirmBody(cs, tt)));
+
+    return FloatingNavigationScaffold(
+      onBack: _openScanner,
+      showBackAction: !_authorizing,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        final tt = Theme.of(context).textTheme;
+        final navInset = FloatingNavigationBarInset.of(context);
+        return Scaffold(body: SafeArea(child: _confirmBody(cs, tt, navInset)));
+      },
+    );
   }
 
-  Widget _confirmBody(ColorScheme cs, TextTheme tt) => ListView(
-    padding: const EdgeInsets.only(bottom: 24),
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(AppIcons.arrowBack),
-              onPressed: _authorizing ? null : _openScanner,
-            ),
-            const SizedBox(width: 4),
-            Text(
+  Widget _confirmBody(ColorScheme cs, TextTheme tt, double navInset) =>
+      ListView(
+        padding: EdgeInsets.only(bottom: 24 + navInset),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+            child: Text(
               'Authorize Login',
               style: tt.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
-          ],
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  AppIcons.monitorSmall,
-                  color: cs.onPrimaryContainer,
-                  size: 24,
-                ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cs.outlineVariant),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Web Login Request',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
+                    child: Icon(
+                      AppIcons.monitorSmall,
+                      color: cs.onPrimaryContainer,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Web Login Request',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(
+                            _server ?? '',
+                            style: TextStyle(fontSize: 12, color: cs.outline),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cs.outlineVariant),
+              ),
+              child: Column(
+                children: [
+                  _detailRow(AppIcons.key, 'Device Code', _code ?? '', cs),
+                  Divider(
+                    height: 1,
+                    indent: 56,
+                    color: cs.outlineVariant.withValues(alpha: 0.65),
+                  ),
+                  _detailRow(AppIcons.web, 'Server', _server ?? '', cs),
+                ],
+              ),
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      AppIcons.alertCircle,
+                      color: cs.onErrorContainer,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: Text(
-                        _server ?? '',
-                        style: TextStyle(fontSize: 12, color: cs.outline),
-                        overflow: TextOverflow.ellipsis,
+                        _error!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: cs.onErrorContainer,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-      const SizedBox(height: 4),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
-          ),
-          child: Column(
-            children: [
-              _detailRow(AppIcons.key, 'Device Code', _code ?? '', cs),
-              Divider(
-                height: 1,
-                indent: 56,
-                color: cs.outlineVariant.withValues(alpha: 0.65),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: FilledButton(
+              onPressed: _authorizing ? null : _authorize,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              _detailRow(AppIcons.web, 'Server', _server ?? '', cs),
-            ],
-          ),
-        ),
-      ),
-      if (_error != null)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: cs.errorContainer,
-              borderRadius: BorderRadius.circular(12),
+              child: _authorizing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Approve'),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  AppIcons.alertCircle,
-                  color: cs.onErrorContainer,
-                  size: 18,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: OutlinedButton(
+              onPressed: _authorizing ? null : () => Navigator.pop(context),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _error!,
-                    style: TextStyle(fontSize: 13, color: cs.onErrorContainer),
-                  ),
-                ),
-              ],
+              ),
+              child: const Text('Cancel'),
             ),
           ),
-        ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-        child: FilledButton(
-          onPressed: _authorizing ? null : _authorize,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: _authorizing
-              ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Approve'),
-        ),
-      ),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: OutlinedButton(
-          onPressed: _authorizing ? null : () => Navigator.pop(context),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text('Cancel'),
-        ),
-      ),
-    ],
-  );
+        ],
+      );
 
   Widget _detailRow(
     IconData icon,
