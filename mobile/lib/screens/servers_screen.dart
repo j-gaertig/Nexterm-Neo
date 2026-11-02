@@ -37,7 +37,15 @@ class ServersScreen extends StatefulWidget {
   final ValueChanged<String>? onSessionOpened;
   final Future<List<dynamic>> Function(String token)? loadEntries;
 
-  const ServersScreen({super.key, required this.authManager, required this.snippetManager, required this.sessionManager, required this.serverViewSettings, this.onSessionOpened, this.loadEntries});
+  const ServersScreen({
+    super.key,
+    required this.authManager,
+    required this.snippetManager,
+    required this.sessionManager,
+    required this.serverViewSettings,
+    this.onSessionOpened,
+    this.loadEntries,
+  });
 
   @override
   State<ServersScreen> createState() => ServersScreenState();
@@ -67,16 +75,23 @@ class ServersScreenState extends State<ServersScreen> {
     return 'n:${folder.type}:${folder.name}:${folder.position}';
   }
 
-  int get _totalServers => folders.fold(0, (sum, item) => sum + _countServers(item));
+  int get _totalServers =>
+      folders.fold(0, (sum, item) => sum + _countServers(item));
   int _countServers(dynamic item) {
     if (item is Server) return 1;
-    if (item is ServerFolder) return item.allServers.length + item.allFolders.fold(0, (sum, sf) => sum + _countServers(sf));
+    if (item is ServerFolder)
+      return item.allServers.length +
+          item.allFolders.fold(0, (sum, sf) => sum + _countServers(sf));
     return 0;
   }
-  int get _onlineServers => folders.fold(0, (sum, item) => sum + _countOnline(item));
+
+  int get _onlineServers =>
+      folders.fold(0, (sum, item) => sum + _countOnline(item));
   int _countOnline(dynamic item) {
     if (item is Server) return item.isRunning ? 1 : 0;
-    if (item is ServerFolder) return item.allServers.where((s) => s.isRunning).length + item.allFolders.fold(0, (sum, sf) => sum + _countOnline(sf));
+    if (item is ServerFolder)
+      return item.allServers.where((s) => s.isRunning).length +
+          item.allFolders.fold(0, (sum, sf) => sum + _countOnline(sf));
     return 0;
   }
 
@@ -130,14 +145,23 @@ class ServersScreenState extends State<ServersScreen> {
     if (hasText != _hasText && mounted) setState(() => _hasText = hasText);
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () {
-      if (mounted) setState(() { _query = _search.text.trim(); _filterFolders(); });
+      if (mounted)
+        setState(() {
+          _query = _search.text.trim();
+          _filterFolders();
+        });
     });
   }
 
   void _clearSearch() {
     _search.clear();
     _debounce?.cancel();
-    if (mounted) setState(() { _query = ''; _hasText = false; _filterFolders(); });
+    if (mounted)
+      setState(() {
+        _query = '';
+        _hasText = false;
+        _filterFolders();
+      });
   }
 
   Future<void> _initStateManager() async {
@@ -149,8 +173,17 @@ class ServersScreenState extends State<ServersScreen> {
     final generation = ++_loadGeneration;
     try {
       final token = widget.authManager.sessionToken;
-      if (token == null) { if (mounted) setState(() { errorMessage = 'Not authenticated'; isLoading = false; }); return; }
-      final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
+      if (token == null) {
+        if (mounted)
+          setState(() {
+            errorMessage = 'Not authenticated';
+            isLoading = false;
+          });
+        return;
+      }
+      final data =
+          await (widget.loadEntries?.call(token) ??
+              ServerService.getServerList(token));
       if (!mounted || generation != _loadGeneration) return;
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
@@ -167,7 +200,10 @@ class ServersScreenState extends State<ServersScreen> {
       _pruneStaleFolderStates(data);
     } catch (e) {
       if (mounted && generation == _loadGeneration) {
-        setState(() { errorMessage = 'Failed to load servers: $e'; isLoading = false; });
+        setState(() {
+          errorMessage = 'Failed to load servers: $e';
+          isLoading = false;
+        });
       }
     }
   }
@@ -176,33 +212,48 @@ class ServersScreenState extends State<ServersScreen> {
     final map = <int, Tag>{};
     for (final item in list) {
       if (item is Server) {
-        for (final t in item.tags ?? <Tag>[]) { map[t.id] = t; }
+        for (final t in item.tags ?? <Tag>[]) {
+          map[t.id] = t;
+        }
       } else if (item is ServerFolder) {
         for (final s in item.allServers) {
-          for (final t in s.tags ?? <Tag>[]) { map[t.id] = t; }
+          for (final t in s.tags ?? <Tag>[]) {
+            map[t.id] = t;
+          }
         }
-        for (final t in _collectTags(item.allFolders)) { map[t.id] = t; }
+        for (final t in _collectTags(item.allFolders)) {
+          map[t.id] = t;
+        }
       }
     }
     return map.values.toList()..sort((a, b) => a.name.compareTo(b.name));
   }
 
-  bool _serverMatchesTags(Server s) => _selectedTags.isEmpty || (s.tags?.any((t) => _selectedTags.contains(t.id)) ?? false);
+  bool _serverMatchesTags(Server s) =>
+      _selectedTags.isEmpty ||
+      (s.tags?.any((t) => _selectedTags.contains(t.id)) ?? false);
 
   void _filterFolders() {
-    if (_query.trim().isEmpty && _selectedTags.isEmpty) { filteredFolders = List.from(folders); return; }
-    filteredFolders = folders.map((item) {
-      if (item is ServerFolder) return _filterFolder(item);
-      if (item is Server) return _serverMatches(item) ? item : null;
-      return null;
-    }).where((e) => e != null).toList();
+    if (_query.trim().isEmpty && _selectedTags.isEmpty) {
+      filteredFolders = List.from(folders);
+      return;
+    }
+    filteredFolders = folders
+        .map((item) {
+          if (item is ServerFolder) return _filterFolder(item);
+          if (item is Server) return _serverMatches(item) ? item : null;
+          return null;
+        })
+        .where((e) => e != null)
+        .toList();
   }
 
   bool _serverMatches(Server s) {
     final matchesTag = _serverMatchesTags(s);
     final q = _query.trim().toLowerCase();
     if (q.isEmpty) return matchesTag;
-    return matchesTag && (s.name.toLowerCase().contains(q) || s.ip.toLowerCase().contains(q));
+    return matchesTag &&
+        (s.name.toLowerCase().contains(q) || s.ip.toLowerCase().contains(q));
   }
 
   bool _tagMatches(Server s) => _serverMatchesTags(s);
@@ -228,10 +279,16 @@ class ServersScreenState extends State<ServersScreen> {
     final kept = _tagOnlyEntries(folder);
     if (kept.isEmpty) return null;
     return ServerFolder(
-      id: folder.id, name: folder.name, type: folder.type, position: folder.position,
-      organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
+      id: folder.id,
+      name: folder.name,
+      type: folder.type,
+      position: folder.position,
+      organizationId: folder.organizationId,
+      requireConnectionReason: folder.requireConnectionReason,
       entries: kept,
-      ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
+      ip: folder.ip,
+      icon: folder.icon,
+      folderType: folder.folderType,
     );
   }
 
@@ -243,10 +300,16 @@ class ServersScreenState extends State<ServersScreen> {
       final tagEntries = _tagOnlyEntries(folder);
       if (tagEntries.isNotEmpty) {
         return ServerFolder(
-          id: folder.id, name: folder.name, type: folder.type, position: folder.position,
-          organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
+          id: folder.id,
+          name: folder.name,
+          type: folder.type,
+          position: folder.position,
+          organizationId: folder.organizationId,
+          requireConnectionReason: folder.requireConnectionReason,
           entries: tagEntries,
-          ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
+          ip: folder.ip,
+          icon: folder.icon,
+          folderType: folder.folderType,
         );
       }
       return null;
@@ -266,10 +329,16 @@ class ServersScreenState extends State<ServersScreen> {
     }
     if (kept.isNotEmpty) {
       return ServerFolder(
-        id: folder.id, name: folder.name, type: folder.type, position: folder.position,
-        organizationId: folder.organizationId, requireConnectionReason: folder.requireConnectionReason,
+        id: folder.id,
+        name: folder.name,
+        type: folder.type,
+        position: folder.position,
+        organizationId: folder.organizationId,
+        requireConnectionReason: folder.requireConnectionReason,
         entries: kept,
-        ip: folder.ip, icon: folder.icon, folderType: folder.folderType,
+        ip: folder.ip,
+        icon: folder.icon,
+        folderType: folder.folderType,
       );
     }
     return null;
@@ -280,7 +349,9 @@ class ServersScreenState extends State<ServersScreen> {
     try {
       final token = widget.authManager.sessionToken;
       if (token == null) return;
-      final data = await (widget.loadEntries?.call(token) ?? ServerService.getServerList(token));
+      final data =
+          await (widget.loadEntries?.call(token) ??
+              ServerService.getServerList(token));
       if (!mounted || generation != _loadGeneration) return;
       final tags = _collectTags(data);
       final validTagIds = tags.map((t) => t.id).toSet();
@@ -295,14 +366,22 @@ class ServersScreenState extends State<ServersScreen> {
       });
       _pruneStaleFolderStates(data);
     } catch (e) {
-      if (mounted && generation == _loadGeneration) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to refresh: $e'), behavior: SnackBarBehavior.floating));
+      if (mounted && generation == _loadGeneration)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
     }
   }
 
   void _restoreStates(List<dynamic> list) {
     for (final item in list) {
       if (item is ServerFolder) {
-        if (_folderState != null && item.id != null && _folderState!.isFolderExpanded(item.id)) {
+        if (_folderState != null &&
+            item.id != null &&
+            _folderState!.isFolderExpanded(item.id)) {
           _expanded.add(_folderKey(item));
         }
         if (item.allFolders.isNotEmpty) _restoreStates(item.allFolders);
@@ -322,6 +401,7 @@ class ServersScreenState extends State<ServersScreen> {
         }
       }
     }
+
     collect(list);
     _expanded.removeWhere((k) => !valid.contains(k));
     for (final id in state.getAllExpandedFolderIds()) {
@@ -349,17 +429,23 @@ class ServersScreenState extends State<ServersScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(children: [
-          _buildHeader(cs, tt),
-          Expanded(
-            child: ListenableBuilder(
-              listenable: widget.serverViewSettings,
-              builder: (_, __) => isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : errorMessage != null ? _buildError(cs, tt) : filteredFolders.isEmpty ? _buildEmpty(cs, tt) : _buildList(cs),
+        child: Column(
+          children: [
+            _buildHeader(cs, tt),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: widget.serverViewSettings,
+                builder: (_, __) => isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : errorMessage != null
+                    ? _buildError(cs, tt)
+                    : filteredFolders.isEmpty
+                    ? _buildEmpty(cs, tt)
+                    : _buildList(cs),
+              ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }
@@ -370,58 +456,94 @@ class ServersScreenState extends State<ServersScreen> {
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Servers', style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
-            if (!isLoading && errorMessage == null && total > 0)
-              Padding(padding: const EdgeInsets.only(top: 2),
-                child: Text('$online of $total online', style: tt.bodySmall?.copyWith(color: cs.outline))),
-          ])),
-          if (widget.authManager.accountManager.accounts.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            InstanceSwitcher(
-              authManager: widget.authManager,
-              onManageInstances: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ServerAccountsScreen(
-                    authManager: widget.authManager,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Servers',
+                      style: tt.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (!isLoading && errorMessage == null && total > 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Text(
+                          '$online of $total online',
+                          style: tt.bodySmall?.copyWith(color: cs.outline),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (widget.authManager.accountManager.accounts.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                InstanceSwitcher(
+                  authManager: widget.authManager,
+                  onManageInstances: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          ServerAccountsScreen(authManager: widget.authManager),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Focus(
+                  onFocusChange: (f) => setState(() => _searchFocused = f),
+                  child: TextField(
+                    controller: _search,
+                    decoration: InputDecoration(
+                      hintText: 'Search servers...',
+                      prefixIcon: Icon(AppIcons.magnify, size: 22),
+                      suffixIcon: _hasText
+                          ? IconButton(
+                              icon: Icon(AppIcons.close, size: 20),
+                              tooltip: 'Clear search',
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: _searchFocused
+                          ? cs.surfaceContainerHighest
+                          : cs.surfaceContainerHigh,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: cs.primary, width: 1.5),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      isDense: true,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          Expanded(
-            child: Focus(
-              onFocusChange: (f) => setState(() => _searchFocused = f),
-              child: TextField(
-                controller: _search,
-                decoration: InputDecoration(
-                  hintText: 'Search servers...',
-                  prefixIcon: Icon(AppIcons.magnify, size: 22),
-                  suffixIcon: _hasText
-                      ? IconButton(icon: Icon(AppIcons.close, size: 20), tooltip: 'Clear search', onPressed: _clearSearch)
-                      : null,
-                  filled: true,
-                  fillColor: _searchFocused ? cs.surfaceContainerHighest : cs.surfaceContainerHigh,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: cs.primary, width: 1.5)),
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                ),
-              ),
-            ),
+              const SizedBox(width: 8),
+              _buildTagFilterButton(cs),
+            ],
           ),
-          const SizedBox(width: 8),
-          _buildTagFilterButton(cs),
-        ]),
-        const SizedBox(height: 8),
-      ]),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 
@@ -470,30 +592,36 @@ class ServersScreenState extends State<ServersScreen> {
             onTap: enabled ? _openTagFilter : null,
             child: SizedBox.square(
               dimension: 48,
-              child: Stack(alignment: Alignment.center, children: [
-                Icon(AppIcons.filterVariant, size: 20, color: foreground),
-                if (active)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: cs.onPrimary,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          color: cs.primary,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(AppIcons.filterVariant, size: 20, color: foreground),
+                  if (active)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 1,
+                        ),
+                        decoration: BoxDecoration(
+                          color: cs.onPrimary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '$count',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                            color: cs.primary,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ]),
+                ],
+              ),
             ),
           ),
         ),
@@ -502,52 +630,103 @@ class ServersScreenState extends State<ServersScreen> {
   }
 
   Widget _buildError(ColorScheme cs, TextTheme tt) => Center(
-    child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: cs.errorContainer, shape: BoxShape.circle),
-        child: Icon(AppIcons.alertCircleOutline, size: 32, color: cs.onErrorContainer),
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cs.errorContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              AppIcons.alertCircleOutline,
+              size: 32,
+              color: cs.onErrorContainer,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Something went wrong',
+            style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            errorMessage!,
+            style: tt.bodySmall?.copyWith(color: cs.outline),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _loadData,
+            icon: Icon(AppIcons.refresh, size: 18),
+            label: const Text('Retry'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ],
       ),
-      const SizedBox(height: 20),
-      Text('Something went wrong', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-      const SizedBox(height: 8),
-      Text(errorMessage!, style: tt.bodySmall?.copyWith(color: cs.outline), textAlign: TextAlign.center),
-      const SizedBox(height: 24),
-      FilledButton.icon(onPressed: _loadData, icon: Icon(AppIcons.refresh, size: 18), label: const Text('Retry'),
-        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
-    ])),
+    ),
   );
 
-  bool get _hasActiveFilter => _query.trim().isNotEmpty || _selectedTags.isNotEmpty;
+  bool get _hasActiveFilter =>
+      _query.trim().isNotEmpty || _selectedTags.isNotEmpty;
 
   Widget _buildEmpty(ColorScheme cs, TextTheme tt) => RefreshIndicator(
     onRefresh: _refreshData,
     child: ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      children: [SizedBox(
-      height: MediaQuery.of(context).size.height * 0.5,
-      child: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: cs.surfaceContainerHigh, shape: BoxShape.circle),
-          child: Icon(AppIcons.serverOff, size: 32, color: cs.outline),
-        ),
-        const SizedBox(height: 20),
-        Text(_hasActiveFilter ? 'No results' : 'No servers yet', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        Text(_hasActiveFilter ? 'Try a different search term or clear filters' : 'Add servers with the + button',
-          style: tt.bodySmall?.copyWith(color: cs.outline), textAlign: TextAlign.center),
-        if (_hasActiveFilter) ...[
-          const SizedBox(height: 16),
-          TextButton.icon(
-            onPressed: () { _selectedTags.clear(); _clearSearch(); },
-            icon: Icon(AppIcons.close, size: 16),
-            label: const Text('Clear filters'),
+      children: [
+        SizedBox(
+          height: MediaQuery.of(context).size.height * 0.5,
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHigh,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(AppIcons.serverOff, size: 32, color: cs.outline),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  _hasActiveFilter ? 'No results' : 'No servers yet',
+                  style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _hasActiveFilter
+                      ? 'Try a different search term or clear filters'
+                      : 'Add servers with the + button',
+                  style: tt.bodySmall?.copyWith(color: cs.outline),
+                  textAlign: TextAlign.center,
+                ),
+                if (_hasActiveFilter) ...[
+                  const SizedBox(height: 16),
+                  TextButton.icon(
+                    onPressed: () {
+                      _selectedTags.clear();
+                      _clearSearch();
+                    },
+                    icon: Icon(AppIcons.close, size: 16),
+                    label: const Text('Clear filters'),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ],
-      ])),
-    )]),
+        ),
+      ],
+    ),
   );
 
   Widget _buildList(ColorScheme cs) {
@@ -557,15 +736,30 @@ class ServersScreenState extends State<ServersScreen> {
         onRefresh: _refreshData,
         child: ListView.builder(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.only(left: 8, right: 8, bottom: 16 + navInset, top: 4),
+          padding: EdgeInsets.only(
+            left: 8,
+            right: 8,
+            bottom: 16 + navInset,
+            top: 4,
+          ),
           itemCount: filteredFolders.length,
           itemBuilder: (_, i) {
             final e = filteredFolders[i];
             if (e is ServerFolder) {
-              return _buildFolder(e, 0, key: ValueKey('folder:${e.id ?? e.name}:${e.type}:${e.position}'));
+              return _buildFolder(
+                e,
+                0,
+                key: ValueKey(
+                  'folder:${e.id ?? e.name}:${e.type}:${e.position}',
+                ),
+              );
             }
             if (e is Server) {
-              return _buildServer(e, 0, key: ValueKey('server:${e.id ?? e.name}'));
+              return _buildServer(
+                e,
+                0,
+                key: ValueKey('server:${e.id ?? e.name}'),
+              );
             }
             return const SizedBox.shrink();
           },
@@ -578,10 +772,16 @@ class ServersScreenState extends State<ServersScreen> {
       onRefresh: _refreshData,
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(left: 8, right: 8, bottom: 16 + navInset, top: 4),
+        padding: EdgeInsets.only(
+          left: 8,
+          right: 8,
+          bottom: 16 + navInset,
+          top: 4,
+        ),
         itemCount: (topServers.isNotEmpty ? 1 : 0) + rest.length,
         itemBuilder: (_, i) {
-          if (topServers.isNotEmpty && i == 0) return _buildServerGrid(topServers, 0);
+          if (topServers.isNotEmpty && i == 0)
+            return _buildServerGrid(topServers, 0);
           final e = rest[topServers.isNotEmpty ? i - 1 : i];
           return _buildEntry(e, 0);
         },
@@ -591,9 +791,20 @@ class ServersScreenState extends State<ServersScreen> {
 
   Widget _buildEntry(dynamic entry, int depth) {
     if (entry is ServerFolder) {
-      return _buildFolder(entry, depth, key: ValueKey('folder:${entry.id ?? entry.name}:${entry.type}:${entry.position}'));
+      return _buildFolder(
+        entry,
+        depth,
+        key: ValueKey(
+          'folder:${entry.id ?? entry.name}:${entry.type}:${entry.position}',
+        ),
+      );
     }
-    if (entry is Server) return _buildServer(entry, depth, key: ValueKey('server:${entry.id ?? entry.name}'));
+    if (entry is Server)
+      return _buildServer(
+        entry,
+        depth,
+        key: ValueKey('server:${entry.id ?? entry.name}'),
+      );
     return const SizedBox.shrink();
   }
 
@@ -601,62 +812,122 @@ class ServersScreenState extends State<ServersScreen> {
     final cs = Theme.of(context).colorScheme;
     final hasEntries = folder.entries.isNotEmpty;
     final open = _expanded.contains(_folderKey(folder));
-    final serverCount = folder.allServers.length + folder.allFolders.fold(0, (sum, f) => sum + _countServers(f));
+    final serverCount =
+        folder.allServers.length +
+        folder.allFolders.fold(0, (sum, f) => sum + _countServers(f));
     final cappedDepth = depth.clamp(0, 2);
 
     final (icon, color) = folder.isOrganization
         ? (open ? AppIcons.brandDomain : AppIcons.brandDomainOff, cs.primary)
         : folder.isPveNode
-            ? (AppIcons.brandServer, cs.tertiary)
-            : (open ? AppIcons.brandFolderOpen : AppIcons.brandFolder, cs.primary);
+        ? (AppIcons.brandServer, cs.tertiary)
+        : (open ? AppIcons.brandFolderOpen : AppIcons.brandFolder, cs.primary);
 
-    return Column(key: key, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12, top: depth == 0 ? 4 : 0),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: hasEntries ? () => _toggleFolder(folder) : null,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-              child: Row(children: [
-                Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                  child: Icon(icon, color: color, size: 17),
+    return Column(
+      key: key,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+            left: 12.0 + cappedDepth * 16,
+            right: 12,
+            top: depth == 0 ? 4 : 0,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: hasEntries ? () => _toggleFolder(folder) : null,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 10,
                 ),
-                const SizedBox(width: 10),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(folder.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                  if (serverCount > 0) Text('$serverCount server${serverCount == 1 ? '' : 's'}',
-                    style: TextStyle(fontSize: 11, color: cs.outline)),
-                ])),
-                if (hasEntries)
-                  AnimatedRotation(turns: open ? 0.5 : 0, duration: const Duration(milliseconds: 200),
-                    child: Icon(AppIcons.chevronDown, color: cs.outline, size: 20)),
-              ]),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(icon, color: color, size: 17),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            folder.name,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (serverCount > 0)
+                            Text(
+                              '$serverCount server${serverCount == 1 ? '' : 's'}',
+                              style: TextStyle(fontSize: 11, color: cs.outline),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (hasEntries)
+                      AnimatedRotation(
+                        turns: open ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          AppIcons.chevronDown,
+                          color: cs.outline,
+                          size: 20,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
-      AnimatedCrossFade(
-        firstChild: const SizedBox(width: double.infinity),
-        secondChild: open
-            ? Column(children: [
-                if (folder.allServers.isNotEmpty)
-                  widget.serverViewSettings.isGrid
-                      ? _buildServerGrid(folder.allServers, depth + 1)
-                      : Column(children: [for (final s in folder.allServers) _buildServer(s, depth + 1, key: ValueKey('server:${s.id ?? s.name}'))]),
-                for (final f in folder.allFolders)
-                  _buildFolder(f, depth + 1, key: ValueKey('folder:${f.id ?? f.name}:${f.type}:${f.position}')),
-              ])
-            : const SizedBox(width: double.infinity),
-        crossFadeState: open ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-        duration: const Duration(milliseconds: 200),
-        sizeCurve: Curves.easeInOut,
-      ),
-    ]);
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: open
+              ? Column(
+                  children: [
+                    if (folder.allServers.isNotEmpty)
+                      widget.serverViewSettings.isGrid
+                          ? _buildServerGrid(folder.allServers, depth + 1)
+                          : Column(
+                              children: [
+                                for (final s in folder.allServers)
+                                  _buildServer(
+                                    s,
+                                    depth + 1,
+                                    key: ValueKey('server:${s.id ?? s.name}'),
+                                  ),
+                              ],
+                            ),
+                    for (final f in folder.allFolders)
+                      _buildFolder(
+                        f,
+                        depth + 1,
+                        key: ValueKey(
+                          'folder:${f.id ?? f.name}:${f.type}:${f.position}',
+                        ),
+                      ),
+                  ],
+                )
+              : const SizedBox(width: double.infinity),
+          crossFadeState: open
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+          sizeCurve: Curves.easeInOut,
+        ),
+      ],
+    );
   }
 
   static const double _gridSpacing = 8;
@@ -742,17 +1013,23 @@ class ServersScreenState extends State<ServersScreen> {
 
     final bg = offline
         ? mutedTileBackground(cs)
-        : pve ? cs.tertiaryContainer : cs.primaryContainer;
+        : pve
+        ? cs.tertiaryContainer
+        : cs.primaryContainer;
     final fg = offline
         ? mutedTileForeground(cs)
-        : pve ? cs.onTertiaryContainer : cs.onPrimaryContainer;
+        : pve
+        ? cs.onTertiaryContainer
+        : cs.onPrimaryContainer;
 
     String? sub;
     final ip = server.ip.trim();
     if (server.disabled) {
       sub = ip.isNotEmpty && ip != 'N/A' ? 'Disabled · $ip' : 'Disabled';
     } else if (pve && server.status != null) {
-      sub = ip.isNotEmpty && ip != 'N/A' ? '${server.status} · $ip' : server.status;
+      sub = ip.isNotEmpty && ip != 'N/A'
+          ? '${server.status} · $ip'
+          : server.status;
     } else if (ip.isNotEmpty && ip != 'N/A') {
       sub = ip;
     }
@@ -760,53 +1037,108 @@ class ServersScreenState extends State<ServersScreen> {
     final shownTags = tags.take(3).toList();
     final extraTags = tags.length - shownTags.length;
     final cappedDepth = depth.clamp(0, 2);
-    final statusLabel = server.disabled ? 'Disabled' : (offline ? 'Offline' : 'Online');
+    final statusLabel = server.disabled
+        ? 'Disabled'
+        : (offline ? 'Offline' : 'Online');
 
     return Semantics(
       button: true,
       label: '${server.name}, $statusLabel${sub != null ? ', $sub' : ''}',
       child: Padding(
-      key: key,
-      padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _connectToServer(server),
-          onLongPress: () => _showServerMenu(server),
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: Row(children: [
-              Container(
-                width: 42, height: 42,
-                decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-                child: Center(child: Icon(icon, color: fg, size: 20)),
+        key: key,
+        padding: EdgeInsets.only(left: 12.0 + cappedDepth * 16, right: 12),
+        child: Material(
+          key: ValueKey('server-tile-${server.id ?? server.name}'),
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => _connectToServer(server),
+            onLongPress: () => _showServerMenu(server),
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: bg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(child: Icon(icon, color: fg, size: 20)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          server.name,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: offline ? mutedServerText(cs) : cs.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (sub != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              sub,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: offline
+                                    ? mutedServerText(cs)
+                                    : cs.outline,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (tags.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final t in shownTags)
+                            Container(
+                              width: 8,
+                              height: 8,
+                              margin: const EdgeInsets.only(left: 4),
+                              decoration: BoxDecoration(
+                                color: _parseColor(t.color),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          if (extraTags > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Text(
+                                '+$extraTags',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: cs.outline,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  Icon(
+                    AppIcons.chevronRight,
+                    color: cs.outlineVariant,
+                    size: 18,
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                Text(server.name, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: offline ? mutedServerText(cs) : cs.onSurface), overflow: TextOverflow.ellipsis),
-                if (sub != null) Padding(padding: const EdgeInsets.only(top: 2),
-                  child: Text(sub, style: TextStyle(fontSize: 12, color: offline ? mutedServerText(cs) : cs.outline), overflow: TextOverflow.ellipsis)),
-              ])),
-              if (tags.isNotEmpty)
-                Padding(padding: const EdgeInsets.only(right: 4),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    for (final t in shownTags)
-                      Container(
-                        width: 8, height: 8, margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(color: _parseColor(t.color), shape: BoxShape.circle),
-                      ),
-                    if (extraTags > 0)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Text('+$extraTags', style: TextStyle(fontSize: 10, color: cs.outline)),
-                      ),
-                  ])),
-              Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
-            ]),
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -868,20 +1200,20 @@ class ServersScreenState extends State<ServersScreen> {
         );
       } else {
         opened = switch (type) {
-          ConnectionType.guacamole => await widget.sessionManager
-              .createGuacSession(
-                token: token,
-                server: server,
-                directIdentity: directIdentity,
-                connectionReason: connectionReason,
-              ),
-          ConnectionType.terminal => await widget.sessionManager
-              .createTerminalSession(
-                token: token,
-                server: server,
-                directIdentity: directIdentity,
-                connectionReason: connectionReason,
-              ),
+          ConnectionType.guacamole =>
+            await widget.sessionManager.createGuacSession(
+              token: token,
+              server: server,
+              directIdentity: directIdentity,
+              connectionReason: connectionReason,
+            ),
+          ConnectionType.terminal =>
+            await widget.sessionManager.createTerminalSession(
+              token: token,
+              server: server,
+              directIdentity: directIdentity,
+              connectionReason: connectionReason,
+            ),
           ConnectionType.sftp => await widget.sessionManager.createSftpSession(
             token: token,
             server: server,
@@ -961,16 +1293,24 @@ class ServersScreenState extends State<ServersScreen> {
   bool _requiresConnectionReason(Server server) {
     final id = _serverIdInt(server.id);
     if (id == null) return false;
-    return _findOrganizationForServer(id, folders)?.requireConnectionReason ?? false;
+    return _findOrganizationForServer(id, folders)?.requireConnectionReason ??
+        false;
   }
 
-  ServerFolder? _findOrganizationForServer(int serverId, List<dynamic> items, [ServerFolder? currentOrg]) {
+  ServerFolder? _findOrganizationForServer(
+    int serverId,
+    List<dynamic> items, [
+    ServerFolder? currentOrg,
+  ]) {
     for (final item in items) {
       if (item is Server) {
         if (_serverIdInt(item.id) == serverId) return currentOrg;
       } else if (item is ServerFolder) {
         final org = item.isOrganization ? item : currentOrg;
-        final found = _findOrganizationForServer(serverId, [...item.allServers, ...item.allFolders], org);
+        final found = _findOrganizationForServer(serverId, [
+          ...item.allServers,
+          ...item.allFolders,
+        ], org);
         if (found != null) return found;
       }
     }
@@ -1000,13 +1340,21 @@ class ServersScreenState extends State<ServersScreen> {
 
   Future<void> _quickConnect(Server server) async {
     if (server.disabled) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${server.name} is disabled'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     if (server.isPve) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Quick Connect is not supported for Proxmox entries'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Quick Connect is not supported for Proxmox entries'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
 
@@ -1018,14 +1366,18 @@ class ServersScreenState extends State<ServersScreen> {
     final directIdentity = await showQuickConnectSheet(context, server);
     if (directIdentity == null || !mounted) return;
 
-    final isFileProtocolForQuickConnect = const {'sftp', 'ftp', 'ftps'}.contains(server.protocol?.toLowerCase());
+    final isFileProtocolForQuickConnect = const {
+      'sftp',
+      'ftp',
+      'ftps',
+    }.contains(server.protocol?.toLowerCase());
     _initiateConnection(
       server,
       type: ServerService.isGuacamoleProtocol(server.protocol)
           ? ConnectionType.guacamole
           : isFileProtocolForQuickConnect
-              ? ConnectionType.sftp
-              : ConnectionType.terminal,
+          ? ConnectionType.sftp
+          : ConnectionType.terminal,
       directIdentity: directIdentity,
     );
   }
@@ -1033,36 +1385,56 @@ class ServersScreenState extends State<ServersScreen> {
   Future<void> _wakeServer(Server server) async {
     if (server.disabled) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${server.name} is disabled'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
     final token = widget.authManager.sessionToken;
     if (token == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Not authenticated'), behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Not authenticated'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
     final entryId = server.id;
     if (entryId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Failed to send magic packet: missing server id'), behavior: SnackBarBehavior.floating));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send magic packet: missing server id'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
       return;
     }
     try {
       await ServerService.wakeServer(token: token, entryId: entryId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Magic packet sent to ${server.name}'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Magic packet sent to ${server.name}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Failed to send magic packet: $e'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send magic packet: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -1072,12 +1444,20 @@ class ServersScreenState extends State<ServersScreen> {
       for (final item in items) {
         if (item is ServerFolder) {
           if (item.type == 'folder') {
-            out.add(FolderOption(id: item.id, name: item.name, type: item.type, organizationId: item.organizationId));
+            out.add(
+              FolderOption(
+                id: item.id,
+                name: item.name,
+                type: item.type,
+                organizationId: item.organizationId,
+              ),
+            );
           }
           walk(item.allFolders);
         }
       }
     }
+
     walk(folders);
     return out;
   }
@@ -1098,6 +1478,7 @@ class ServersScreenState extends State<ServersScreen> {
         }
       }
     }
+
     walk(folders, 0);
     FolderOption? match;
     int best = -1;
@@ -1116,16 +1497,28 @@ class ServersScreenState extends State<ServersScreen> {
       if (orgId == null && folder.id != null) {
         orgId = int.tryParse(folder.id.toString().split('-').last) ?? folder.id;
       }
-      return FolderOption(id: null, name: folder.name, type: 'organization', organizationId: orgId ?? folder.id);
+      return FolderOption(
+        id: null,
+        name: folder.name,
+        type: 'organization',
+        organizationId: orgId ?? folder.id,
+      );
     }
-    return FolderOption(id: folder.id, name: folder.name, type: folder.type, organizationId: folder.organizationId);
+    return FolderOption(
+      id: folder.id,
+      name: folder.name,
+      type: folder.type,
+      organizationId: folder.organizationId,
+    );
   }
 
   FolderOption? _parentFolderOf(dynamic serverId) {
     FolderOption? search(List<dynamic> items) {
       for (final item in items) {
         if (item is ServerFolder) {
-          if (item.allServers.any((s) => s.id.toString() == serverId.toString())) {
+          if (item.allServers.any(
+            (s) => s.id.toString() == serverId.toString(),
+          )) {
             return _folderOptionOf(item);
           }
           final nested = search(item.allFolders);
@@ -1134,6 +1527,7 @@ class ServersScreenState extends State<ServersScreen> {
       }
       return null;
     }
+
     return search(folders);
   }
 
@@ -1184,15 +1578,26 @@ class ServersScreenState extends State<ServersScreen> {
     final token = widget.authManager.sessionToken;
     if (token == null) return;
     try {
-      await ServerEditorService.duplicateEntry(token: token, entryId: server.id);
+      await ServerEditorService.duplicateEntry(
+        token: token,
+        entryId: server.id,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${server.name} duplicated'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text('${server.name} duplicated'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       _refreshData();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Duplicate failed: $e'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text('Duplicate failed: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -1201,15 +1606,29 @@ class ServersScreenState extends State<ServersScreen> {
     if (token == null) return;
     final disabled = !server.disabled;
     try {
-      await ServerEditorService.setEntryDisabled(token: token, entryId: server.id, disabled: disabled);
+      await ServerEditorService.setEntryDisabled(
+        token: token,
+        entryId: server.id,
+        disabled: disabled,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(disabled ? '${server.name} disabled' : '${server.name} enabled'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text(
+            disabled ? '${server.name} disabled' : '${server.name} enabled',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       _refreshData();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(disabled ? 'Disable failed: $e' : 'Enable failed: $e'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text(disabled ? 'Disable failed: $e' : 'Enable failed: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -1222,8 +1641,14 @@ class ServersScreenState extends State<ServersScreen> {
         title: const Text('Delete server?'),
         content: Text('${server.name} will be permanently deleted.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -1232,25 +1657,43 @@ class ServersScreenState extends State<ServersScreen> {
       await ServerEditorService.deleteEntry(token: token, entryId: server.id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${server.name} deleted'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text('${server.name} deleted'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       _refreshData();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delete failed: $e'), behavior: SnackBarBehavior.floating));
+        SnackBar(
+          content: Text('Delete failed: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   void _connectToServer(Server server) {
     if (server.disabled) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} is disabled'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${server.name} is disabled'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     final cs = Theme.of(context).colorScheme;
     if (server.isStopped) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('${server.name} is ${server.isPve ? "not running" : "offline"}'), behavior: SnackBarBehavior.floating));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${server.name} is ${server.isPve ? "not running" : "offline"}',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       return;
     }
     final hasIdentities = server.identities?.isNotEmpty == true;
@@ -1258,12 +1701,16 @@ class ServersScreenState extends State<ServersScreen> {
       _quickConnect(server);
       return;
     }
-    if (ServerService.isGuacamoleProtocol(server.protocol) || server.type == 'pve-qemu') {
+    if (ServerService.isGuacamoleProtocol(server.protocol) ||
+        server.type == 'pve-qemu') {
       _initiateConnection(server, type: ConnectionType.guacamole);
       return;
     }
     final protocolLower = server.protocol?.toLowerCase();
-    final isFileProtocol = protocolLower == 'sftp' || protocolLower == 'ftp' || protocolLower == 'ftps';
+    final isFileProtocol =
+        protocolLower == 'sftp' ||
+        protocolLower == 'ftp' ||
+        protocolLower == 'ftps';
     if (isFileProtocol) {
       _initiateConnection(server, type: ConnectionType.sftp);
       return;
@@ -1275,62 +1722,137 @@ class ServersScreenState extends State<ServersScreen> {
     }
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Center(child: Container(
-          margin: const EdgeInsets.only(top: 12, bottom: 4), width: 36, height: 4,
-          decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)),
-        )),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-              child: Icon(_serverIcon(server), color: cs.onPrimaryContainer, size: 18),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 4),
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
             ),
-            const SizedBox(width: 12),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(server.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-              if (server.ip.isNotEmpty && server.ip != 'N/A')
-                Text(server.ip, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis),
-            ])),
-          ]),
-        ),
-        const SizedBox(height: 8),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
-          Expanded(child: _connectionOption(ctx, AppIcons.consoleLine, 'Terminal', 'SSH session', cs, () {
-            Navigator.pop(ctx); _initiateConnection(server);
-          })),
-          const SizedBox(width: 10),
-          Expanded(child: _connectionOption(ctx, AppIcons.folderOutline, 'SFTP', 'File manager', cs, () {
-            Navigator.pop(ctx); _initiateConnection(server, type: ConnectionType.sftp);
-          })),
-        ])),
-        const SizedBox(height: 16),
-      ])),
-    );
-  }
-
-  Widget _connectionOption(BuildContext ctx, IconData icon, String title, String sub, ColorScheme cs, VoidCallback onTap) =>
-    Material(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-          child: Column(children: [
-            Icon(icon, color: cs.primary, size: 28),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _serverIcon(server),
+                      color: cs.onPrimaryContainer,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          server.name,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (server.ip.isNotEmpty && server.ip != 'N/A')
+                          Text(
+                            server.ip,
+                            style: TextStyle(fontSize: 12, color: cs.outline),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 2),
-            Text(sub, style: TextStyle(fontSize: 11, color: cs.outline)),
-          ]),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _connectionOption(
+                      ctx,
+                      AppIcons.consoleLine,
+                      'Terminal',
+                      'SSH session',
+                      cs,
+                      () {
+                        Navigator.pop(ctx);
+                        _initiateConnection(server);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _connectionOption(
+                      ctx,
+                      AppIcons.folderOutline,
+                      'SFTP',
+                      'File manager',
+                      cs,
+                      () {
+                        Navigator.pop(ctx);
+                        _initiateConnection(server, type: ConnectionType.sftp);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
         ),
       ),
     );
+  }
+
+  Widget _connectionOption(
+    BuildContext ctx,
+    IconData icon,
+    String title,
+    String sub,
+    ColorScheme cs,
+    VoidCallback onTap,
+  ) => Material(
+    color: cs.surfaceContainerHigh,
+    borderRadius: BorderRadius.circular(14),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+        child: Column(
+          children: [
+            Icon(icon, color: cs.primary, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 2),
+            Text(sub, style: TextStyle(fontSize: 11, color: cs.outline)),
+          ],
+        ),
+      ),
+    ),
+  );
 
   IconData _serverIcon(Server server) {
     final icon = server.icon;

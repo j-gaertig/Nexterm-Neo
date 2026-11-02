@@ -106,4 +106,58 @@ void main() {
       );
     }
   });
+
+  test('keeps borders visible on every palette surface', () {
+    double contrast(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final lighter = la > lb ? la : lb;
+      final darker = la > lb ? lb : la;
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    for (final theme in AppThemes.all) {
+      for (final brightness in Brightness.values) {
+        final scheme = theme.palette(brightness).toColorScheme(brightness);
+        expect(
+          contrast(scheme.outlineVariant, scheme.surface),
+          greaterThanOrEqualTo(1.4),
+          reason: '${theme.id} ${brightness.name} border on canvas',
+        );
+        expect(
+          contrast(scheme.outlineVariant, scheme.surfaceContainerHigh),
+          greaterThanOrEqualTo(1.3),
+          reason: '${theme.id} ${brightness.name} border on raised surface',
+        );
+      }
+    }
+  });
+
+  test('keeps raised surfaces distinct without adding component outlines', () {
+    double contrast(Color a, Color b) {
+      final la = a.computeLuminance();
+      final lb = b.computeLuminance();
+      final lighter = la > lb ? la : lb;
+      final darker = la > lb ? lb : la;
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    for (final theme in AppThemes.all) {
+      for (final brightness in Brightness.values) {
+        final scheme = theme.palette(brightness).toColorScheme(brightness);
+        expect(
+          contrast(scheme.surfaceContainerHigh, scheme.surface),
+          greaterThanOrEqualTo(brightness == Brightness.light ? 1.05 : 1.2),
+          reason: '${theme.id} ${brightness.name} raised surface',
+        );
+      }
+    }
+
+    final data = ThemeManager(ThemeMode.dark).darkTheme();
+    expect(data.dividerTheme.color, isNull);
+    expect(data.dialogTheme.shape, isNull);
+    expect(data.bottomSheetTheme.shape, isNull);
+    expect(data.popupMenuTheme.shape, isNull);
+    expect(data.cardTheme.shape, isNull);
+  });
 }

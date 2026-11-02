@@ -61,6 +61,19 @@ class AppThemePalette {
 
   ColorScheme toColorScheme(Brightness brightness) {
     final isLight = brightness == Brightness.light;
+
+    // Keep the surface hierarchy and border contrast of the Material scheme
+    // that shipped before the built-in palettes. Deriving these roles from the
+    // palette instead of hard-coding them keeps every theme recognisable while
+    // restoring the softer card edges and list separators of the old look.
+    Color raised(double alpha) =>
+        Color.alphaBlend(text.withValues(alpha: alpha), canvas);
+    final outlineVariant = raised(isLight ? 0.22 : 0.27);
+    final surfaceLow = raised(isLight ? 0.015 : 0.035);
+    final surfaceContainer = raised(isLight ? 0.035 : 0.07);
+    final surfaceHigh = raised(isLight ? 0.055 : 0.11);
+    final surfaceHighest = raised(isLight ? 0.09 : 0.16);
+
     return ColorScheme(
       brightness: brightness,
       primary: accent,
@@ -84,14 +97,14 @@ class AppThemePalette {
       onSurfaceVariant: textMuted,
       // Nexterm uses `outline` for secondary labels as well as borders.
       outline: textMuted,
-      outlineVariant: border,
+      outlineVariant: outlineVariant,
       surfaceDim: canvas,
       surfaceBright: surfaceOverlay,
-      surfaceContainerLowest: codeBackground,
-      surfaceContainerLow: surface,
-      surfaceContainer: surfaceRaised,
-      surfaceContainerHigh: isLight ? accentSurface : surfaceRaised,
-      surfaceContainerHighest: input,
+      surfaceContainerLowest: isLight ? surface : canvas,
+      surfaceContainerLow: surfaceLow,
+      surfaceContainer: surfaceContainer,
+      surfaceContainerHigh: surfaceHigh,
+      surfaceContainerHighest: surfaceHighest,
       inverseSurface: text,
       onInverseSurface: canvas,
       inversePrimary: accent,
@@ -210,7 +223,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFFFFFFF),
     text: Color(0xFF27272A),
     textMuted: Color(0xFF71717B),
-    border: Color(0xFFE4E4E7),
+    border: Color(0xFFC9C9CF),
     input: Color(0xFFD4D4D8),
     accent: Color(0xFF1B4ED8),
     onAccent: Color(0xFFFFFFFF),
@@ -236,7 +249,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFF111111),
     text: Color(0xFFF5F5F5),
     textMuted: Color(0xFF818181),
-    border: Color(0xFF191919),
+    border: Color(0xFF343434),
     input: Color(0xFF1E1E1E),
     accent: Color(0xFF346BF1),
     onAccent: Color(0xFFFFFFFF),
@@ -262,7 +275,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFFFFFFF),
     text: Color(0xFF1A1B21),
     textMuted: Color(0xFF5D5E66),
-    border: Color(0xFFE1E2EC),
+    border: Color(0xFFC9CBD9),
     input: Color(0xFFD9DAE6),
     accent: Color(0xFF3157D5),
     onAccent: Color(0xFFFFFFFF),
@@ -288,7 +301,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFF22262F),
     text: Color(0xFFF5F5F7),
     textMuted: Color(0xFFA9ABB3),
-    border: Color(0xFF2E323B),
+    border: Color(0xFF343945),
     input: Color(0xFF383C45),
     accent: Color(0xFF9FC6FF),
     onAccent: Color(0xFF002E69),
@@ -314,7 +327,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFFFFFFF),
     text: Color(0xFF501854),
     textMuted: Color(0xFFAC1668),
-    border: Color(0xFFEEE1ED),
+    border: Color(0xFFDEC5DC),
     input: Color(0xFFE7C1DC),
     accent: Color(0xFFDB2777),
     onAccent: Color(0xFFFFFFFF),
@@ -340,7 +353,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFF100A0E),
     text: Color(0xFFF9F8FB),
     textMuted: Color(0xFFE7D0DD),
-    border: Color(0xFF27242C),
+    border: Color(0xFF443A49),
     input: Color(0xFF302029),
     accent: Color(0xFFA3004C),
     onAccent: Color(0xFFFBD0E8),
@@ -366,7 +379,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFE7E9E8),
     text: Color(0xFF241523),
     textMuted: Color(0xFF746C73),
-    border: Color(0xFFCBD5D1),
+    border: Color(0xFFB6C6BE),
     input: Color(0xFFBECBC5),
     accent: Color(0xFF1B7D50),
     onAccent: Color(0xFFFFFAFF),
@@ -418,7 +431,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFE8E9EB),
     text: Color(0xFF241523),
     textMuted: Color(0xFF746C75),
-    border: Color(0xFFCDD4DC),
+    border: Color(0xFFBCC7D1),
     input: Color(0xFFC0C9D4),
     accent: Color(0xFF2672AF),
     onAccent: Color(0xFFFFFAFF),
@@ -470,7 +483,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFECE9E9),
     text: Color(0xFF241523),
     textMuted: Color(0xFF766C74),
-    border: Color(0xFFDDD2CE),
+    border: Color(0xFFCDBEB8),
     input: Color(0xFFD4C6C1),
     accent: Color(0xFFAE552A),
     onAccent: Color(0xFFFFFAFF),
@@ -522,7 +535,7 @@ class AppThemes {
     surfaceOverlay: Color(0xFFEBE9ED),
     text: Color(0xFF241523),
     textMuted: Color(0xFF766C76),
-    border: Color(0xFFD6D1DE),
+    border: Color(0xFFC8C1D2),
     input: Color(0xFFCCC5D6),
     accent: Color(0xFF7253B9),
     onAccent: Color(0xFFFFFAFF),

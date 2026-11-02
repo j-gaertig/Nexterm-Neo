@@ -35,11 +35,7 @@ List<ServerAction> buildServerActions(
 }) {
   final showQuick = server.isServer && !server.isPve;
   return [
-    ServerAction(
-      icon: AppIcons.connection,
-      label: 'Connect',
-      onTap: onConnect,
-    ),
+    ServerAction(icon: AppIcons.connection, label: 'Connect', onTap: onConnect),
     if (showQuick &&
         (server.identities?.isNotEmpty == true) &&
         server.protocol?.toLowerCase() == 'ssh')
@@ -61,11 +57,7 @@ List<ServerAction> buildServerActions(
         onTap: onWakeOnLan,
       ),
     if (showQuick)
-      ServerAction(
-        icon: AppIcons.pencilOutline,
-        label: 'Edit',
-        onTap: onEdit,
-      ),
+      ServerAction(icon: AppIcons.pencilOutline, label: 'Edit', onTap: onEdit),
     ServerAction(
       icon: AppIcons.contentCopy,
       label: 'Duplicate',
@@ -102,11 +94,8 @@ Future<void> showServerActionsSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
-    builder: (_) => ServerActionsSheet(
-      server: server,
-      icon: icon,
-      actions: actions,
-    ),
+    builder: (_) =>
+        ServerActionsSheet(server: server, icon: icon, actions: actions),
   );
 }
 

@@ -42,6 +42,7 @@ class InstanceSwitcher extends StatelessWidget {
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: cs.outlineVariant),
           ),
           constraints: const BoxConstraints(minWidth: 260, maxWidth: 340),
           onSelected: (value) {
@@ -91,7 +92,7 @@ class InstanceSwitcher extends StatelessWidget {
                 color: cs.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: cs.outlineVariant.withValues(alpha: 0.35),
+                  color: cs.outlineVariant.withValues(alpha: 0.65),
                 ),
               ),
               child: Row(

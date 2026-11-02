@@ -7,11 +7,16 @@ import '../../utils/app_icons.dart';
 
 import '../../models/server.dart';
 
-Future<Map<String, dynamic>?> showQuickConnectSheet(BuildContext context, Server server) {
+Future<Map<String, dynamic>?> showQuickConnectSheet(
+  BuildContext context,
+  Server server,
+) {
   return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
     builder: (_) => QuickConnectSheet(server: server),
   );
 }
@@ -71,7 +76,10 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
   }
 
   bool get _showUsername => _authType != 'password-only';
-  bool get _showPassword => _authType == 'password' || _authType == 'password-only' || _authType == 'both';
+  bool get _showPassword =>
+      _authType == 'password' ||
+      _authType == 'password-only' ||
+      _authType == 'both';
   bool get _showKey => _authType == 'ssh' || _authType == 'both';
 
   Future<void> _pickKey() async {
@@ -94,13 +102,18 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to read key: $e'), behavior: SnackBarBehavior.floating));
+          SnackBar(
+            content: Text('Failed to read key: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
 
   void _toast(String message) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating));
+    SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+  );
 
   bool _validate() {
     if (_showUsername && _username.text.trim().isEmpty) {
@@ -129,10 +142,12 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
     } else if (_authType == 'both') {
       directIdentity['password'] = _password.text;
       directIdentity['sshKey'] = _sshKey;
-      if (_passphrase.text.isNotEmpty) directIdentity['passphrase'] = _passphrase.text;
+      if (_passphrase.text.isNotEmpty)
+        directIdentity['passphrase'] = _passphrase.text;
     } else {
       directIdentity['sshKey'] = _sshKey;
-      if (_passphrase.text.isNotEmpty) directIdentity['passphrase'] = _passphrase.text;
+      if (_passphrase.text.isNotEmpty)
+        directIdentity['passphrase'] = _passphrase.text;
     }
 
     Navigator.pop(context, directIdentity);
@@ -144,114 +159,212 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
     final tt = Theme.of(context).textTheme;
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Center(child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4), width: 36, height: 4,
-              decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)),
-            )),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-                  child: Icon(AppIcons.cursorDefaultClick, color: cs.onPrimaryContainer, size: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 4),
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Quick Connect', style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  Text(widget.server.name, style: TextStyle(fontSize: 12, color: cs.outline), overflow: TextOverflow.ellipsis),
-                ])),
-              ]),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                if (_showUsername) ...[
-                  _label('Username'),
-                  _field(_username, hint: 'Username', icon: AppIcons.accountCircleOutline),
-                  const SizedBox(height: 14),
-                ],
-                _label('Authentication'),
-                DropdownButtonFormField<String>(
-                  initialValue: _authType,
-                  decoration: _decoration(icon: AppIcons.shieldAccountOutline),
-                  items: [
-                    for (final opt in _authOptions)
-                      DropdownMenuItem(value: opt, child: Text(_authLabels[opt] ?? opt)),
-                  ],
-                  onChanged: (v) { if (v != null) setState(() => _authType = v); },
-                ),
-                if (_showPassword) ...[
-                  const SizedBox(height: 14),
-                  _label('Password'),
-                  _field(_password, hint: 'Password', icon: AppIcons.lockOutline, obscure: true),
-                ],
-                if (_showKey) ...[
-                  const SizedBox(height: 14),
-                  _label('SSH Private Key'),
-                  Material(
-                    color: cs.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: _pickKey,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        child: Row(children: [
-                          Icon(AppIcons.fileUploadOutline, size: 20, color: cs.outline),
-                          const SizedBox(width: 12),
-                          Expanded(child: Text(
-                            _keyName ?? 'Select key file',
-                            style: TextStyle(fontSize: 14, color: _keyName != null ? cs.onSurface : cs.outline),
-                            overflow: TextOverflow.ellipsis,
-                          )),
-                          if (_keyName != null) Icon(AppIcons.checkCircle, size: 18, color: cs.primary),
-                        ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        AppIcons.cursorDefaultClick,
+                        color: cs.onPrimaryContainer,
+                        size: 18,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _label('Passphrase (optional)'),
-                  _field(_passphrase, hint: 'Passphrase', icon: AppIcons.lockOutline, obscure: true),
-                ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: _connect,
-                    icon: Icon(AppIcons.connection, size: 18),
-                    label: const Text('Connect'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quick Connect',
+                            style: tt.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            widget.server.name,
+                            style: TextStyle(fontSize: 12, color: cs.outline),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ]),
-            ),
-          ]),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_showUsername) ...[
+                      _label('Username'),
+                      _field(
+                        _username,
+                        hint: 'Username',
+                        icon: AppIcons.accountCircleOutline,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    _label('Authentication'),
+                    DropdownButtonFormField<String>(
+                      initialValue: _authType,
+                      decoration: _decoration(
+                        icon: AppIcons.shieldAccountOutline,
+                      ),
+                      items: [
+                        for (final opt in _authOptions)
+                          DropdownMenuItem(
+                            value: opt,
+                            child: Text(_authLabels[opt] ?? opt),
+                          ),
+                      ],
+                      onChanged: (v) {
+                        if (v != null) setState(() => _authType = v);
+                      },
+                    ),
+                    if (_showPassword) ...[
+                      const SizedBox(height: 14),
+                      _label('Password'),
+                      _field(
+                        _password,
+                        hint: 'Password',
+                        icon: AppIcons.lockOutline,
+                        obscure: true,
+                      ),
+                    ],
+                    if (_showKey) ...[
+                      const SizedBox(height: 14),
+                      _label('SSH Private Key'),
+                      Material(
+                        color: cs.surfaceContainerHigh,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: cs.outlineVariant),
+                        ),
+                        child: InkWell(
+                          onTap: _pickKey,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 14,
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  AppIcons.fileUploadOutline,
+                                  size: 20,
+                                  color: cs.outline,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    _keyName ?? 'Select key file',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: _keyName != null
+                                          ? cs.onSurface
+                                          : cs.outline,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (_keyName != null)
+                                  Icon(
+                                    AppIcons.checkCircle,
+                                    size: 18,
+                                    color: cs.primary,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      _label('Passphrase (optional)'),
+                      _field(
+                        _passphrase,
+                        hint: 'Passphrase',
+                        icon: AppIcons.lockOutline,
+                        obscure: true,
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: _connect,
+                        icon: Icon(AppIcons.connection, size: 18),
+                        label: const Text('Connect'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _label(String text) => Padding(
-        padding: const EdgeInsets.only(bottom: 6, left: 2),
-        child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.outline)),
-      );
+    padding: const EdgeInsets.only(bottom: 6, left: 2),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: Theme.of(context).colorScheme.outline,
+      ),
+    ),
+  );
 
-  Widget _field(TextEditingController controller, {required String hint, required IconData icon, bool obscure = false}) => TextField(
-        controller: controller,
-        obscureText: obscure,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: _decoration(hint: hint, icon: icon),
-      );
+  Widget _field(
+    TextEditingController controller, {
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+  }) => TextField(
+    controller: controller,
+    obscureText: obscure,
+    autocorrect: false,
+    enableSuggestions: false,
+    decoration: _decoration(hint: hint, icon: icon),
+  );
 
   InputDecoration _decoration({String? hint, required IconData icon}) {
     final cs = Theme.of(context).colorScheme;
@@ -262,9 +375,18 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
       fillColor: cs.surfaceContainerHigh,
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: cs.primary, width: 1.5)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: cs.primary, width: 1.5),
+      ),
     );
   }
 }
