@@ -9,16 +9,7 @@ import '../widgets/floating_navigation_bar.dart';
 
 class MonitoringScreen extends StatefulWidget {
   final AuthManager authManager;
-
-  /// Notifies the navigation shell when the detail view opens or closes so the
-  /// trailing back action can appear next to the floating bar.
-  final VoidCallback? onDetailsChanged;
-
-  const MonitoringScreen({
-    super.key,
-    required this.authManager,
-    this.onDetailsChanged,
-  });
+  const MonitoringScreen({super.key, required this.authManager});
   @override
   State<MonitoringScreen> createState() => MonitoringScreenState();
 }
@@ -41,7 +32,6 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         _selected = null;
         _details = null;
       });
-      widget.onDetailsChanged?.call();
       return true;
     }
     return false;
@@ -78,7 +68,6 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       _error = null;
       _loading = true;
     });
-    widget.onDetailsChanged?.call();
     _load();
   }
 
@@ -116,7 +105,6 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       _selected = server;
       _loadingDetails = true;
     });
-    widget.onDetailsChanged?.call();
     try {
       final token =
           widget.authManager.sessionToken ??
@@ -501,9 +489,17 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       key: const ValueKey('detail'),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.fromLTRB(8, 8, 20, 0),
           child: Row(
             children: [
+              IconButton(
+                icon: const Icon(AppIcons.arrowBack),
+                onPressed: () => setState(() {
+                  _selected = null;
+                  _details = null;
+                }),
+              ),
+              const SizedBox(width: 4),
               Container(
                 width: 36,
                 height: 36,

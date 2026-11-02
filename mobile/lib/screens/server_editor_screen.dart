@@ -9,8 +9,6 @@ import '../services/server_editor_service.dart';
 import '../services/server_service.dart';
 import '../utils/app_icons.dart';
 import '../utils/server_field_config.dart';
-import '../widgets/floating_navigation_bar.dart';
-import '../widgets/floating_navigation_scaffold.dart';
 
 class FolderOption {
   final dynamic id;
@@ -524,77 +522,70 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
 
   @override
   Widget build(BuildContext context) {
-    return FloatingNavigationScaffold(
-      builder: (context) {
-        final cs = Theme.of(context).colorScheme;
-        final tt = Theme.of(context).textTheme;
-        final navInset = FloatingNavigationBarInset.of(context);
-
-        return Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            title: Text(
-              _isEdit
-                  ? 'Edit server'
-                  : (_protocol == null || _protocol!.isEmpty)
-                  ? 'New server'
-                  : 'New ${_protocol!.toUpperCase()} server',
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          _isEdit
+              ? 'Edit server'
+              : (_protocol == null || _protocol!.isEmpty)
+              ? 'New server'
+              : 'New ${_protocol!.toUpperCase()} server',
+        ),
+        bottom: _loading
+            ? null
+            : TabBar(
+                controller: _tabs,
+                tabs: [for (final k in _tabKeys) Tab(text: _tabLabel(k))],
+              ),
+        actions: [
+          if (!_loading)
+            TextButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
             ),
-            bottom: _loading
-                ? null
-                : TabBar(
-                    controller: _tabs,
-                    tabs: [for (final k in _tabKeys) Tab(text: _tabLabel(k))],
-                  ),
-            actions: [
-              if (!_loading)
-                TextButton(
-                  onPressed: _saving ? null : _save,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Save'),
-                ),
-            ],
-          ),
-          body: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          AppIcons.alertCircleOutline,
-                          size: 40,
-                          color: cs.error,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          style: tt.bodyMedium,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Back'),
-                        ),
-                      ],
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      AppIcons.alertCircleOutline,
+                      size: 40,
+                      color: cs.error,
                     ),
-                  ),
-                )
-              : TabBarView(
-                  controller: _tabs,
-                  children: [for (final k in _tabKeys) _tabView(k, navInset)],
+                    const SizedBox(height: 12),
+                    Text(
+                      _error!,
+                      style: tt.bodyMedium,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Back'),
+                    ),
+                  ],
                 ),
-        );
-      },
+              ),
+            )
+          : TabBarView(
+              controller: _tabs,
+              children: [for (final k in _tabKeys) _tabView(k)],
+            ),
     );
   }
 
@@ -609,14 +600,14 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
     }
   }
 
-  Widget _tabView(String key, double navInset) {
+  Widget _tabView(String key) {
     switch (key) {
       case 'identities':
-        return _identitiesTab(navInset);
+        return _identitiesTab();
       case 'settings':
-        return _settingsTab(navInset);
+        return _settingsTab();
       default:
-        return _detailsTab(navInset);
+        return _detailsTab();
     }
   }
 
@@ -656,11 +647,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
     ),
   );
 
-  Widget _detailsTab(double navInset) {
+  Widget _detailsTab() {
     final cs = Theme.of(context).colorScheme;
     final fc = _fieldConfig;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 32 + navInset),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -869,10 +860,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
     return backend;
   }
 
-  Widget _settingsTab(double navInset) {
+  Widget _settingsTab() {
     final fc = _fieldConfig;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 32 + navInset),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1380,10 +1371,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
     }).toList();
   }
 
-  Widget _identitiesTab(double navInset) {
+  Widget _identitiesTab() {
     final hasOrg = _organizationId != null;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 32 + navInset),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
