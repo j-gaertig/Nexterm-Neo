@@ -5,9 +5,9 @@ import '../services/api_config.dart';
 
 class ApiClient {
   static const Duration _timeout = Duration(seconds: 30);
-  static const String appVersion = '1.2.2';
+  static const String _appVersion = '1.2.2';
   static String get userAgent =>
-      'NextermMobile/$appVersion (${Platform.operatingSystem}; ${Platform.operatingSystemVersion})';
+      'NextermMobile/$_appVersion (${Platform.operatingSystem}; ${Platform.operatingSystemVersion})';
 
   static String normalizeBaseUrl(String url) {
     url = url.trim();

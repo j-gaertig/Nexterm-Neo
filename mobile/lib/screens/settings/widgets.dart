@@ -3,8 +3,47 @@ part of '../settings_screen.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _SettingsWidgets on _SettingsScreenState {
+  Widget _accountProfile(ColorScheme cs, String server) => Padding(
+    padding: const EdgeInsets.all(16),
+    child: Row(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: cs.primaryContainer,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(AppIcons.account, color: cs.onPrimaryContainer, size: 24),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _fullName ?? _username ?? 'User',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  server,
+                  style: TextStyle(fontSize: 12, color: cs.outline),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _section(ColorScheme cs, {required List<Widget> children}) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     child: Material(
       color: cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
@@ -33,6 +72,85 @@ extension _SettingsWidgets on _SettingsScreenState {
         endIndent: endIndent,
         color: appBorderColor(cs),
       );
+
+  Widget _navTile(
+    IconData icon,
+    String title,
+    String sub,
+    ColorScheme cs,
+    VoidCallback onTap,
+  ) => Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            _iconBox(icon, cs),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 15)),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      sub,
+                      style: TextStyle(fontSize: 12, color: cs.outline),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(AppIcons.chevronRight, color: cs.outlineVariant, size: 18),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  Widget _logoutTile(ColorScheme cs) => Semantics(
+    button: true,
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _handleLogout,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: cs.errorContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  AppIcons.exitToApp,
+                  color: cs.onErrorContainer,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Logout',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: cs.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 
   Widget _themePickerTile(ColorScheme cs) => ListenableBuilder(
     listenable: widget.themeManager,

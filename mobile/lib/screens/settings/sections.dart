@@ -3,6 +3,84 @@ part of '../settings_screen.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _SettingsSections on _SettingsScreenState {
+  List<Widget> _accountSection(ColorScheme cs) => [
+    _sectionHeader('Account', cs),
+    _section(
+      cs,
+      children: [
+        if (widget.authManager.isAuthenticated) ...[
+          _accountProfile(cs, _serverLabel),
+          _divider(cs),
+        ],
+        _navTile(
+          AppIcons.serverNetwork,
+          'Server Connections',
+          _connectionCountLabel(),
+          cs,
+          () => pushPage(
+            context,
+            (_) => ServerAccountsScreen(authManager: widget.authManager),
+          ),
+        ),
+        if (widget.authManager.isAuthenticated) ...[
+          _divider(cs),
+          _logoutTile(cs),
+        ],
+      ],
+    ),
+  ];
+
+  List<Widget> _securitySection(ColorScheme cs) => [
+    _sectionHeader('Security', cs),
+    _section(
+      cs,
+      children: [
+        ListenableBuilder(
+          listenable: widget.screenLockSettings,
+          builder: (_, __) => SwitchListTile(
+            contentPadding: const EdgeInsets.only(left: 16, right: 12),
+            secondary: _iconBox(AppIcons.lockOutline, cs),
+            title: const Text('Screen Lock', style: TextStyle(fontSize: 15)),
+            subtitle: Text(
+              _screenLockBusy
+                  ? 'Waiting for authentication...'
+                  : widget.screenLockSettings.enabled
+                  ? 'Required when opening Nexterm'
+                  : 'Use your device screen lock to open the app',
+              style: TextStyle(fontSize: 12, color: cs.outline),
+            ),
+            value: widget.screenLockSettings.enabled,
+            onChanged: _screenLockBusy ? null : _handleScreenLockChanged,
+          ),
+        ),
+        _divider(cs),
+        _navTile(
+          AppIcons.devices,
+          'Signed-in Devices',
+          'Manage devices signed in to your account',
+          cs,
+          () => pushPage(
+            context,
+            (_) => SessionsScreen(authManager: widget.authManager),
+          ),
+        ),
+        _divider(cs),
+        _navTile(
+          AppIcons.qrcodeScan,
+          'Authorize Login',
+          'Approve a web login with a QR code',
+          cs,
+          () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => QrScannerScreen(authManager: widget.authManager),
+            ),
+          ),
+        ),
+      ],
+    ),
+  ];
+
   List<Widget> _appearanceSection(ColorScheme cs) => [
     _sectionHeader('Appearance', cs),
     _section(
