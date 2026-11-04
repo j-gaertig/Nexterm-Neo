@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_ui.dart';
 import '../../models/server_account.dart';
 import '../../utils/app_icons.dart';
 import '../../utils/auth_manager.dart';
@@ -42,7 +43,7 @@ class InstanceSwitcher extends StatelessWidget {
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: cs.outlineVariant),
+            side: appBorderSide(cs),
           ),
           constraints: const BoxConstraints(minWidth: 260, maxWidth: 340),
           onSelected: (value) {

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_ui.dart';
 import '../utils/app_icons.dart';
 import '../models/session_model.dart';
 import '../services/auth_service.dart';
 import '../utils/auth_manager.dart';
+import '../widgets/floating_navigation_bar.dart';
 
 class SessionsScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -27,11 +29,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final token = widget.authManager.sessionToken;
     if (token != null) {
       final sessions = await _auth.listSessions(token);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _sessions = sessions;
           _loading = false;
         });
+      }
     } else {
       setState(() => _loading = false);
     }
@@ -76,11 +79,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
     if (ua.startsWith('NextermConnector/')) return AppIcons.application;
     if (ua.startsWith('NextermMobile/')) return AppIcons.cellphoneLink;
     final l = ua.toLowerCase();
-    if (l.contains('mobile') || l.contains('android') || l.contains('iphone'))
+    if (l.contains('mobile') || l.contains('android') || l.contains('iphone')) {
       return AppIcons.cellphone;
+    }
     if (l.contains('tablet') || l.contains('ipad')) return AppIcons.tablet;
-    if (l.contains('mac') || l.contains('windows') || l.contains('linux'))
+    if (l.contains('mac') || l.contains('windows') || l.contains('linux')) {
       return AppIcons.laptop;
+    }
     return AppIcons.devices;
   }
 
@@ -99,8 +104,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final conn = RegExp(
       r'^NextermConnector/([\d.]+)\s*\(([^;]+);',
     ).firstMatch(ua);
-    if (conn != null)
+    if (conn != null) {
       return 'Connector ${conn.group(1)} · ${conn.group(2)?.trim()}';
+    }
     final mobile = RegExp(
       r'^NextermMobile/([\d.]+)\s*\(([^;)]+)',
     ).firstMatch(ua);
@@ -129,34 +135,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
 
     return Scaffold(
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(AppIcons.arrowBack),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      'Signed-in Devices',
-                      style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(AppIcons.refresh, size: 22),
-                    onPressed: _load,
-                  ),
-                ],
+            AppSubPageHeader(
+              title: 'Signed-in Devices',
+              trailing: IconButton(
+                icon: const Icon(AppIcons.refresh, size: 22),
+                tooltip: 'Refresh',
+                onPressed: _loading ? null : _load,
               ),
             ),
             Expanded(
@@ -165,7 +155,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   : RefreshIndicator(
                       onRefresh: _load,
                       child: _sessions == null || _sessions!.isEmpty
-                          ? _empty(cs, tt)
+                          ? _empty()
                           : _list(cs),
                     ),
             ),
@@ -175,69 +165,40 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  Widget _empty(ColorScheme cs, TextTheme tt) => ListView(
-    children: [
-      SizedBox(
-        height: MediaQuery.of(context).size.height * 0.5,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(AppIcons.monitor, size: 32, color: cs.outline),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'No other devices',
-                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Only this device is active',
-                style: tt.bodySmall?.copyWith(color: cs.outline),
-              ),
-            ],
+  Widget _empty() => LayoutBuilder(
+    builder: (context, constraints) => ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: [
+        SizedBox(
+          height: constraints.maxHeight,
+          child: const AppEmptyState(
+            icon: AppIcons.monitor,
+            title: 'No other devices',
+            message: 'Only this device is active',
           ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 
   Widget _list(ColorScheme cs) => ListView.builder(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    physics: const AlwaysScrollableScrollPhysics(),
+    padding: EdgeInsets.fromLTRB(
+      12,
+      4,
+      12,
+      16 + FloatingNavigationBarInset.of(context),
+    ),
     itemCount: _sessions!.length,
     itemBuilder: (_, i) => _sessionTile(_sessions![i], cs),
   );
 
   Widget _sessionTile(SessionModel s, ColorScheme cs) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
-      ),
+    child: AppCard(
       child: Row(
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              _icon(s.userAgent),
-              color: cs.onPrimaryContainer,
-              size: 20,
-            ),
-          ),
+          AppIconBox(icon: _icon(s.userAgent), size: 42),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -263,20 +224,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          Material(
-            color: cs.errorContainer,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              onTap: () => _revoke(s.id),
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Icon(
-                  AppIcons.deleteOutline,
-                  size: 18,
-                  color: cs.onErrorContainer,
-                ),
-              ),
+          IconButton(
+            tooltip: 'Sign out device',
+            onPressed: () => _revoke(s.id),
+            icon: const Icon(AppIcons.deleteOutline, size: 18),
+            style: IconButton.styleFrom(
+              backgroundColor: cs.errorContainer,
+              foregroundColor: cs.onErrorContainer,
             ),
           ),
         ],

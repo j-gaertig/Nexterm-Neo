@@ -14,9 +14,17 @@ class ServerFolder {
   final String? folderType;
 
   ServerFolder({
-    this.id, required this.name, this.type = 'folder', this.position, this.organizationId,
-    this.requireConnectionReason, this.entries = const [], this.isExpanded = false,
-    this.ip, this.icon, this.folderType,
+    this.id,
+    required this.name,
+    this.type = 'folder',
+    this.position,
+    this.organizationId,
+    this.requireConnectionReason,
+    this.entries = const [],
+    this.isExpanded = false,
+    this.ip,
+    this.icon,
+    this.folderType,
   });
 
   factory ServerFolder.fromJson(Map<String, dynamic> json) => ServerFolder(
@@ -33,9 +41,16 @@ class ServerFolder {
   );
 
   Map<String, dynamic> toJson() => {
-    'id': id, 'name': name, 'type': type, 'position': position,
-    'organizationId': organizationId, 'requireConnectionReason': requireConnectionReason,
-    'entries': entries, 'ip': ip, 'icon': icon, 'folderType': folderType,
+    'id': id,
+    'name': name,
+    'type': type,
+    'position': position,
+    'organizationId': organizationId,
+    'requireConnectionReason': requireConnectionReason,
+    'entries': entries,
+    'ip': ip,
+    'icon': icon,
+    'folderType': folderType,
   };
 
   List<Server> get servers => entries
@@ -54,7 +69,11 @@ class ServerFolder {
       .toList();
 
   List<Server> get pveEntries => entries
-      .where((e) => e is Map<String, dynamic> && (e['type'] as String?)?.startsWith('pve-') == true)
+      .where(
+        (e) =>
+            e is Map<String, dynamic> &&
+            (e['type'] as String?)?.startsWith('pve-') == true,
+      )
       .map((e) => Server.fromJson(e as Map<String, dynamic>))
       .toList();
 

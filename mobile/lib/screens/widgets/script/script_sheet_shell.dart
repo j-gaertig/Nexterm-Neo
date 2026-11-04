@@ -3,11 +3,15 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/app_ui.dart';
+import '../../../utils/app_icons.dart';
+
 /// Shared visual container for every script dialog. Keeps the header, body,
 /// and action area consistent and safe with the keyboard, small screens, and
 /// large text.
 class ScriptSheetShell extends StatelessWidget {
   final String title;
+  final IconData icon;
   final Widget child;
   final Widget footer;
   final bool bodyIsScrollable;
@@ -16,6 +20,7 @@ class ScriptSheetShell extends StatelessWidget {
   const ScriptSheetShell({
     super.key,
     required this.title,
+    this.icon = AppIcons.codeBracesBox,
     required this.child,
     required this.footer,
     this.bodyIsScrollable = true,
@@ -24,7 +29,6 @@ class ScriptSheetShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
     final media = MediaQuery.of(context);
     final available = math.max(
@@ -42,34 +46,34 @@ class ScriptSheetShell extends StatelessWidget {
     final useWholeSheet = wholeSheetScrollable || available < 300;
 
     final header = <Widget>[
-      Center(
-        child: Container(
-          margin: EdgeInsets.only(top: compact ? 6 : 12, bottom: 4),
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.outlineVariant,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ),
+      AppSheetHandle(margin: EdgeInsets.only(top: compact ? 6 : 12, bottom: 4)),
       Padding(
-        padding: EdgeInsets.fromLTRB(edge, compact ? 6 : 12, edge, 0),
-        child: Text(
-          title,
-          style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          maxLines: compact ? 1 : 2,
-          overflow: TextOverflow.ellipsis,
+        padding: EdgeInsets.fromLTRB(edge, compact ? 6 : 10, edge, 0),
+        child: Row(
+          children: [
+            if (!compact) ...[
+              AppIconBox(icon: icon, size: 36),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Text(
+                title,
+                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                maxLines: compact ? 1 : 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
-      SizedBox(height: compact ? 6 : 10),
+      SizedBox(height: compact ? 6 : 12),
     ];
 
     final footerArea = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Divider(height: 1, color: cs.outlineVariant),
+        const AppDivider(),
         Padding(
           padding: EdgeInsets.fromLTRB(
             edge,
@@ -190,7 +194,7 @@ class ScriptSheetSecondaryButton extends StatelessWidget {
     return OutlinedButton(
       onPressed: onPressed,
       style: _actionStyle().copyWith(
-        side: WidgetStatePropertyAll(BorderSide(color: cs.outlineVariant)),
+        side: WidgetStatePropertyAll(appBorderSide(cs)),
       ),
       child: _actionLabel(label),
     );
@@ -239,7 +243,7 @@ Future<bool> showScriptConfirmationDialog(
                   onPressed: () => Navigator.pop(dialogContext, false),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
-                    side: BorderSide(color: cs.outlineVariant),
+                    side: appBorderSide(cs),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),

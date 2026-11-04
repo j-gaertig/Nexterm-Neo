@@ -1,3 +1,4 @@
+import '../utils/api_exception.dart';
 import 'package:flutter/material.dart';
 import '../utils/app_icons.dart';
 import 'package:re_editor/re_editor.dart';
@@ -42,8 +43,9 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
   @override
   void initState() {
     super.initState();
-    _toolbarController =
-        MobileSelectionToolbarController(builder: _toolbarBuilder);
+    _toolbarController = MobileSelectionToolbarController(
+      builder: _toolbarBuilder,
+    );
     _load();
   }
 
@@ -111,8 +113,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
         token: widget.token,
       );
       if (!mounted) return;
-      final langs =
-          CodeLanguage.highlightLanguagesForPath(widget.remotePath);
+      final langs = CodeLanguage.highlightLanguagesForPath(widget.remotePath);
       final controller = CodeLineEditingController.fromText(text);
       _controller?.removeListener(_onChanged);
       _controller?.dispose();
@@ -150,14 +151,14 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
         _dirty = false;
         _saving = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Saved')));
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
+        SnackBar(content: Text(friendlyApiError(e, fallback: 'Save failed.'))),
       );
     }
   }
@@ -207,8 +208,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canSave =
-        _dirty && !_saving && !_loading && _controller != null;
+    final canSave = _dirty && !_saving && !_loading && _controller != null;
     return PopScope(
       canPop: !_dirty,
       onPopInvokedWithResult: (didPop, result) {
@@ -225,12 +225,7 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
           ),
           title: Row(
             children: [
-              Expanded(
-                child: Text(
-                  _fileName,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+              Expanded(child: Text(_fileName, overflow: TextOverflow.ellipsis)),
               if (_dirty)
                 Text(
                   ' ●',
@@ -282,15 +277,9 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
                 color: Theme.of(context).colorScheme.error,
               ),
               const SizedBox(height: 12),
-              Text(
-                error,
-                textAlign: TextAlign.center,
-              ),
+              Text(error, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(
-                onPressed: _load,
-                child: const Text('Retry'),
-              ),
+              FilledButton(onPressed: _load, child: const Text('Retry')),
             ],
           ),
         ),
@@ -317,20 +306,20 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
       ),
       indicatorBuilder:
           (context, editingController, chunkController, notifier) {
-        return Row(
-          children: [
-            DefaultCodeLineNumber(
-              controller: editingController,
-              notifier: notifier,
-            ),
-            DefaultCodeChunkIndicator(
-              width: 20,
-              controller: chunkController,
-              notifier: notifier,
-            ),
-          ],
-        );
-      },
+            return Row(
+              children: [
+                DefaultCodeLineNumber(
+                  controller: editingController,
+                  notifier: notifier,
+                ),
+                DefaultCodeChunkIndicator(
+                  width: 20,
+                  controller: chunkController,
+                  notifier: notifier,
+                ),
+              ],
+            );
+          },
     );
   }
 }

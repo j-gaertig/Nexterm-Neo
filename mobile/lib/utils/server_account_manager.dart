@@ -15,8 +15,12 @@ class ServerAccountManager extends ChangeNotifier {
   bool get hasAccounts => _accounts.isNotEmpty;
 
   ServerAccount? get activeAccount {
-    if (_activeAccountId == null) return _accounts.isNotEmpty ? _accounts.first : null;
-    return _accounts.cast<ServerAccount?>().firstWhere((a) => a!.id == _activeAccountId, orElse: () => _accounts.isNotEmpty ? _accounts.first : null);
+    if (_activeAccountId == null)
+      return _accounts.isNotEmpty ? _accounts.first : null;
+    return _accounts.cast<ServerAccount?>().firstWhere(
+      (a) => a!.id == _activeAccountId,
+      orElse: () => _accounts.isNotEmpty ? _accounts.first : null,
+    );
   }
 
   Future<void> load() async {
@@ -57,7 +61,11 @@ class ServerAccountManager extends ChangeNotifier {
 
   Future<void> updateAccount(ServerAccount updated) async {
     final i = _accounts.indexWhere((a) => a.id == updated.id);
-    if (i != -1) { _accounts[i] = updated; await _save(); notifyListeners(); }
+    if (i != -1) {
+      _accounts[i] = updated;
+      await _save();
+      notifyListeners();
+    }
   }
 
   Future<void> _save() async {

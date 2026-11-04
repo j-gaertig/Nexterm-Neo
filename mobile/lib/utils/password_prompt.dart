@@ -31,11 +31,7 @@ class PasswordIdentity {
 
 /// Identity auth types that carry a password. Mirrors the web filter
 /// `['password', 'both', 'password-only']` in `XtermRenderer.jsx`.
-const Set<String> passwordIdentityTypes = {
-  'password',
-  'both',
-  'password-only',
-};
+const Set<String> passwordIdentityTypes = {'password', 'both', 'password-only'};
 
 String _takeLast(String s, int n) {
   final runes = s.runes.toList(growable: false);
@@ -81,7 +77,10 @@ String stripTerminalNoise(String? value) {
   // OSC 8 hyperlinks.
   s = s.replaceAll(RegExp('\u001b\\]8;;.*?\u001b\\\\'), '');
   // Other OSC sequences.
-  s = s.replaceAll(RegExp('\u001b\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)'), '');
+  s = s.replaceAll(
+    RegExp('\u001b\\][^\u0007\u001b]*(?:\u0007|\u001b\\\\)'),
+    '',
+  );
   // CSI sequences.
   s = s.replaceAll(RegExp('\u001b\\[[0-?]*[ -/]*[@-~]'), '');
   // Charset selection.
@@ -89,16 +88,21 @@ String stripTerminalNoise(String? value) {
   // Single-char escape sequences.
   s = s.replaceAll(RegExp('\u001b[78=><A-Za-z]'), '');
   // C0 controls (keep \t \n \r, drop the rest incl. DEL).
-  s = s.replaceAll(RegExp('[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]'), '');
+  s = s.replaceAll(
+    RegExp('[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]'),
+    '',
+  );
   // Zero-width / bidi / soft hyphen / word joiners.
   s = s.replaceAll(
-      RegExp('[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\u061c\ufeff\u00ad]'),
-      '');
+    RegExp('[\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\u061c\ufeff\u00ad]'),
+    '',
+  );
   // BMP private use area.
   s = s.replaceAll(RegExp('[\ue000-\uf8ff]'), '');
   // Supplementary private use planes (no regex escape, filter runes).
-  if (s.runes.any((r) =>
-      (r >= 0xF0000 && r <= 0xFFFFD) || (r >= 0x100000 && r <= 0x10FFFD))) {
+  if (s.runes.any(
+    (r) => (r >= 0xF0000 && r <= 0xFFFFD) || (r >= 0x100000 && r <= 0x10FFFD),
+  )) {
     final buf = StringBuffer();
     for (final rune in s.runes) {
       if ((rune >= 0xF0000 && rune <= 0xFFFFD) ||

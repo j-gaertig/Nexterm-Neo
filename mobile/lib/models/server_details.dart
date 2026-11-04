@@ -53,7 +53,8 @@ class ServerDetails {
     dynamic folderId = json['folderId'];
     if (folderId is Map && folderId['id'] != null) folderId = folderId['id'];
     dynamic organizationId = json['organizationId'];
-    if (organizationId is Map && organizationId['id'] != null) organizationId = organizationId['id'];
+    if (organizationId is Map && organizationId['id'] != null)
+      organizationId = organizationId['id'];
     return ServerDetails(
       id: json['id'],
       name: (json['name'] ?? '').toString(),
@@ -65,7 +66,6 @@ class ServerDetails {
       organizationId: organizationId,
     );
   }
-
 }
 
 class EngineInfo {
@@ -76,10 +76,8 @@ class EngineInfo {
   const EngineInfo({this.id, this.name = '', this.connected = false});
 
   factory EngineInfo.fromJson(Map<String, dynamic> json) => EngineInfo(
-        id: json['id'],
-        name: (json['name'] ?? '').toString(),
-        connected: json['connected'] == true,
-      );
+    id: json['id'],
+    name: (json['name'] ?? '').toString(),
+    connected: json['connected'] == true,
+  );
 }
-
-

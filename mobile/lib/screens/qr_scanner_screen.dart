@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../widgets/app_ui.dart';
 import '../utils/app_icons.dart';
 import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
@@ -30,8 +31,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       if (uri.scheme == 'nexterm' && uri.host == 'authorize') {
         final code = uri.queryParameters['code'],
             server = uri.queryParameters['server'];
-        if (code != null && server != null)
+        if (code != null && server != null) {
           return {'code': code, 'server': Uri.decodeComponent(server)};
+        }
       }
     } catch (_) {}
     return null;
@@ -100,7 +102,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         token: account.token,
       );
       final data = json.decode(resp.body);
-      if (resp.statusCode == 200 && !(data['code'] is int)) {
+      if (resp.statusCode == 200 && data['code'] is! int) {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
@@ -157,7 +159,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
+            border: Border.all(color: appBorderColor(cs)),
           ),
           child: Row(
             children: [
@@ -209,7 +211,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
+            border: Border.all(color: appBorderColor(cs)),
           ),
           child: Column(
             children: [

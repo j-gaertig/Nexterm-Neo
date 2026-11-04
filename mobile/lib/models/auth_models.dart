@@ -5,7 +5,13 @@ class UserInfo {
   final String role;
   final bool totpEnabled;
 
-  const UserInfo({required this.username, required this.firstName, required this.lastName, required this.role, required this.totpEnabled});
+  const UserInfo({
+    required this.username,
+    required this.firstName,
+    required this.lastName,
+    required this.role,
+    required this.totpEnabled,
+  });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) => UserInfo(
     username: json['username'] ?? '',

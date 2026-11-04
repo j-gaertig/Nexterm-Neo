@@ -7,7 +7,11 @@ class ConnectionLoader extends StatefulWidget {
   final bool visible;
   final Color? backgroundColor;
 
-  const ConnectionLoader({super.key, required this.visible, this.backgroundColor});
+  const ConnectionLoader({
+    super.key,
+    required this.visible,
+    this.backgroundColor,
+  });
 
   @override
   State<ConnectionLoader> createState() => _ConnectionLoaderState();

@@ -27,12 +27,16 @@ class ManagedIdentity {
       name: (json['name'] ?? '').toString(),
       username: (json['username'] ?? '').toString(),
       authType: (rawAuth == null || rawAuth.isEmpty) ? 'password' : rawAuth,
-      scope: (json['scope'] ?? (json['organizationId'] != null ? 'organization' : 'personal')).toString(),
+      scope:
+          (json['scope'] ??
+                  (json['organizationId'] != null
+                      ? 'organization'
+                      : 'personal'))
+              .toString(),
       organizationId: json['organizationId'],
       accountId: json['accountId'],
     );
   }
-
 }
 
 class IdentityDraft {
@@ -61,18 +65,15 @@ class IdentityDraft {
   });
 
   factory IdentityDraft.fromManaged(ManagedIdentity m) => IdentityDraft(
-        name: m.name,
-        username: m.username,
-        authType: m.authType,
-        scope: m.scope,
-        organizationId: m.organizationId,
-      );
+    name: m.name,
+    username: m.username,
+    authType: m.authType,
+    scope: m.scope,
+    organizationId: m.organizationId,
+  );
 
   Map<String, dynamic> toPayload() {
-    final payload = <String, dynamic>{
-      'name': name,
-      'type': authType,
-    };
+    final payload = <String, dynamic>{'name': name, 'type': authType};
     if (authType != 'password-only' && username.isNotEmpty) {
       payload['username'] = username;
     }
@@ -87,9 +88,11 @@ class IdentityDraft {
     }
     final hasPassphrase = passphrase.isNotEmpty;
     if (authType == 'password' || authType == 'password-only') {
-      if (passwordTouched || password.isNotEmpty) payload['password'] = password;
+      if (passwordTouched || password.isNotEmpty)
+        payload['password'] = password;
     } else if (authType == 'both') {
-      if (passwordTouched || password.isNotEmpty) payload['password'] = password;
+      if (passwordTouched || password.isNotEmpty)
+        payload['password'] = password;
       if (sshKey != null) payload['sshKey'] = sshKey;
       if (hasPassphrase) payload['passphrase'] = passphrase;
     } else {

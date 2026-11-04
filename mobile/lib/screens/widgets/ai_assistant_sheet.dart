@@ -35,19 +35,68 @@ class _Tool {
 String _arg(Map<String, dynamic> a, String key) => a[key]?.toString() ?? '';
 
 final Map<String, _Tool> _tools = {
-  'runCommand': _Tool(AppIcons.consoleLine, 'Run command', (a) => _arg(a, 'command')),
-  'readFile': _Tool(AppIcons.fileDocumentOutline, 'Read file', (a) => _arg(a, 'path')),
-  'writeFile': _Tool(AppIcons.fileEditOutline, 'Write file', (a) => _arg(a, 'path')),
-  'editFile': _Tool(AppIcons.fileEditOutline, 'Edit file', (a) => _arg(a, 'path')),
-  'listDirectory': _Tool(AppIcons.folderOutline, 'List directory', (a) => _arg(a, 'path')),
-  'statPath': _Tool(AppIcons.informationOutline, 'Inspect path', (a) => _arg(a, 'path')),
-  'makeDirectory': _Tool(AppIcons.folderPlusOutline, 'Create directory', (a) => _arg(a, 'path')),
-  'deleteFile': _Tool(AppIcons.trashCanOutline, 'Delete file', (a) => _arg(a, 'path')),
-  'removeDirectory': _Tool(AppIcons.trashCanOutline, 'Remove directory',
-      (a) => a['recursive'] == true ? '${_arg(a, 'path')} (recursive)' : _arg(a, 'path')),
-  'movePath': _Tool(AppIcons.fileMoveOutline, 'Move', (a) => '${_arg(a, 'source')} → ${_arg(a, 'destination')}'),
-  'changePermissions': _Tool(AppIcons.lockOutline, 'Change permissions', (a) => '${_arg(a, 'path')} → ${_arg(a, 'mode')}'),
-  'findDirectories': _Tool(AppIcons.magnify, 'Find directories', (a) => _arg(a, 'query')),
+  'runCommand': _Tool(
+    AppIcons.consoleLine,
+    'Run command',
+    (a) => _arg(a, 'command'),
+  ),
+  'readFile': _Tool(
+    AppIcons.fileDocumentOutline,
+    'Read file',
+    (a) => _arg(a, 'path'),
+  ),
+  'writeFile': _Tool(
+    AppIcons.fileEditOutline,
+    'Write file',
+    (a) => _arg(a, 'path'),
+  ),
+  'editFile': _Tool(
+    AppIcons.fileEditOutline,
+    'Edit file',
+    (a) => _arg(a, 'path'),
+  ),
+  'listDirectory': _Tool(
+    AppIcons.folderOutline,
+    'List directory',
+    (a) => _arg(a, 'path'),
+  ),
+  'statPath': _Tool(
+    AppIcons.informationOutline,
+    'Inspect path',
+    (a) => _arg(a, 'path'),
+  ),
+  'makeDirectory': _Tool(
+    AppIcons.folderPlusOutline,
+    'Create directory',
+    (a) => _arg(a, 'path'),
+  ),
+  'deleteFile': _Tool(
+    AppIcons.trashCanOutline,
+    'Delete file',
+    (a) => _arg(a, 'path'),
+  ),
+  'removeDirectory': _Tool(
+    AppIcons.trashCanOutline,
+    'Remove directory',
+    (a) => a['recursive'] == true
+        ? '${_arg(a, 'path')} (recursive)'
+        : _arg(a, 'path'),
+  ),
+  'movePath': _Tool(
+    AppIcons.fileMoveOutline,
+    'Move',
+    (a) => '${_arg(a, 'source')} → ${_arg(a, 'destination')}',
+  ),
+  'changePermissions': _Tool(
+    AppIcons.lockOutline,
+    'Change permissions',
+    (a) => '${_arg(a, 'path')} → ${_arg(a, 'mode')}',
+  ),
+  'findDirectories': _Tool(
+    AppIcons.magnify,
+    'Find directories',
+    (a) => _arg(a, 'query'),
+  ),
 };
 
 enum _Role { user, assistant, system, tool }
@@ -74,7 +123,8 @@ class _Msg {
   String? error;
 }
 
-class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerProviderStateMixin {
+class _AIAssistantSheetState extends State<AIAssistantSheet>
+    with SingleTickerProviderStateMixin {
   final _input = TextEditingController();
   final _scroll = ScrollController();
   final _messages = <_Msg>[];
@@ -94,10 +144,13 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))
-      ..addListener(() {
-        if (mounted) setState(() {});
-      });
+    _pulse =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 1000),
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
     _input.addListener(() {
       final has = _input.text.trim().isNotEmpty;
       if (has != _hasInput) setState(() => _hasInput = has);
@@ -120,7 +173,9 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
       _abortRunningTools();
 
       if (code != null && code >= 4000) {
-        _connectionError = (reason?.isNotEmpty ?? false) ? reason : 'Connection to the assistant was lost.';
+        _connectionError = (reason?.isNotEmpty ?? false)
+            ? reason
+            : 'Connection to the assistant was lost.';
         return;
       }
       if (code == 1000 || code == 1005) return;
@@ -219,9 +274,17 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         case 'tool-result':
           final result = msg['result'];
           final denied = result is Map && result['denied'] == true;
-          _patchTool(msg['callId']?.toString(), denied ? 'denied' : 'done', result: result);
+          _patchTool(
+            msg['callId']?.toString(),
+            denied ? 'denied' : 'done',
+            result: result,
+          );
         case 'tool-error':
-          _patchTool(msg['callId']?.toString(), 'error', error: msg['error']?.toString());
+          _patchTool(
+            msg['callId']?.toString(),
+            'error',
+            error: msg['error']?.toString(),
+          );
         case 'done':
           _endStreaming();
           _running = false;
@@ -232,7 +295,12 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
         case 'error':
           _endStreaming();
           _running = false;
-          _messages.add(_Msg(_Role.system, text: msg['message']?.toString() ?? 'Something went wrong.'));
+          _messages.add(
+            _Msg(
+              _Role.system,
+              text: msg['message']?.toString() ?? 'Something went wrong.',
+            ),
+          );
       }
     });
     _scrollToBottom();
@@ -257,19 +325,26 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
     if (callId == null) return;
     final existing = _toolFor(callId);
     if (existing == null) {
-      _messages.add(_Msg(
-        _Role.tool,
-        callId: callId,
-        tool: msg['tool']?.toString(),
-        args: _asMap(msg['args']),
-        status: status,
-      ));
+      _messages.add(
+        _Msg(
+          _Role.tool,
+          callId: callId,
+          tool: msg['tool']?.toString(),
+          args: _asMap(msg['args']),
+          status: status,
+        ),
+      );
     } else {
       existing.status = status;
     }
   }
 
-  void _patchTool(String? callId, String status, {dynamic result, String? error}) {
+  void _patchTool(
+    String? callId,
+    String status, {
+    dynamic result,
+    String? error,
+  }) {
     final tool = _toolFor(callId);
     if (tool == null) return;
     tool.status = status;
@@ -279,7 +354,8 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
 
   void _abortRunningTools() {
     for (final m in _messages) {
-      if (m.role == _Role.tool && (m.status == 'running' || m.status == 'awaiting-confirm')) {
+      if (m.role == _Role.tool &&
+          (m.status == 'running' || m.status == 'awaiting-confirm')) {
         m.status = 'aborted';
       }
     }
@@ -290,8 +366,11 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+        _scroll.animateTo(
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -330,72 +409,106 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SizedBox(
         height: MediaQuery.of(context).size.height * 0.9,
         child: SafeArea(
           top: false,
-          child: Column(children: [
-            _header(cs),
-            Expanded(child: _body(cs)),
-            _composer(cs),
-          ]),
+          child: Column(
+            children: [
+              _header(cs),
+              Expanded(child: _body(cs)),
+              _composer(cs),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _header(ColorScheme cs) => Column(children: [
-        Container(
-          margin: const EdgeInsets.only(top: 12, bottom: 4),
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(color: cs.outlineVariant, borderRadius: BorderRadius.circular(2)),
+  Widget _header(ColorScheme cs) => Column(
+    children: [
+      Container(
+        margin: const EdgeInsets.only(top: 12, bottom: 4),
+        width: 36,
+        height: 4,
+        decoration: BoxDecoration(
+          color: cs.outlineVariant,
+          borderRadius: BorderRadius.circular(2),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-          child: Row(children: [
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+        child: Row(
+          children: [
             Container(
               padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: cs.primaryContainer, borderRadius: BorderRadius.circular(10)),
-              child: Icon(AppIcons.robotHappyOutline, color: cs.onPrimaryContainer, size: 18),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                AppIcons.robotHappyOutline,
+                color: cs.onPrimaryContainer,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('AI Assistant',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                if (widget.serverName?.isNotEmpty ?? false)
-                  Text(widget.serverName!,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'AI Assistant',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (widget.serverName?.isNotEmpty ?? false)
+                    Text(
+                      widget.serverName!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.outline)),
-              ]),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: cs.outline),
+                    ),
+                ],
+              ),
             ),
             IconButton(
               icon: Icon(AppIcons.close, size: 20),
               onPressed: () => Navigator.pop(context),
-              style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
-          ]),
+          ],
         ),
-        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
-      ]);
+      ),
+      Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
+    ],
+  );
 
   Widget _body(ColorScheme cs) {
     if (_messages.isEmpty && _connectionError == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(AppIcons.robotHappyOutline, size: 48, color: cs.outline),
-            const SizedBox(height: 16),
-            Text(
-              'Ask the assistant to inspect or change this server. It can run commands and read or edit files directly over the connection.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: cs.outline, fontSize: 14, height: 1.4),
-            ),
-          ]),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(AppIcons.robotHappyOutline, size: 48, color: cs.outline),
+              const SizedBox(height: 16),
+              Text(
+                'Ask the assistant to inspect or change this server. It can run commands and read or edit files directly over the connection.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: cs.outline, fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -414,37 +527,64 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
   }
 
   Widget _message(ColorScheme cs, _Msg m) => switch (m.role) {
-        _Role.user => Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 12, left: 40),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(16)),
-              child: SelectableText(m.text, style: TextStyle(color: cs.onPrimary, fontSize: 14, height: 1.4)),
+    _Role.user => Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12, left: 40),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.primary,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: SelectableText(
+          m.text,
+          style: TextStyle(color: cs.onPrimary, fontSize: 14, height: 1.4),
+        ),
+      ),
+    ),
+    _Role.assistant => Container(
+      margin: const EdgeInsets.only(bottom: 12, right: 24),
+      child: GptMarkdown(
+        m.text,
+        style: TextStyle(color: cs.onSurface, fontSize: 14, height: 1.5),
+      ),
+    ),
+    _Role.system => Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            AppIcons.alertCircleOutline,
+            size: 16,
+            color: cs.onErrorContainer,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              m.text,
+              style: TextStyle(fontSize: 13, color: cs.onErrorContainer),
             ),
           ),
-        _Role.assistant => Container(
-            margin: const EdgeInsets.only(bottom: 12, right: 24),
-            child: GptMarkdown(m.text, style: TextStyle(color: cs.onSurface, fontSize: 14, height: 1.5)),
-          ),
-        _Role.system => Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
-            child: Row(children: [
-              Icon(AppIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
-              const SizedBox(width: 8),
-              Expanded(child: Text(m.text, style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
-            ]),
-          ),
-        _Role.tool => _toolCard(cs, m),
-      };
+        ],
+      ),
+    ),
+    _Role.tool => _toolCard(cs, m),
+  };
 
   Widget _toolCard(ColorScheme cs, _Msg m) {
     final tool = _tools[m.tool];
     final summary = tool?.summary(m.args ?? {}) ?? '';
     final result = m.result;
-    final exitCode = m.tool == 'runCommand' && m.status == 'done' && result is Map && result['denied'] != true
+    final exitCode =
+        m.tool == 'runCommand' &&
+            m.status == 'done' &&
+            result is Map &&
+            result['denied'] != true
         ? result['exitCode'] as int?
         : null;
     final failed = exitCode != null && exitCode != 0;
@@ -454,39 +594,78 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: failed ? cs.error.withValues(alpha: 0.5) : cs.outlineVariant.withValues(alpha: 0.4)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-          child: Row(children: [
-            Icon(tool?.icon ?? AppIcons.consoleLine, size: 16, color: cs.onSurfaceVariant),
-            const SizedBox(width: 8),
-            Text(tool?.label ?? m.tool ?? 'Tool',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
-            const Spacer(),
-            _toolStatus(cs, m, exitCode, failed),
-          ]),
+        border: Border.all(
+          color: failed
+              ? cs.error.withValues(alpha: 0.5)
+              : cs.outlineVariant.withValues(alpha: 0.4),
         ),
-        if (summary.isNotEmpty)
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-            child: Text(summary, style: GoogleFonts.jetBrainsMono(fontSize: 12, color: cs.onSurfaceVariant, height: 1.4)),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+            child: Row(
+              children: [
+                Icon(
+                  tool?.icon ?? AppIcons.consoleLine,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  tool?.label ?? m.tool ?? 'Tool',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurface,
+                  ),
+                ),
+                const Spacer(),
+                _toolStatus(cs, m, exitCode, failed),
+              ],
+            ),
           ),
-        if (m.status == 'awaiting-confirm') _confirmActions(cs, m),
-        if (m.status == 'denied') _note(cs, 'You denied this action.'),
-        if (m.status == 'aborted') _note(cs, 'Stopped.'),
-        if (m.status == 'error') _note(cs, m.error ?? 'Failed.', error: true),
-        if (m.status == 'done') _toolResult(cs, m),
-      ]),
+          if (summary.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+              child: Text(
+                summary,
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          if (m.status == 'awaiting-confirm') _confirmActions(cs, m),
+          if (m.status == 'denied') _note(cs, 'You denied this action.'),
+          if (m.status == 'aborted') _note(cs, 'Stopped.'),
+          if (m.status == 'error') _note(cs, m.error ?? 'Failed.', error: true),
+          if (m.status == 'done') _toolResult(cs, m),
+        ],
+      ),
     );
   }
 
-  Widget _toolStatus(ColorScheme cs, _Msg m, int? exitCode, bool failed) => switch (m.status) {
-        'running' => SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
-        'done' => failed
-            ? Text('exit $exitCode', style: TextStyle(fontSize: 12, color: cs.error, fontWeight: FontWeight.w600))
-            : Icon(AppIcons.check, size: 16, color: Colors.green),
+  Widget _toolStatus(ColorScheme cs, _Msg m, int? exitCode, bool failed) =>
+      switch (m.status) {
+        'running' => SizedBox(
+          width: 14,
+          height: 14,
+          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+        ),
+        'done' =>
+          failed
+              ? Text(
+                  'exit $exitCode',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                )
+              : Icon(AppIcons.check, size: 16, color: Colors.green),
         'denied' => Icon(AppIcons.cancel, size: 16, color: cs.error),
         'aborted' => Icon(AppIcons.stop, size: 16, color: cs.outline),
         'error' => Icon(AppIcons.close, size: 16, color: cs.error),
@@ -494,18 +673,26 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
       };
 
   Widget _confirmActions(ColorScheme cs, _Msg m) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Allow this action?', style: TextStyle(fontSize: 13, color: cs.onSurface)),
-          const SizedBox(height: 8),
-          Row(children: [
+    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Allow this action?',
+          style: TextStyle(fontSize: 13, color: cs.onSurface),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: () => _confirm(m.callId!, false),
                 icon: Icon(AppIcons.cancel, size: 16),
                 label: const Text('Deny'),
                 style: OutlinedButton.styleFrom(
-                    foregroundColor: cs.error, side: BorderSide(color: cs.error.withValues(alpha: 0.5))),
+                  foregroundColor: cs.error,
+                  side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -516,51 +703,80 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
                 label: const Text('Allow'),
               ),
             ),
-          ]),
-        ]),
-      );
+          ],
+        ),
+      ],
+    ),
+  );
 
   Widget _note(ColorScheme cs, String text, {bool error = false}) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        child: Text(text, style: TextStyle(fontSize: 12, color: error ? cs.error : cs.outline)),
-      );
+    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+    child: Text(
+      text,
+      style: TextStyle(fontSize: 12, color: error ? cs.error : cs.outline),
+    ),
+  );
 
   Widget _toolResult(ColorScheme cs, _Msg m) {
     final result = m.result;
-    if (result is! Map || result['denied'] == true) return const SizedBox.shrink();
+    if (result is! Map || result['denied'] == true)
+      return const SizedBox.shrink();
 
     Widget output(String text, {bool stderr = false}) => Container(
-          width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(8)),
-          child: SelectableText(text,
-              style: GoogleFonts.jetBrainsMono(fontSize: 12, height: 1.4, color: stderr ? cs.error : cs.onSurface)),
-        );
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SelectableText(
+        text,
+        style: GoogleFonts.jetBrainsMono(
+          fontSize: 12,
+          height: 1.4,
+          color: stderr ? cs.error : cs.onSurface,
+        ),
+      ),
+    );
 
     switch (m.tool) {
       case 'runCommand':
         final stdout = result['stdout']?.toString() ?? '';
         final stderr = result['stderr']?.toString() ?? '';
-        return Column(children: [
-          if (stdout.isNotEmpty) output(stdout),
-          if (stderr.isNotEmpty) output(stderr, stderr: true),
-        ]);
+        return Column(
+          children: [
+            if (stdout.isNotEmpty) output(stdout),
+            if (stderr.isNotEmpty) output(stderr, stderr: true),
+          ],
+        );
       case 'readFile':
         final content = result['content']?.toString() ?? '';
-        return output(content + (result['truncated'] == true ? '\n… [truncated]' : ''));
+        return output(
+          content + (result['truncated'] == true ? '\n… [truncated]' : ''),
+        );
       case 'listDirectory':
         final entries = (result['entries'] as List?) ?? [];
         if (entries.isEmpty) return const SizedBox.shrink();
         return Padding(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Wrap(spacing: 8, runSpacing: 4, children: [
-            for (final e in entries)
-              if (e is Map)
-                Text('${e['name']}${e['type'] == 'folder' ? '/' : ''}',
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final e in entries)
+                if (e is Map)
+                  Text(
+                    '${e['name']}${e['type'] == 'folder' ? '/' : ''}',
                     style: GoogleFonts.jetBrainsMono(
-                        fontSize: 12, color: e['type'] == 'folder' ? cs.primary : cs.onSurfaceVariant)),
-          ]),
+                      fontSize: 12,
+                      color: e['type'] == 'folder'
+                          ? cs.primary
+                          : cs.onSurfaceVariant,
+                    ),
+                  ),
+            ],
+          ),
         );
       default:
         return const SizedBox.shrink();
@@ -568,92 +784,129 @@ class _AIAssistantSheetState extends State<AIAssistantSheet> with SingleTickerPr
   }
 
   Widget _typing(ColorScheme cs) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: Row(children: [
-          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary)),
-          const SizedBox(width: 10),
-          Text('Thinking...', style: TextStyle(color: cs.outline, fontSize: 13)),
-        ]),
-      );
+    margin: const EdgeInsets.only(bottom: 12),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+        ),
+        const SizedBox(width: 10),
+        Text('Thinking...', style: TextStyle(color: cs.outline, fontSize: 13)),
+      ],
+    ),
+  );
 
   Widget _errorBanner(ColorScheme cs) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          Icon(AppIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
-          const SizedBox(width: 8),
-          Expanded(child: Text(_connectionError!, style: TextStyle(fontSize: 13, color: cs.onErrorContainer))),
-        ]),
-      );
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: cs.errorContainer,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Icon(AppIcons.alertCircleOutline, size: 16, color: cs.onErrorContainer),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            _connectionError!,
+            style: TextStyle(fontSize: 13, color: cs.onErrorContainer),
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _composer(ColorScheme cs) => Container(
-        decoration: BoxDecoration(
-          color: cs.surface,
-          border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4))),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          if (_speechEnabled)
-            GestureDetector(
-              onTap: _ready ? _toggleListening : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(right: 4, bottom: 2),
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _listening ? cs.error.withValues(alpha: 0.15) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: _listening
-                      ? [
-                          BoxShadow(
-                            color: cs.error.withValues(alpha: 0.2 * _pulse.value),
-                            blurRadius: 8 + 4 * _pulse.value,
-                            spreadRadius: _pulse.value,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(_listening ? AppIcons.microphoneActive : AppIcons.microphoneOutline,
-                    size: 22, color: _listening ? cs.error : cs.outline),
+    decoration: BoxDecoration(
+      color: cs.surface,
+      border: Border(
+        top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+    ),
+    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (_speechEnabled)
+          GestureDetector(
+            onTap: _ready ? _toggleListening : null,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.only(right: 4, bottom: 2),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _listening
+                    ? cs.error.withValues(alpha: 0.15)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: _listening
+                    ? [
+                        BoxShadow(
+                          color: cs.error.withValues(alpha: 0.2 * _pulse.value),
+                          blurRadius: 8 + 4 * _pulse.value,
+                          spreadRadius: _pulse.value,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                _listening
+                    ? AppIcons.microphoneActive
+                    : AppIcons.microphoneOutline,
+                size: 22,
+                color: _listening ? cs.error : cs.outline,
               ),
             ),
-          Expanded(
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 120),
-              decoration: BoxDecoration(color: cs.surfaceContainerHigh, borderRadius: BorderRadius.circular(20)),
-              child: TextField(
-                controller: _input,
-                enabled: _ready,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _send(),
-                style: TextStyle(fontSize: 15, color: cs.onSurface),
-                decoration: InputDecoration(
-                  hintText: !_ready
-                      ? 'Connecting...'
-                      : _listening
-                          ? 'Listening...'
-                          : 'Message the assistant...',
-                  hintStyle: TextStyle(color: cs.outline.withValues(alpha: 0.7)),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        Expanded(
+          child: Container(
+            constraints: const BoxConstraints(maxHeight: 120),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: TextField(
+              controller: _input,
+              enabled: _ready,
+              minLines: 1,
+              maxLines: 4,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => _send(),
+              style: TextStyle(fontSize: 15, color: cs.onSurface),
+              decoration: InputDecoration(
+                hintText: !_ready
+                    ? 'Connecting...'
+                    : _listening
+                    ? 'Listening...'
+                    : 'Message the assistant...',
+                hintStyle: TextStyle(color: cs.outline.withValues(alpha: 0.7)),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          _running
-              ? IconButton.filled(
-                  onPressed: _stop,
-                  icon: Icon(AppIcons.stop),
-                  style: IconButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
-                )
-              : IconButton.filled(
-                  onPressed: _hasInput && _ready ? _send : null,
-                  icon: Icon(AppIcons.send),
+        ),
+        const SizedBox(width: 8),
+        _running
+            ? IconButton.filled(
+                onPressed: _stop,
+                icon: Icon(AppIcons.stop),
+                style: IconButton.styleFrom(
+                  backgroundColor: cs.error,
+                  foregroundColor: cs.onError,
                 ),
-        ]),
-      );
+              )
+            : IconButton.filled(
+                onPressed: _hasInput && _ready ? _send : null,
+                icon: Icon(AppIcons.send),
+              ),
+      ],
+    ),
+  );
 }

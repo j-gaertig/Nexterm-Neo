@@ -1,3 +1,5 @@
+import '../widgets/app_ui.dart';
+import '../utils/api_exception.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -190,18 +192,24 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   Future<void> _handleOpenBrowser() async {
     if (_deviceCode == null) return;
     var baseUrl = ApiConfig.baseUrl;
-    if (baseUrl.endsWith('/api'))
+    if (baseUrl.endsWith('/api')) {
       baseUrl = baseUrl.substring(0, baseUrl.length - 4);
+    }
     try {
       await launchUrl(
         Uri.parse('$baseUrl/link?code=$_deviceCode'),
         mode: LaunchMode.externalApplication,
       );
     } catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not open browser: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              friendlyApiError(e, fallback: 'Could not open the browser.'),
+            ),
+          ),
+        );
+      }
     }
     _startPolling();
   }
@@ -209,10 +217,11 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   Future<void> _copyCode() async {
     if (_deviceCode == null) return;
     await Clipboard.setData(ClipboardData(text: _deviceCode!));
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Code copied to clipboard')));
+    }
   }
 
   void _goBack() {
@@ -355,7 +364,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
       color: cs.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant),
+        side: appBorderSide(cs),
       ),
       child: ListTile(
         leading: Container(
@@ -454,7 +463,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cs.outlineVariant),
+            border: Border.all(color: appBorderColor(cs)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

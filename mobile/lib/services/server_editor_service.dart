@@ -17,7 +17,9 @@ class ServerEditorService {
           throw Exception((data['message'] ?? 'Request failed').toString());
         }
         if (statusCode >= 300) {
-          throw Exception((data['message'] ?? 'Request failed: $statusCode').toString());
+          throw Exception(
+            (data['message'] ?? 'Request failed: $statusCode').toString(),
+          );
         }
       } else if (statusCode >= 300) {
         throw Exception('Request failed: $statusCode');
@@ -57,7 +59,9 @@ class ServerEditorService {
     }
     if (data is Map<String, dynamic>) {
       if (data['code'] is int && (data['code'] as int) >= 300) {
-        throw Exception((data['message'] ?? 'Failed to load server').toString());
+        throw Exception(
+          (data['message'] ?? 'Failed to load server').toString(),
+        );
       }
       return ServerDetails.fromJson(_entryToMap(data));
     }
@@ -108,7 +112,12 @@ class ServerEditorService {
     required Map<String, dynamic> config,
     required List<int> identities,
   }) async {
-    final body = <String, dynamic>{'name': name, 'icon': icon, 'config': config, 'identities': identities};
+    final body = <String, dynamic>{
+      'name': name,
+      'icon': icon,
+      'config': config,
+      'identities': identities,
+    };
     body.removeWhere((k, v) => v == null);
     final response = await ApiClient.patch(
       '/entries/$entryId',
@@ -118,17 +127,30 @@ class ServerEditorService {
     _throwIfError(response.statusCode, response.body);
   }
 
-  static Future<void> deleteEntry({required String token, required dynamic entryId}) async {
+  static Future<void> deleteEntry({
+    required String token,
+    required dynamic entryId,
+  }) async {
     final response = await ApiClient.delete('/entries/$entryId', token: token);
     _throwIfError(response.statusCode, response.body);
   }
 
-  static Future<void> duplicateEntry({required String token, required dynamic entryId}) async {
-    final response = await ApiClient.post('/entries/$entryId/duplicate', token: token);
+  static Future<void> duplicateEntry({
+    required String token,
+    required dynamic entryId,
+  }) async {
+    final response = await ApiClient.post(
+      '/entries/$entryId/duplicate',
+      token: token,
+    );
     _throwIfError(response.statusCode, response.body);
   }
 
-  static Future<void> setEntryDisabled({required String token, required dynamic entryId, required bool disabled}) async {
+  static Future<void> setEntryDisabled({
+    required String token,
+    required dynamic entryId,
+    required bool disabled,
+  }) async {
     final response = await ApiClient.patch(
       '/entries/$entryId',
       body: {'disabled': disabled},
@@ -174,13 +196,23 @@ class ServerEditorService {
       throw Exception('Failed to load identities');
     }
     if (data is! List) return [];
-    return data.whereType<Map<String, dynamic>>().map(ManagedIdentity.fromJson).toList();
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(ManagedIdentity.fromJson)
+        .toList();
   }
 
-  static Future<int> createIdentity({required String token, required Map<String, dynamic> payload}) async {
+  static Future<int> createIdentity({
+    required String token,
+    required Map<String, dynamic> payload,
+  }) async {
     final cleaned = Map<String, dynamic>.from(payload);
     cleaned.removeWhere((k, v) => v == null);
-    final response = await ApiClient.put('/identities', body: cleaned, token: token);
+    final response = await ApiClient.put(
+      '/identities',
+      body: cleaned,
+      token: token,
+    );
     _throwIfError(response.statusCode, response.body);
     dynamic data;
     try {
@@ -204,7 +236,11 @@ class ServerEditorService {
     final cleaned = Map<String, dynamic>.from(payload);
     cleaned.removeWhere((k, v) => v == null);
     if (cleaned.isEmpty) return;
-    final response = await ApiClient.patch('/identities/$identityId', body: cleaned, token: token);
+    final response = await ApiClient.patch(
+      '/identities/$identityId',
+      body: cleaned,
+      token: token,
+    );
     _throwIfError(response.statusCode, response.body);
   }
 
@@ -218,12 +254,19 @@ class ServerEditorService {
       final key = entry.key;
       final draft = entry.value;
       if (key.startsWith('new-')) {
-        final id = await createIdentity(token: token, payload: draft.toPayload());
+        final id = await createIdentity(
+          token: token,
+          payload: draft.toPayload(),
+        );
         result.add(id);
       } else {
         final id = int.tryParse(key);
         if (id == null) continue;
-        await updateIdentity(token: token, identityId: id, payload: draft.toPayload());
+        await updateIdentity(
+          token: token,
+          identityId: id,
+          payload: draft.toPayload(),
+        );
         result.add(id);
       }
     }
@@ -235,7 +278,9 @@ class ServerEditorService {
     required dynamic identityId,
     required dynamic organizationId,
   }) async {
-    final orgId = organizationId is int ? organizationId : int.tryParse(organizationId.toString());
+    final orgId = organizationId is int
+        ? organizationId
+        : int.tryParse(organizationId.toString());
     if (orgId == null) throw Exception('Invalid organization id');
     final response = await ApiClient.post(
       '/identities/$identityId/move',

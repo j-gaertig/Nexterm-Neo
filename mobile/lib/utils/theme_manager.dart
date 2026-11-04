@@ -66,11 +66,11 @@ class ThemeManager extends ChangeNotifier {
 
   static const _pageTransitions = PageTransitionsTheme(
     builders: {
-      TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+      TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
       TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-      TargetPlatform.linux: FadeUpwardsPageTransitionsBuilder(),
+      TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
       TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-      TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+      TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
     },
   );
 
@@ -111,9 +111,12 @@ class ThemeManager extends ChangeNotifier {
         backgroundColor: scheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
       ),
+      // One snackbar style everywhere: floating, rounded, never full-width.
       snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,
         contentTextStyle: TextStyle(color: scheme.onInverseSurface),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }

@@ -19,11 +19,7 @@ class ServerViewSettings extends ChangeNotifier {
   int get gridColumns => _gridColumns;
   bool get isGrid => _mode == ServerViewMode.grid;
 
-  ServerViewSettings._({
-    required ServerViewMode mode,
-    required int gridColumns,
-  })  : _mode = mode,
-        _gridColumns = gridColumns;
+  ServerViewSettings._({required this._mode, required this._gridColumns});
 
   static Future<ServerViewSettings> load() async {
     final prefs = await SharedPreferences.getInstance();

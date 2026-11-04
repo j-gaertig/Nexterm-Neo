@@ -9,7 +9,11 @@ class MonitoringService {
     return (json.decode(r.body) as List).map((e) => M.from(e)).toList();
   }
 
-  static Future<M> getDetails(String token, dynamic id, {String range = '1h'}) async {
+  static Future<M> getDetails(
+    String token,
+    dynamic id, {
+    String range = '1h',
+  }) async {
     final ep = id.toString().startsWith('pve-')
         ? '/monitoring/integration/${id.toString().substring(4)}?timeRange=$range'
         : '/monitoring/$id?timeRange=$range';

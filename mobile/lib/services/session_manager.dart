@@ -337,22 +337,34 @@ class SessionManager extends ChangeNotifier {
       final serverSessions = await ConnectionService.listSessions(token: token);
       if (serverSessions.isEmpty) return;
 
+      // Only sessions that are neither open locally nor hibernated need their
+      // server entry; resuming the app must not re-fetch everything.
       final entryIds = serverSessions
+          .where(
+            (s) =>
+                !_sessions.containsKey(s['sessionId']) &&
+                (s['isHibernated'] as bool? ?? false) == false,
+          )
           .map((s) => s['entryId'])
           .whereType<int>()
           .toSet();
+      if (entryIds.isEmpty) return;
       final entryMap = <int, Server>{};
-      for (final eid in entryIds) {
-        try {
-          final resp = await ApiClient.get('/entries/$eid', token: token);
-          if (resp.statusCode == 200) {
-            final data = json.decode(resp.body);
-            if (data is Map<String, dynamic>) {
-              entryMap[eid] = Server.fromJson(data);
+      await Future.wait(
+        entryIds.map((eid) async {
+          try {
+            final resp = await ApiClient.get('/entries/$eid', token: token);
+            if (resp.statusCode == 200) {
+              final data = json.decode(resp.body);
+              if (data is Map<String, dynamic>) {
+                entryMap[eid] = Server.fromJson(data);
+              }
             }
+          } catch (_) {
+            // Skip entries that cannot be loaded; their sessions stay hidden.
           }
-        } catch (_) {}
-      }
+        }),
+      );
 
       for (final sData in serverSessions) {
         final sessionId = sData['sessionId'] as String?;

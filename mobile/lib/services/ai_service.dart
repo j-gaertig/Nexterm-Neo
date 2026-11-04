@@ -60,10 +60,10 @@ class AIAssistantChannel {
     _subscription?.cancel();
     _channel?.sink.close();
 
-    final url = ApiClient.buildWebSocketUrl('/ws/ai', queryParams: {
-      'sessionToken': token,
-      'sessionId': sessionId,
-    });
+    final url = ApiClient.buildWebSocketUrl(
+      '/ws/ai',
+      queryParams: {'sessionToken': token, 'sessionId': sessionId},
+    );
 
     final channel = IOWebSocketChannel.connect(
       Uri.parse(url),
@@ -93,9 +93,11 @@ class AIAssistantChannel {
     _channel?.sink.add(jsonEncode(payload));
   }
 
-  void sendPrompt(String content) => _send({'type': 'prompt', 'content': content});
+  void sendPrompt(String content) =>
+      _send({'type': 'prompt', 'content': content});
 
-  void confirm(String callId, bool allow) => _send({'type': 'confirm', 'callId': callId, 'allow': allow});
+  void confirm(String callId, bool allow) =>
+      _send({'type': 'confirm', 'callId': callId, 'allow': allow});
 
   void abort() => _send({'type': 'abort'});
 

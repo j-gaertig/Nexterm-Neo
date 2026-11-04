@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/session_manager.dart';
 import '../utils/app_icons.dart';
+import '../widgets/app_ui.dart';
 import '../widgets/floating_navigation_bar.dart';
 import 'widgets/session_grid_card.dart';
 
@@ -56,30 +57,10 @@ class SessionsOverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(int count, ColorScheme cs, TextTheme tt) {
-    final countLabel = count == 1
-        ? '1 active session'
-        : '$count active sessions';
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Sessions',
-            style: tt.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              countLabel,
-              style: tt.bodySmall?.copyWith(color: cs.outline),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildHeader(int count, ColorScheme cs, TextTheme tt) => AppPageHeader(
+    title: 'Sessions',
+    subtitle: count == 1 ? '1 active session' : '$count active sessions',
+  );
 
   Widget _buildGrid(BuildContext context, List<AppSession> sessions) {
     final media = MediaQuery.of(context);
@@ -133,35 +114,9 @@ class SessionsOverviewScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildEmpty(ColorScheme cs, TextTheme tt) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHigh,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(AppIcons.monitorOff, size: 32, color: cs.outline),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'No active sessions',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Sessions you open appear here.',
-              style: tt.bodySmall?.copyWith(color: cs.outline),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildEmpty(ColorScheme cs, TextTheme tt) => const AppEmptyState(
+    icon: AppIcons.monitorOff,
+    title: 'No active sessions',
+    message: 'Sessions you open appear here.',
+  );
 }

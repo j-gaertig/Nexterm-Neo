@@ -5,7 +5,13 @@ class Snippet {
   final String command;
   final String? description;
 
-  const Snippet({required this.id, required this.name, required this.accountId, required this.command, this.description});
+  const Snippet({
+    required this.id,
+    required this.name,
+    required this.accountId,
+    required this.command,
+    this.description,
+  });
 
   factory Snippet.fromJson(Map<String, dynamic> json) => Snippet(
     id: json['id'] as int,

@@ -209,7 +209,17 @@ class AppIcons {
   static final Map<String, IconData> _mdiByCamelName = {
     for (final icon in MdiIcons.values)
       if (icon.mdiMetadata != null)
-        icon.mdiMetadata!.name.split('-').asMap().entries.map((e) => e.key == 0 ? e.value : e.value[0].toUpperCase() + e.value.substring(1)).join(): icon,
+        icon.mdiMetadata!.name
+                .split('-')
+                .asMap()
+                .entries
+                .map(
+                  (e) => e.key == 0
+                      ? e.value
+                      : e.value[0].toUpperCase() + e.value.substring(1),
+                )
+                .join():
+            icon,
   };
 
   static IconData? resolveBackendIcon(String camel) {

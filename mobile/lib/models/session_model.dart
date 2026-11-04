@@ -19,8 +19,12 @@ class SessionModel {
     id: json['id'].toString(),
     userAgent: json['userAgent'] as String?,
     ip: json['ip'] as String?,
-    createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
-    lastActivity: json['lastActivity'] != null ? DateTime.tryParse(json['lastActivity']) : null,
+    createdAt: json['createdAt'] != null
+        ? DateTime.tryParse(json['createdAt'])
+        : null,
+    lastActivity: json['lastActivity'] != null
+        ? DateTime.tryParse(json['lastActivity'])
+        : null,
     current: json['current'] as bool?,
   );
 }

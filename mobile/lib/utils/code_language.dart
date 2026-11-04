@@ -132,7 +132,8 @@ class CodeLanguage {
   }
 
   static Map<String, CodeHighlightThemeMode> highlightLanguagesForPath(
-      String remotePath) {
+    String remotePath,
+  ) {
     final id = languageIdForPath(remotePath);
     switch (id) {
       case 'javascript':
@@ -184,15 +185,11 @@ class CodeLanguage {
       case 'ini':
         return {'ini': CodeHighlightThemeMode(mode: langIni)};
       case 'properties':
-        return {
-          'properties': CodeHighlightThemeMode(mode: langProperties)
-        };
+        return {'properties': CodeHighlightThemeMode(mode: langProperties)};
       case 'dart':
         return {'dart': CodeHighlightThemeMode(mode: langDart)};
       case 'dockerfile':
-        return {
-          'dockerfile': CodeHighlightThemeMode(mode: langDockerfile)
-        };
+        return {'dockerfile': CodeHighlightThemeMode(mode: langDockerfile)};
       case 'makefile':
         return {'makefile': CodeHighlightThemeMode(mode: langMakefile)};
       case 'nginx':

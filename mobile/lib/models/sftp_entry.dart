@@ -16,15 +16,16 @@ class SftpEntry {
   });
 
   factory SftpEntry.fromJson(Map<String, dynamic> json) => SftpEntry(
-        name: json['name'] as String? ?? '',
-        isDir: json['type'] == 'folder' || (json['isDir'] as bool? ?? false),
-        isSymlink: json['isSymlink'] as bool? ?? false,
-        size: (json['size'] as num?)?.toInt() ?? 0,
-        mtime: (json['last_modified'] as num?)?.toInt() ??
-            (json['mtime'] as num?)?.toInt() ??
-            0,
-        mode: (json['mode'] as num?)?.toInt() ?? 0,
-      );
+    name: json['name'] as String? ?? '',
+    isDir: json['type'] == 'folder' || (json['isDir'] as bool? ?? false),
+    isSymlink: json['isSymlink'] as bool? ?? false,
+    size: (json['size'] as num?)?.toInt() ?? 0,
+    mtime:
+        (json['last_modified'] as num?)?.toInt() ??
+        (json['mtime'] as num?)?.toInt() ??
+        0,
+    mode: (json['mode'] as num?)?.toInt() ?? 0,
+  );
 
   String get formattedSize {
     if (isDir) return '';

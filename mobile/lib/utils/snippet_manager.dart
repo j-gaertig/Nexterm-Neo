@@ -32,7 +32,8 @@ class SnippetManager extends ChangeNotifier {
     }
   }
 
-  Future<void> reloadSnippets(String token) => loadSnippets(token, forceRefresh: true);
+  Future<void> reloadSnippets(String token) =>
+      loadSnippets(token, forceRefresh: true);
 
   void clear() {
     _snippets = [];

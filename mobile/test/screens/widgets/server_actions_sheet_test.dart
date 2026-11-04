@@ -97,16 +97,19 @@ void main() {
       expect(_labelsFor(_server), _labels);
     });
 
-    test('hides quick actions for Proxmox entries and shows the disabled state', () {
-      const pve = Server(
-        id: 2,
-        name: 'pve-node',
-        ip: '10.0.0.2',
-        type: 'pve-qemu',
-        disabled: true,
-      );
-      expect(_labelsFor(pve), ['Connect', 'Duplicate', 'Enable', 'Delete']);
-    });
+    test(
+      'hides quick actions for Proxmox entries and shows the disabled state',
+      () {
+        const pve = Server(
+          id: 2,
+          name: 'pve-node',
+          ip: '10.0.0.2',
+          type: 'pve-qemu',
+          disabled: true,
+        );
+        expect(_labelsFor(pve), ['Connect', 'Duplicate', 'Enable', 'Delete']);
+      },
+    );
 
     test('only offers Run Script for SSH servers with an identity', () {
       const noIdentities = Server(
@@ -174,7 +177,9 @@ void main() {
       final scrollable = find.byType(Scrollable);
       expect(scrollable, findsOneWidget);
 
-      final sheetHeight = tester.getSize(find.byType(ServerActionsSheet)).height;
+      final sheetHeight = tester
+          .getSize(find.byType(ServerActionsSheet))
+          .height;
       expect(sheetHeight, lessThanOrEqualTo(480 * 0.85));
 
       final scrollableState = tester.state<ScrollableState>(scrollable);
@@ -196,9 +201,7 @@ void main() {
       expect(find.byType(ServerActionsSheet), findsNothing);
     });
 
-    testWidgets('keeps the last action reachable in landscape', (
-      tester,
-    ) async {
+    testWidgets('keeps the last action reachable in landscape', (tester) async {
       await _pumpHost(tester, size: const Size(640, 360), textScale: 2);
       final tapped = <String>[];
       await _openSheet(tester, tapped);
@@ -265,7 +268,9 @@ void main() {
       final tapped = <String>[];
       await _openSheet(tester, tapped);
 
-      final sheetHeight = tester.getSize(find.byType(ServerActionsSheet)).height;
+      final sheetHeight = tester
+          .getSize(find.byType(ServerActionsSheet))
+          .height;
       expect(sheetHeight, lessThan(800 * 0.85));
 
       final scrollableState = tester.state<ScrollableState>(

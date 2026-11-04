@@ -16,11 +16,13 @@ void main() {
 
   test('discardAll drops local sessions without server calls', () {
     final sm = SessionManager();
-    sm.seedSessionForTesting(AppSession(
-      sessionId: 'home-session',
-      server: const Server(name: 'home-assistant', ip: '192.168.1.60'),
-      type: ConnectionType.terminal,
-    ));
+    sm.seedSessionForTesting(
+      AppSession(
+        sessionId: 'home-session',
+        server: const Server(name: 'home-assistant', ip: '192.168.1.60'),
+        type: ConnectionType.terminal,
+      ),
+    );
     var notified = 0;
     sm.addListener(() => notified++);
     sm.discardAll();

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/app_ui.dart';
 import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import '../../renderers/script_execution_controller.dart';
@@ -647,7 +648,7 @@ class _ScriptExecutionDockState extends State<ScriptExecutionDock> {
 
   ButtonStyle _dockSecondaryStyle(ColorScheme cs) => OutlinedButton.styleFrom(
     minimumSize: const Size.fromHeight(48),
-    side: BorderSide(color: cs.outlineVariant),
+    side: appBorderSide(cs),
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
   );
 }

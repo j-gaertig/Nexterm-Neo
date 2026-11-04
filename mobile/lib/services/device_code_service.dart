@@ -18,8 +18,8 @@ class DeviceCodeResponse {
     return DeviceCodeResponse(
       code: json['code'] ?? '',
       token: json['token'] ?? '',
-      expiresAt: json['expiresAt'] != null 
-          ? DateTime.parse(json['expiresAt']) 
+      expiresAt: json['expiresAt'] != null
+          ? DateTime.parse(json['expiresAt'])
           : DateTime.now().add(const Duration(minutes: 10)),
     );
   }
@@ -68,12 +68,18 @@ class DeviceCodeService {
         if (data['code'] != null && data['code'] is String) {
           return DeviceCodeResponse.fromJson(data);
         }
-        return DeviceCodeResponse.error(data['message'] ?? 'Failed to create device code');
+        return DeviceCodeResponse.error(
+          data['message'] ?? 'Failed to create device code',
+        );
       } else if (response.statusCode == 429) {
-        return DeviceCodeResponse.error('Too many requests. Please try again later.');
+        return DeviceCodeResponse.error(
+          'Too many requests. Please try again later.',
+        );
       } else {
         final data = json.decode(response.body);
-        return DeviceCodeResponse.error(data['message'] ?? 'Failed to create device code');
+        return DeviceCodeResponse.error(
+          data['message'] ?? 'Failed to create device code',
+        );
       }
     } catch (e) {
       return DeviceCodeResponse.error('Connection error: $e');

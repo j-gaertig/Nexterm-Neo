@@ -18,11 +18,12 @@ class SftpTextFileService {
     required String token,
   }) {
     return Uri.parse(
-        '${ApiConfig.baseUrl}/entries/sftp'
-        '?sessionId=${Uri.encodeComponent(sessionId)}'
-        '&path=${Uri.encodeComponent(remotePath)}'
-        '&sessionToken=${Uri.encodeComponent(token)}'
-        '&preview=true');
+      '${ApiConfig.baseUrl}/entries/sftp'
+      '?sessionId=${Uri.encodeComponent(sessionId)}'
+      '&path=${Uri.encodeComponent(remotePath)}'
+      '&sessionToken=${Uri.encodeComponent(token)}'
+      '&preview=true',
+    );
   }
 
   static Uri uploadUri({
@@ -31,10 +32,11 @@ class SftpTextFileService {
     required String token,
   }) {
     return Uri.parse(
-        '${ApiConfig.baseUrl}/entries/sftp/upload'
-        '?sessionId=${Uri.encodeComponent(sessionId)}'
-        '&path=${Uri.encodeComponent(remotePath)}'
-        '&sessionToken=${Uri.encodeComponent(token)}');
+      '${ApiConfig.baseUrl}/entries/sftp/upload'
+      '?sessionId=${Uri.encodeComponent(sessionId)}'
+      '&path=${Uri.encodeComponent(remotePath)}'
+      '&sessionToken=${Uri.encodeComponent(token)}',
+    );
   }
 
   static Future<String> loadText({
@@ -45,9 +47,9 @@ class SftpTextFileService {
     final client = http.Client();
     try {
       final request = http.Request(
-          'GET',
-          downloadUri(
-              sessionId: sessionId, remotePath: remotePath, token: token));
+        'GET',
+        downloadUri(sessionId: sessionId, remotePath: remotePath, token: token),
+      );
       request.headers['User-Agent'] = ApiClient.userAgent;
       final streamed = await client
           .send(request)
@@ -57,8 +59,8 @@ class SftpTextFileService {
         throw SftpTextFileException('File too large');
       }
       final body = await streamed.stream.toBytes().timeout(
-            const Duration(minutes: 5),
-          );
+        const Duration(minutes: 5),
+      );
       if (streamed.statusCode != 200) {
         String detail = '';
         try {
@@ -66,19 +68,22 @@ class SftpTextFileService {
         } catch (_) {}
         if (streamed.statusCode == 403) {
           throw SftpTextFileException(
-              detail.isNotEmpty ? detail : 'Permission denied',
-              streamed.statusCode);
+            detail.isNotEmpty ? detail : 'Permission denied',
+            streamed.statusCode,
+          );
         }
         if (streamed.statusCode == 404) {
           throw SftpTextFileException(
-              detail.isNotEmpty ? detail : 'File not found',
-              streamed.statusCode);
+            detail.isNotEmpty ? detail : 'File not found',
+            streamed.statusCode,
+          );
         }
         throw SftpTextFileException(
-            detail.isNotEmpty
-                ? detail
-                : 'Load failed (HTTP ${streamed.statusCode})',
-            streamed.statusCode);
+          detail.isNotEmpty
+              ? detail
+              : 'Load failed (HTTP ${streamed.statusCode})',
+          streamed.statusCode,
+        );
       }
       return utf8.decode(body, allowMalformed: true);
     } finally {
@@ -98,7 +103,10 @@ class SftpTextFileService {
       final response = await client
           .post(
             uploadUri(
-                sessionId: sessionId, remotePath: remotePath, token: token),
+              sessionId: sessionId,
+              remotePath: remotePath,
+              token: token,
+            ),
             headers: {
               'User-Agent': ApiClient.userAgent,
               'Content-Type': 'application/octet-stream',
@@ -119,14 +127,16 @@ class SftpTextFileService {
         }
         if (response.statusCode == 403) {
           throw SftpTextFileException(
-              detail.isNotEmpty ? detail : 'Permission denied',
-              response.statusCode);
+            detail.isNotEmpty ? detail : 'Permission denied',
+            response.statusCode,
+          );
         }
         throw SftpTextFileException(
-            detail.isNotEmpty
-                ? detail
-                : 'Save failed (HTTP ${response.statusCode})',
-            response.statusCode);
+          detail.isNotEmpty
+              ? detail
+              : 'Save failed (HTTP ${response.statusCode})',
+          response.statusCode,
+        );
       }
     } finally {
       client.close();

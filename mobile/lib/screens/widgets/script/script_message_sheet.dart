@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import 'script_sheet_result.dart';
 import 'script_sheet_shell.dart';
@@ -47,6 +48,7 @@ class ScriptMessageSheet extends StatelessWidget {
       },
       child: ScriptSheetShell(
         title: event.title.isEmpty ? 'Script Message' : event.title,
+        icon: AppIcons.informationOutline,
         footer: ScriptSheetActions(
           primary: scriptSheetPrimaryButton(
             label: 'OK',

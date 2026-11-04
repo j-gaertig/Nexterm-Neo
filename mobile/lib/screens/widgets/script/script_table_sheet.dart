@@ -3,8 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../widgets/app_ui.dart';
 import '../../../utils/script_csv.dart';
 import '../../../utils/script_protocol.dart';
+import '../../../utils/app_icons.dart';
 import 'script_sheet_result.dart';
 import 'script_sheet_shell.dart';
 
@@ -62,6 +64,7 @@ class ScriptTableSheet extends StatelessWidget {
       },
       child: ScriptSheetShell(
         title: event.title.isEmpty ? 'Script Table' : event.title,
+        icon: AppIcons.fileDocumentOutline,
         bodyIsScrollable: false,
         wholeSheetScrollable: embedded,
         footer: ScriptSheetActions(
@@ -87,18 +90,14 @@ class ScriptTableSheet extends StatelessWidget {
         child: hasData
             ? Container(
                 decoration: BoxDecoration(
-                  border: Border.all(color: cs.outlineVariant),
-                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: appBorderColor(cs)),
+                  borderRadius: BorderRadius.circular(AppRadii.control),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: _ScrollableScriptTable(table: table, embedded: embedded),
               )
-            : Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+            : AppCard(
+                onSheet: true,
                 child: Text(
                   'No table data available',
                   style: TextStyle(fontSize: 13, color: cs.outline),
@@ -146,8 +145,8 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
     return Container(
       constraints: const BoxConstraints(minHeight: 44),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHigh,
-        border: Border(bottom: BorderSide(color: cs.outlineVariant)),
+        color: cs.surfaceContainerHighest,
+        border: Border(bottom: appBorderSide(cs)),
       ),
       child: Row(
         children: [
@@ -191,9 +190,7 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
         color: index.isEven
             ? Colors.transparent
             : cs.surfaceContainerLow.withValues(alpha: 0.55),
-        border: Border(
-          bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.55)),
-        ),
+        border: Border(bottom: appBorderSide(cs)),
       ),
       child: Row(
         children: [
@@ -241,7 +238,7 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
           viewportWidth: viewportWidth,
           contentWidth: width,
           color: cs.outline,
-          trackColor: cs.outlineVariant.withValues(alpha: 0.55),
+          trackColor: appBorderColor(cs),
         ),
       ],
     );
@@ -285,15 +282,14 @@ class _ScrollableScriptTableState extends State<_ScrollableScriptTable> {
             Flexible(
               child: Scrollbar(
                 controller: _verticalController,
-                child: SingleChildScrollView(
+                child: ListView.builder(
                   controller: _verticalController,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < rows.length; i++)
-                        _dataRow(cs, headers, rows[i], widths, i),
-                    ],
-                  ),
+                  // Small tables shrink to their content; large ones build
+                  // rows lazily so big CSV results stay smooth.
+                  shrinkWrap: rows.length <= 60,
+                  itemCount: rows.length,
+                  itemBuilder: (_, i) =>
+                      _dataRow(cs, headers, rows[i], widths, i),
                 ),
               ),
             ),

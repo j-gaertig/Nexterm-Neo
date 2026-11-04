@@ -12,6 +12,7 @@ import '../utils/terminal_settings.dart';
 import '../utils/sftp_settings.dart';
 import '../utils/server_view_settings.dart';
 import '../widgets/floating_navigation_bar.dart';
+import '../widgets/nav_scope.dart';
 import '../widgets/tab_crossfade.dart';
 import 'servers_screen.dart';
 import 'active_sessions_screen.dart';
@@ -56,6 +57,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
   final _serversKey = GlobalKey<ServersScreenState>();
+  final _navController = MainNavController();
 
   @override
   void initState() {
@@ -67,6 +69,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
+    _navController.dispose();
     super.dispose();
   }
 
@@ -213,6 +216,12 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final showNavigationBar =
         !isInSession && MediaQuery.viewInsetsOf(context).bottom == 0;
 
+    _navController.update(
+      selectedIndex: _selectedIndex,
+      destinations: _destinations(hasSessions),
+      onSelect: _switchTab,
+    );
+
     final theme = Theme.of(context);
     final pageTheme = showNavigationBar
         ? theme.copyWith(
@@ -228,146 +237,150 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           )
         : theme;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+    return MainNavScope(
+      controller: _navController,
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
 
-        if (isInSession) {
-          // Let the visible renderer handle in-session navigation (for example
-          // the SFTP directory history) before returning to the overview.
-          final session = _openSessionId == null
-              ? null
-              : widget.sessionManager.getSession(_openSessionId!);
-          final handled = session?.handleBack?.call() ?? false;
-          if (handled) return;
-          _sessionsKey.currentState?.showOverview();
-          return;
-        }
+          if (isInSession) {
+            // Let the visible renderer handle in-session navigation (for example
+            // the SFTP directory history) before returning to the overview.
+            final session = _openSessionId == null
+                ? null
+                : widget.sessionManager.getSession(_openSessionId!);
+            final handled = session?.handleBack?.call() ?? false;
+            if (handled) return;
+            _sessionsKey.currentState?.showOverview();
+            return;
+          }
 
-        if (isOnSessionsTab) {
-          _switchTab(0);
-          return;
-        }
+          if (isOnSessionsTab) {
+            _switchTab(0);
+            return;
+          }
 
-        if (_selectedIndex == monitoringIndex) {
-          final handled = _monitoringKey.currentState?.goBack() ?? false;
-          if (handled) return;
-        }
+          if (_selectedIndex == monitoringIndex) {
+            final handled = _monitoringKey.currentState?.goBack() ?? false;
+            if (handled) return;
+          }
 
-        if (_selectedIndex != 0) {
-          _switchTab(0);
-          return;
-        }
+          if (_selectedIndex != 0) {
+            _switchTab(0);
+            return;
+          }
 
-        SystemNavigator.pop();
-      },
-      child: Scaffold(
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            Column(
-              children: [
-                if (showAttentionBanner)
-                  _ScriptAttentionBanner(
-                    session: attentionSession,
-                    waitingCount: widget.sessionManager.waitingInputCount,
-                    onOpen: () {
-                      setState(
-                        () => _dismissedAttentionSessionIds.remove(
-                          attentionSession.sessionId,
-                        ),
-                      );
-                      _openSession(attentionSession.sessionId);
-                    },
-                    onDismiss: () {
-                      setState(
-                        () => _dismissedAttentionSessionIds.add(
-                          attentionSession.sessionId,
-                        ),
-                      );
-                    },
-                  ),
-                Expanded(
-                  child: FloatingNavigationBarInset(
-                    bottom: showNavigationBar
-                        ? FloatingNavigationBar.contentInset
-                        : 0,
-                    child: Theme(
-                      data: pageTheme,
-                      // Resolve the MediaQuery below the Scaffold: it has
-                      // already consumed the keyboard inset, so forwarding the
-                      // one from above the Scaffold would make the pages' own
-                      // Scaffolds subtract the keyboard height a second time.
-                      child: Builder(
-                        builder: (context) {
-                          Widget stack = TabCrossfade(
-                            index: _selectedIndex,
-                            // Swiping works between the top-level pages, but
-                            // not while a fullscreen session or the keyboard is
-                            // open. The edge destinations only move inwards.
-                            swipeEnabled: showNavigationBar && !isInSession,
-                            onSwipeIndexChanged: _switchTab,
-                            children: pages,
-                          );
-                          if (showAttentionBanner) {
-                            stack = MediaQuery(
-                              data: MediaQuery.of(
-                                context,
-                              ).removePadding(removeTop: true),
-                              child: stack,
+          SystemNavigator.pop();
+        },
+        child: Scaffold(
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              Column(
+                children: [
+                  if (showAttentionBanner)
+                    _ScriptAttentionBanner(
+                      session: attentionSession,
+                      waitingCount: widget.sessionManager.waitingInputCount,
+                      onOpen: () {
+                        setState(
+                          () => _dismissedAttentionSessionIds.remove(
+                            attentionSession.sessionId,
+                          ),
+                        );
+                        _openSession(attentionSession.sessionId);
+                      },
+                      onDismiss: () {
+                        setState(
+                          () => _dismissedAttentionSessionIds.add(
+                            attentionSession.sessionId,
+                          ),
+                        );
+                      },
+                    ),
+                  Expanded(
+                    child: FloatingNavigationBarInset(
+                      bottom: showNavigationBar
+                          ? FloatingNavigationBar.contentInset
+                          : 0,
+                      child: Theme(
+                        data: pageTheme,
+                        // Resolve the MediaQuery below the Scaffold: it has
+                        // already consumed the keyboard inset, so forwarding the
+                        // one from above the Scaffold would make the pages' own
+                        // Scaffolds subtract the keyboard height a second time.
+                        child: Builder(
+                          builder: (context) {
+                            Widget stack = TabCrossfade(
+                              index: _selectedIndex,
+                              // Swiping works between the top-level pages, but
+                              // not while a fullscreen session or the keyboard is
+                              // open. The edge destinations only move inwards.
+                              swipeEnabled: showNavigationBar && !isInSession,
+                              onSwipeIndexChanged: _switchTab,
+                              children: pages,
                             );
-                          }
-                          return stack;
-                        },
+                            if (showAttentionBanner) {
+                              stack = MediaQuery(
+                                data: MediaQuery.of(
+                                  context,
+                                ).removePadding(removeTop: true),
+                                child: stack,
+                              );
+                            }
+                            return stack;
+                          },
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            if (showNavigationBar)
-              Positioned(
-                key: const ValueKey('floating-navigation-overlay'),
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildNavigationBar(hasSessions),
+                ],
               ),
-          ],
+              if (showNavigationBar)
+                Positioned(
+                  key: const ValueKey('floating-navigation-overlay'),
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildNavigationBar(hasSessions),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavigationBar(bool hasSessions) {
+  List<FloatingNavigationDestination> _destinations(bool hasSessions) {
     final sessionCount = widget.sessionManager.sessionCount;
     final waitingCount = widget.sessionManager.waitingInputCount;
+    return [
+      const FloatingNavigationDestination(icon: AppIcons.dns, label: 'Servers'),
+      if (hasSessions)
+        FloatingNavigationDestination(
+          icon: AppIcons.monitorMultiple,
+          label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
+          badgeText: waitingCount > 0 ? '!' : '$sessionCount',
+          badgeIsAlert: waitingCount > 0,
+        ),
+      const FloatingNavigationDestination(
+        icon: AppIcons.chartBoxOutline,
+        label: 'Monitoring',
+      ),
+      const FloatingNavigationDestination(
+        icon: AppIcons.cog,
+        label: 'Settings',
+      ),
+    ];
+  }
+
+  Widget _buildNavigationBar(bool hasSessions) {
     return FloatingNavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _switchTab,
       trailing: _buildNavigationAction(),
-      destinations: [
-        const FloatingNavigationDestination(
-          icon: AppIcons.dns,
-          label: 'Servers',
-        ),
-        if (hasSessions)
-          FloatingNavigationDestination(
-            icon: AppIcons.monitorMultiple,
-            label: waitingCount > 0 ? 'Sessions · input' : 'Sessions',
-            badgeText: waitingCount > 0 ? '!' : '$sessionCount',
-            badgeIsAlert: waitingCount > 0,
-          ),
-        const FloatingNavigationDestination(
-          icon: AppIcons.chartBoxOutline,
-          label: 'Monitoring',
-        ),
-        const FloatingNavigationDestination(
-          icon: AppIcons.cog,
-          label: 'Settings',
-        ),
-      ],
+      destinations: _destinations(hasSessions),
     );
   }
 

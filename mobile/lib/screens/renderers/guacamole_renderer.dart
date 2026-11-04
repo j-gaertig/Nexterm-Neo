@@ -1,3 +1,4 @@
+import '../../utils/api_exception.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 
@@ -65,10 +66,22 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
   static const int _maxReconnectAttempts = 5;
 
   static const _ks = (
-    escape: 0xFF1B, tab: 0xFF09, enter: 0xFF0D, backspace: 0xFF08,
-    delete: 0xFFFF, up: 0xFF52, down: 0xFF54, left: 0xFF51, right: 0xFF53,
-    home: 0xFF50, end: 0xFF57, pageUp: 0xFF55, pageDown: 0xFF56,
-    ctrl: 0xFFE3, alt: 0xFFE9, shift: 0xFFE1,
+    escape: 0xFF1B,
+    tab: 0xFF09,
+    enter: 0xFF0D,
+    backspace: 0xFF08,
+    delete: 0xFFFF,
+    up: 0xFF52,
+    down: 0xFF54,
+    left: 0xFF51,
+    right: 0xFF53,
+    home: 0xFF50,
+    end: 0xFF57,
+    pageUp: 0xFF55,
+    pageDown: 0xFF56,
+    ctrl: 0xFFE3,
+    alt: 0xFFE9,
+    shift: 0xFFE1,
   );
 
   @override
@@ -175,16 +188,22 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
         }
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Failed to connect: $e');
+      if (mounted)
+        setState(
+          () => _error = friendlyApiError(e, fallback: 'Failed to connect.'),
+        );
     }
   }
 
   void _sendDisplaySize() {
-    if (_client == null || _availableWidth <= 0 || _availableHeight <= 0)
+    if (_client == null || _availableWidth <= 0 || _availableHeight <= 0) {
       return;
+    }
     final dpr = MediaQuery.of(context).devicePixelRatio;
     _client!.sendSize(
-        (_availableWidth * dpr).toInt(), (_availableHeight * dpr).toInt());
+      (_availableWidth * dpr).toInt(),
+      (_availableHeight * dpr).toInt(),
+    );
     _initialSizeSent = true;
   }
 
@@ -193,24 +212,27 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     _availableWidth = w;
     _availableHeight = h;
     if (changed) _updateScaling();
-    if (_connected && w > 0 && h > 0 && (!_initialSizeSent || changed))
+    if (_connected && w > 0 && h > 0 && (!_initialSizeSent || changed)) {
       _sendDisplaySize();
+    }
   }
 
   void _updateScaling() {
     if (_displayWidth <= 0 ||
         _displayHeight <= 0 ||
         _availableWidth <= 0 ||
-        _availableHeight <= 0) return;
+        _availableHeight <= 0) {
+      return;
+    }
     _displayScale = (_availableWidth / _displayWidth)
         .clamp(0.0, _availableHeight / _displayHeight)
         .toDouble();
     _displayOffsetX =
         (_availableWidth - _displayWidth * _displayScale * _userScale) / 2 +
-            _panOffsetX;
+        _panOffsetX;
     _displayOffsetY =
         (_availableHeight - _displayHeight * _displayScale * _userScale) / 2 +
-            _panOffsetY;
+        _panOffsetY;
   }
 
   Offset _screenToRemote(Offset pos) {
@@ -240,8 +262,9 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
 
     _longPressTimer?.cancel();
     _longPressTimer = Timer(_longPressDelay, () {
-      if (!_hasMoved && _activePointers.length == 1)
+      if (!_hasMoved && _activePointers.length == 1) {
         _onLongPress(e.localPosition);
+      }
     });
   }
 
@@ -270,16 +293,16 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       _mouseY = r.dy;
       if (!_buttonHeld) _buttonHeld = true;
       _client!.sendMouseState(
-          GuacMouseState(x: _mouseX, y: _mouseY, left: true));
+        GuacMouseState(x: _mouseX, y: _mouseY, left: true),
+      );
     } else {
       final delta = e.localPosition - (prev ?? e.localPosition);
       final s = _displayScale * _userScale;
-      _mouseX =
-          (_mouseX + delta.dx / s).clamp(0, _displayWidth.toDouble());
-      _mouseY =
-          (_mouseY + delta.dy / s).clamp(0, _displayHeight.toDouble());
+      _mouseX = (_mouseX + delta.dx / s).clamp(0, _displayWidth.toDouble());
+      _mouseY = (_mouseY + delta.dy / s).clamp(0, _displayHeight.toDouble());
       _client!.sendMouseState(
-          GuacMouseState(x: _mouseX, y: _mouseY, left: _buttonHeld));
+        GuacMouseState(x: _mouseX, y: _mouseY, left: _buttonHeld),
+      );
       setState(() {});
     }
   }
@@ -306,7 +329,8 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     if (!_buttonHeld) {
       _buttonHeld = true;
       _client!.sendMouseState(
-          GuacMouseState(x: _mouseX, y: _mouseY, left: true));
+        GuacMouseState(x: _mouseX, y: _mouseY, left: true),
+      );
     }
     _releaseTimer?.cancel();
     _releaseTimer = Timer(_releaseDelay, () {
@@ -324,7 +348,8 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
   void _sendMouseUp() {
     _buttonHeld = false;
     _client?.sendMouseState(
-        GuacMouseState(x: _mouseX, y: _mouseY, left: false));
+      GuacMouseState(x: _mouseX, y: _mouseY, left: false),
+    );
   }
 
   void _cancelTimers() {
@@ -342,10 +367,12 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     }
     if (_buttonHeld) _sendMouseUp();
     _client!.sendMouseState(
-        GuacMouseState(x: _mouseX, y: _mouseY, right: true));
+      GuacMouseState(x: _mouseX, y: _mouseY, right: true),
+    );
     Future.delayed(const Duration(milliseconds: 50), () {
       _client?.sendMouseState(
-          GuacMouseState(x: _mouseX, y: _mouseY, right: false));
+        GuacMouseState(x: _mouseX, y: _mouseY, right: false),
+      );
     });
   }
 
@@ -363,14 +390,13 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     if (p.length < 2 || _pinchBaseDistance <= 0) return;
     final center = (p[0] + p[1]) / 2;
     setState(() {
-      _userScale = (_pinchBaseScale *
-              (p[0] - p[1]).distance /
-              _pinchBaseDistance)
-          .clamp(0.5, 3.0);
-      _panOffsetX =
-          _pinchBasePan.dx + (center.dx - _pinchBaseCenter.dx);
-      _panOffsetY =
-          _pinchBasePan.dy + (center.dy - _pinchBaseCenter.dy);
+      _userScale =
+          (_pinchBaseScale * (p[0] - p[1]).distance / _pinchBaseDistance).clamp(
+            0.5,
+            3.0,
+          );
+      _panOffsetX = _pinchBasePan.dx + (center.dx - _pinchBaseCenter.dx);
+      _panOffsetY = _pinchBasePan.dy + (center.dy - _pinchBaseCenter.dy);
       _updateScaling();
     });
   }
@@ -381,7 +407,9 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
   void _sendKeyPress(int ks) {
     _sendKey(ks);
     Future.delayed(
-        const Duration(milliseconds: 50), () => _sendKey(ks, pressed: false));
+      const Duration(milliseconds: 50),
+      () => _sendKey(ks, pressed: false),
+    );
   }
 
   void _toggleMod(int ks, bool held, void Function(bool) set) {
@@ -404,13 +432,6 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       _shiftHeld = false;
       _sendKey(_ks.shift, pressed: false);
     }
-  }
-
-  void _sendText(String text) {
-    for (final c in text.runes) {
-      _sendKeyPress(c < 128 ? c : c + 0x01000000);
-    }
-    _releaseModifiers();
   }
 
   void _fitScreen() {
@@ -451,7 +472,8 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      width: 36, height: 4,
+                      width: 36,
+                      height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         color: cs.outlineVariant,
@@ -459,73 +481,114 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
                       ),
                     ),
 
-                    Row(children: [
-                      Expanded(child: _sheetAction(
-                        icon: _mouseMode == MouseMode.direct
-                            ? AppIcons.cursorDefaultClick : AppIcons.mouse,
-                        label: _mouseMode == MouseMode.direct ? 'Touch' : 'Mouse',
-                        cs: cs,
-                        onTap: () {
-                          setState(() {
-                            _mouseMode = _mouseMode == MouseMode.direct
-                                ? MouseMode.virtualMouse : MouseMode.direct;
-                          });
-                          setSheetState(() {});
-                        },
-                      )),
-                      const SizedBox(width: 8),
-                      Expanded(child: _sheetAction(
-                        icon: AppIcons.keyboard, label: 'Keys',
-                        cs: cs, onTap: () { Navigator.pop(ctx); _showKeyboardInput(); },
-                      )),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _sheetAction(
+                            icon: _mouseMode == MouseMode.direct
+                                ? AppIcons.cursorDefaultClick
+                                : AppIcons.mouse,
+                            label: _mouseMode == MouseMode.direct
+                                ? 'Touch'
+                                : 'Mouse',
+                            cs: cs,
+                            onTap: () {
+                              setState(() {
+                                _mouseMode = _mouseMode == MouseMode.direct
+                                    ? MouseMode.virtualMouse
+                                    : MouseMode.direct;
+                              });
+                              setSheetState(() {});
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _sheetAction(
+                            icon: AppIcons.keyboard,
+                            label: 'Keys',
+                            cs: cs,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _showKeyboardInput();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 8),
-                    Row(children: [
-                      Expanded(child: _sheetAction(
-                        icon: AppIcons.fitToScreen, label: 'Fit',
-                        cs: cs, onTap: () { Navigator.pop(ctx); _fitScreen(); },
-                      )),
-                      const SizedBox(width: 8),
-                      Expanded(child: _sheetAction(
-                        icon: AppIcons.keyboardSettings, label: 'C+A+Del',
-                        cs: cs, onTap: () { Navigator.pop(ctx); _sendCtrlAltDel(); },
-                      )),
-                    ]),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _sheetAction(
+                            icon: AppIcons.fitToScreen,
+                            label: 'Fit',
+                            cs: cs,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _fitScreen();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _sheetAction(
+                            icon: AppIcons.keyboardSettings,
+                            label: 'C+A+Del',
+                            cs: cs,
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _sendCtrlAltDel();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
 
-                    Row(children: [
-                      _sheetMod('CTRL', _ctrlHeld, () {
-                        _toggleMod(_ks.ctrl, _ctrlHeld, (v) => _ctrlHeld = v);
-                        setSheetState(() {});
-                      }, cs),
-                      const SizedBox(width: 6),
-                      _sheetMod('ALT', _altHeld, () {
-                        _toggleMod(_ks.alt, _altHeld, (v) => _altHeld = v);
-                        setSheetState(() {});
-                      }, cs),
-                      const SizedBox(width: 6),
-                      _sheetMod('SHIFT', _shiftHeld, () {
-                        _toggleMod(_ks.shift, _shiftHeld, (v) => _shiftHeld = v);
-                        setSheetState(() {});
-                      }, cs),
-                    ]),
+                    Row(
+                      children: [
+                        _sheetMod('CTRL', _ctrlHeld, () {
+                          _toggleMod(_ks.ctrl, _ctrlHeld, (v) => _ctrlHeld = v);
+                          setSheetState(() {});
+                        }, cs),
+                        const SizedBox(width: 6),
+                        _sheetMod('ALT', _altHeld, () {
+                          _toggleMod(_ks.alt, _altHeld, (v) => _altHeld = v);
+                          setSheetState(() {});
+                        }, cs),
+                        const SizedBox(width: 6),
+                        _sheetMod('SHIFT', _shiftHeld, () {
+                          _toggleMod(
+                            _ks.shift,
+                            _shiftHeld,
+                            (v) => _shiftHeld = v,
+                          );
+                          setSheetState(() {});
+                        }, cs),
+                      ],
+                    ),
                     const SizedBox(height: 12),
 
-                    Wrap(spacing: 6, runSpacing: 6, children: [
-                      _sheetKey('ESC', _ks.escape, cs),
-                      _sheetKey('TAB', _ks.tab, cs),
-                      _sheetKey('⏎', _ks.enter, cs),
-                      _sheetKey('⌫', _ks.backspace, cs),
-                      _sheetKey('DEL', _ks.delete, cs),
-                      _sheetKey('↑', _ks.up, cs),
-                      _sheetKey('↓', _ks.down, cs),
-                      _sheetKey('←', _ks.left, cs),
-                      _sheetKey('→', _ks.right, cs),
-                      _sheetKey('HOME', _ks.home, cs),
-                      _sheetKey('END', _ks.end, cs),
-                      _sheetKey('PGUP', _ks.pageUp, cs),
-                      _sheetKey('PGDN', _ks.pageDown, cs),
-                    ]),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        _sheetKey('ESC', _ks.escape, cs),
+                        _sheetKey('TAB', _ks.tab, cs),
+                        _sheetKey('⏎', _ks.enter, cs),
+                        _sheetKey('⌫', _ks.backspace, cs),
+                        _sheetKey('DEL', _ks.delete, cs),
+                        _sheetKey('↑', _ks.up, cs),
+                        _sheetKey('↓', _ks.down, cs),
+                        _sheetKey('←', _ks.left, cs),
+                        _sheetKey('→', _ks.right, cs),
+                        _sheetKey('HOME', _ks.home, cs),
+                        _sheetKey('END', _ks.end, cs),
+                        _sheetKey('PGUP', _ks.pageUp, cs),
+                        _sheetKey('PGDN', _ks.pageDown, cs),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -536,8 +599,12 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     );
   }
 
-  Widget _sheetAction({required IconData icon, required String label,
-      required ColorScheme cs, required VoidCallback onTap}) {
+  Widget _sheetAction({
+    required IconData icon,
+    required String label,
+    required ColorScheme cs,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -546,16 +613,31 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
           color: cs.primaryContainer.withValues(alpha: 0.35),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 18, color: cs.primary),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: cs.onSurface)),
-        ]),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: cs.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _sheetMod(String label, bool active, VoidCallback onTap, ColorScheme cs) {
+  Widget _sheetMod(
+    String label,
+    bool active,
+    VoidCallback onTap,
+    ColorScheme cs,
+  ) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -565,10 +647,16 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
             color: active ? cs.primary : cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Center(child: Text(label, style: TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w600,
-            color: active ? cs.onPrimary : cs.onSurface,
-          ))),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: active ? cs.onPrimary : cs.onSurface,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -583,8 +671,14 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
           color: cs.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(label, style: TextStyle(
-          fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+        ),
       ),
     );
   }
@@ -595,11 +689,14 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     return Stack(
       children: [
         Positioned.fill(
-          child: LayoutBuilder(builder: (_, c) {
-            WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _onLayoutChanged(c.maxWidth, c.maxHeight));
-            return Container(color: Colors.black, child: _buildDisplay());
-          }),
+          child: LayoutBuilder(
+            builder: (_, c) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _onLayoutChanged(c.maxWidth, c.maxHeight),
+              );
+              return Container(color: Colors.black, child: _buildDisplay());
+            },
+          ),
         ),
         Positioned.fill(
           child: ConnectionLoader(visible: !_receivedData && _error == null),
@@ -642,17 +739,23 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       width: double.infinity,
       padding: const EdgeInsets.all(8),
       color: colors.errorContainer,
-      child: Row(children: [
-        Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
-        const SizedBox(width: 8),
-        Expanded(
-            child: Text(_error!,
-                style: TextStyle(color: colors.onErrorContainer))),
-        IconButton(
+      child: Row(
+        children: [
+          Icon(AppIcons.alertCircleOutline, color: colors.onErrorContainer),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _error!,
+              style: TextStyle(color: colors.onErrorContainer),
+            ),
+          ),
+          IconButton(
             icon: Icon(AppIcons.close),
             onPressed: () => setState(() => _error = null),
-            color: colors.onErrorContainer),
-      ]),
+            color: colors.onErrorContainer,
+          ),
+        ],
+      ),
     );
   }
 
@@ -664,20 +767,21 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       onPointerCancel: _onPointerCancel,
       behavior: HitTestBehavior.opaque,
       child: ClipRect(
-          child: CustomPaint(
-        painter: _GuacPainter(
-          client: _client,
-          displayScale: _displayScale,
-          userScale: _userScale,
-          offsetX: _displayOffsetX,
-          offsetY: _displayOffsetY,
-          mouseMode: _mouseMode,
-          mouseX: _mouseX,
-          mouseY: _mouseY,
-          repaint: _repaint,
+        child: CustomPaint(
+          painter: _GuacPainter(
+            client: _client,
+            displayScale: _displayScale,
+            userScale: _userScale,
+            offsetX: _displayOffsetX,
+            offsetY: _displayOffsetY,
+            mouseMode: _mouseMode,
+            mouseX: _mouseX,
+            mouseY: _mouseY,
+            repaint: _repaint,
+          ),
+          size: Size.infinite,
         ),
-        size: Size.infinite,
-      )),
+      ),
     );
   }
 
@@ -739,8 +843,9 @@ class _GuacPainter extends CustomPainter {
     for (final layer in display.visibleLayers) {
       if (layer.image == null) continue;
       canvas.save();
-      if (layer.index > 0)
+      if (layer.index > 0) {
         canvas.translate(layer.x.toDouble(), layer.y.toDouble());
+      }
       final paint = layer.opacity < 255
           ? (Paint()..color = Color.fromARGB(layer.opacity, 255, 255, 255))
           : Paint();
@@ -759,13 +864,18 @@ class _GuacPainter extends CustomPainter {
         ..lineTo(mouseX + 13, mouseY + 12)
         ..close();
       canvas.drawPath(
-          path, Paint()..color = Colors.white..style = PaintingStyle.fill);
+        path,
+        Paint()
+          ..color = Colors.white
+          ..style = PaintingStyle.fill,
+      );
       canvas.drawPath(
-          path,
-          Paint()
-            ..color = Colors.black
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.5);
+        path,
+        Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
     }
     canvas.restore();
   }

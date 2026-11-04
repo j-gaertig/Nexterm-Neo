@@ -41,8 +41,12 @@ void main() {
       expect(c.showTerminalSettings, isFalse);
     });
     test('ftp and ftps allow password only', () {
-      expect(getServerFieldConfig('server', 'ftp').allowedAuthTypes, ['password']);
-      expect(getServerFieldConfig('server', 'ftps').allowedAuthTypes, ['password']);
+      expect(getServerFieldConfig('server', 'ftp').allowedAuthTypes, [
+        'password',
+      ]);
+      expect(getServerFieldConfig('server', 'ftps').allowedAuthTypes, [
+        'password',
+      ]);
     });
   });
 
@@ -51,47 +55,97 @@ void main() {
       expect(getServerTabs('server', 'telnet'), ['details', 'settings']);
     });
     test('ssh has all three tabs', () {
-      expect(getServerTabs('server', 'ssh'), ['details', 'identities', 'settings']);
+      expect(getServerTabs('server', 'ssh'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
     });
     test('rdp has all three tabs', () {
-      expect(getServerTabs('server', 'rdp'), ['details', 'identities', 'settings']);
+      expect(getServerTabs('server', 'rdp'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
     });
     test('vnc sftp ftp ftps have identities and settings', () {
-      expect(getServerTabs('server', 'vnc'), ['details', 'identities', 'settings']);
-      expect(getServerTabs('server', 'sftp'), ['details', 'identities', 'settings']);
-      expect(getServerTabs('server', 'ftp'), ['details', 'identities', 'settings']);
-      expect(getServerTabs('server', 'ftps'), ['details', 'identities', 'settings']);
+      expect(getServerTabs('server', 'vnc'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
+      expect(getServerTabs('server', 'sftp'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
+      expect(getServerTabs('server', 'ftp'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
+      expect(getServerTabs('server', 'ftps'), [
+        'details',
+        'identities',
+        'settings',
+      ]);
     });
   });
 
   group('validateServerFields', () {
     test('rejects empty name and missing ip port', () {
-      expect(validateServerFields('server', 'ssh', '', {'ip': 'a', 'port': '22'}), isFalse);
-      expect(validateServerFields('server', 'ssh', 'n', {'ip': '', 'port': '22'}), isFalse);
-      expect(validateServerFields('server', 'ssh', 'n', {'ip': 'a', 'port': ''}), isFalse);
+      expect(
+        validateServerFields('server', 'ssh', '', {'ip': 'a', 'port': '22'}),
+        isFalse,
+      );
+      expect(
+        validateServerFields('server', 'ssh', 'n', {'ip': '', 'port': '22'}),
+        isFalse,
+      );
+      expect(
+        validateServerFields('server', 'ssh', 'n', {'ip': 'a', 'port': ''}),
+        isFalse,
+      );
     });
     test('accepts complete ssh fields', () {
-      expect(validateServerFields('server', 'ssh', 'n', {'ip': '1.2.3.4', 'port': '22'}), isTrue);
+      expect(
+        validateServerFields('server', 'ssh', 'n', {
+          'ip': '1.2.3.4',
+          'port': '22',
+        }),
+        isTrue,
+      );
     });
   });
 
   group('IdentityDraft.toPayload', () {
     test('password-only omits username', () {
-      final d = IdentityDraft(name: 'a', authType: 'password-only', password: 'p', passwordTouched: true);
+      final d = IdentityDraft(
+        name: 'a',
+        authType: 'password-only',
+        password: 'p',
+        passwordTouched: true,
+      );
       final payload = d.toPayload();
       expect(payload['type'], 'password-only');
       expect(payload.containsKey('username'), isFalse);
       expect(payload['password'], 'p');
     });
     test('rejects unparsable organizationId instead of dropping scope', () {
-      final d = IdentityDraft(name: 'a', authType: 'password', organizationId: 'abc');
+      final d = IdentityDraft(
+        name: 'a',
+        authType: 'password',
+        organizationId: 'abc',
+      );
       expect(() => d.toPayload(), throwsException);
     });
   });
 
   group('protocol constants', () {
     test('covers all seven protocols with default ports', () {
-      final values = ServerEditorConstants.protocols.map((p) => p['value']).toSet();
+      final values = ServerEditorConstants.protocols
+          .map((p) => p['value'])
+          .toSet();
       expect(values, {'ssh', 'telnet', 'rdp', 'vnc', 'sftp', 'ftp', 'ftps'});
       for (final v in values) {
         expect(ServerEditorConstants.defaultPorts[v], isNotEmpty);

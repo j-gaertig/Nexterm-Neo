@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_ui.dart';
 import '../../services/session_manager.dart';
 import '../../utils/app_icons.dart';
 
@@ -60,7 +61,10 @@ class SessionGridCard extends StatelessWidget {
       label: '${session.server.name}, $_protocol',
       child: Material(
         color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          side: appBorderSide(cs),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,

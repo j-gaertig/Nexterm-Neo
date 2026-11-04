@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/app_ui.dart';
 import '../../utils/app_icons.dart';
 import '../../utils/server_field_config.dart';
 
@@ -43,17 +44,7 @@ class ServerProtocolSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 12, bottom: 4),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
+          AppSheetHandle(margin: const EdgeInsets.only(top: 12, bottom: 4)),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
             child: Text(

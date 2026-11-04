@@ -1,3 +1,5 @@
+import '../widgets/app_ui.dart';
+import '../utils/api_exception.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../utils/app_icons.dart';
@@ -21,6 +23,8 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   bool _loading = true, _loadingDetails = false;
   String? _error;
   Timer? _timer;
+  // Inactive tabs stay alive but their tickers are muted; pause polling there.
+  bool _visible = true;
   String? _activeAccountId;
   int _loadGeneration = 0;
 
@@ -43,10 +47,18 @@ class MonitoringScreenState extends State<MonitoringScreen> {
     _activeAccountId = widget.authManager.accountManager.activeAccount?.id;
     widget.authManager.addListener(_onAuthChanged);
     _load();
-    _timer = Timer.periodic(
-      const Duration(seconds: 60),
-      (_) => _load(silent: true),
-    );
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_visible) _load(silent: true);
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final visible = TickerMode.of(context);
+    // Refresh once when the tab becomes visible again.
+    if (visible && !_visible && !_loading) _load(silent: true);
+    _visible = visible;
   }
 
   @override
@@ -85,15 +97,19 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         _loading = false;
         _error = null;
       });
-      if (_selected != null)
+      if (_selected != null) {
         _selected = servers.firstWhere(
           (s) => s['id'] == _selected!['id'],
           orElse: () => _selected!,
         );
+      }
     } catch (e) {
       if (mounted && generation == _loadGeneration) {
         setState(() {
-          _error = e.toString();
+          _error = friendlyApiError(
+            e,
+            fallback: 'Failed to load monitoring data.',
+          );
           _loading = false;
         });
       }
@@ -110,13 +126,18 @@ class MonitoringScreenState extends State<MonitoringScreen> {
           widget.authManager.sessionToken ??
           (throw Exception('Not authenticated'));
       final details = await MonitoringService.getDetails(token, server['id']);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _details = details;
           _loadingDetails = false;
         });
+      }
     } catch (_) {
-      if (mounted) setState(() => _loadingDetails = false);
+      if (!mounted) return;
+      setState(() => _loadingDetails = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not load server details.')),
+      );
     }
   }
 
@@ -162,137 +183,33 @@ class MonitoringScreenState extends State<MonitoringScreen> {
     ],
   );
 
-  Widget _buildHeader() {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Monitoring',
-                  style: tt.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (!_loading && _error == null && _servers.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      '$_onlineCount of ${_servers.length} reporting',
-                      style: tt.bodySmall?.copyWith(color: cs.outline),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildHeader() => AppPageHeader(
+    title: 'Monitoring',
+    subtitle: !_loading && _error == null && _servers.isNotEmpty
+        ? '$_onlineCount of ${_servers.length} reporting'
+        : null,
+  );
 
-  Widget _errView() {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cs.errorContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                AppIcons.alertCircleOutline,
-                size: 32,
-                color: cs.onErrorContainer,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Something went wrong',
-              style: tt.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _error!,
-              style: tt.bodySmall?.copyWith(color: cs.outline),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: _load,
-              icon: Icon(AppIcons.refresh, size: 18),
-              label: const Text('Retry'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _errView() => AppErrorState(message: _error!, onRetry: _load);
 
-  Widget _emptyView() {
-    final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
+  Widget _emptyView() => RefreshIndicator(
+    onRefresh: _load,
+    child: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(
-            height: MediaQuery.of(context).size.height * 0.5,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHigh,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      AppIcons.chartBoxOutline,
-                      size: 32,
-                      color: cs.outline,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'No monitoring data',
-                    style: tt.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Enable monitoring from the web dashboard',
-                    style: tt.bodySmall?.copyWith(color: cs.outline),
-                  ),
-                ],
-              ),
+            height: constraints.maxHeight,
+            child: const AppEmptyState(
+              icon: AppIcons.chartBoxOutline,
+              title: 'No monitoring data',
+              message: 'Enable monitoring from the web dashboard',
             ),
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
 
   Widget _listView() => RefreshIndicator(
     onRefresh: _load,
@@ -330,7 +247,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         color: cs.surfaceContainerHigh,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: cs.outlineVariant),
+          side: appBorderSide(cs),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
@@ -439,7 +356,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cs.outlineVariant),
+        border: Border.all(color: appBorderColor(cs)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,7 +551,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
       decoration: BoxDecoration(
         color: cs.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: cs.outlineVariant),
+        border: Border.all(color: appBorderColor(cs)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -721,7 +638,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cs.outlineVariant),
+            border: Border.all(color: appBorderColor(cs)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

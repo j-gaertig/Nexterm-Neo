@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_ui.dart';
 import '../../models/server.dart';
 import '../../utils/muted_colors.dart';
 import '../../utils/tag_color.dart';
@@ -67,7 +68,10 @@ class ServerGridCard extends StatelessWidget {
       label: '${server.name}, $statusLabel${sub != null ? ', $sub' : ''}',
       child: Material(
         color: cs.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          side: appBorderSide(cs),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,

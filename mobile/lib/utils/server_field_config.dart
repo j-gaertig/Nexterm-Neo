@@ -92,9 +92,7 @@ ServerFieldConfig getServerFieldConfig(String type, String? protocol) {
       );
     case 'ftp':
     case 'ftps':
-      return const ServerFieldConfig(
-        allowedAuthTypes: ['password'],
-      );
+      return const ServerFieldConfig(allowedAuthTypes: ['password']);
     case 'demo':
       return const ServerFieldConfig(
         showIpPort: false,
@@ -116,7 +114,8 @@ List<String> getServerTabs(String type, String? protocol) {
   final config = getServerFieldConfig(type, protocol);
   final tabs = <String>['details'];
   if (config.showIdentities) tabs.add('identities');
-  final hasSettings = config.showMonitoring ||
+  final hasSettings =
+      config.showMonitoring ||
       config.showKeyboardLayout ||
       config.showDisplaySettings ||
       config.showAudioSettings ||
@@ -129,7 +128,12 @@ List<String> getServerTabs(String type, String? protocol) {
   return tabs;
 }
 
-bool validateServerFields(String type, String? protocol, String name, Map<String, dynamic> config) {
+bool validateServerFields(
+  String type,
+  String? protocol,
+  String name,
+  Map<String, dynamic> config,
+) {
   final fieldConfig = getServerFieldConfig(type, protocol);
   if (name.trim().isEmpty) return false;
   if (fieldConfig.showIpPort) {

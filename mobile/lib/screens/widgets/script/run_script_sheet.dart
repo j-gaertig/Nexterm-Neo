@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/app_ui.dart';
 import '../../../models/managed_identity.dart';
 import '../../../models/script.dart';
 import '../../../models/server.dart';
@@ -284,7 +285,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
             children: [
               _header(cs, tight: tight),
               _searchRow(cs, tight: tight),
-              Divider(height: 1, color: cs.outlineVariant),
+              const AppDivider(),
               if (widget.manager.isLoading)
                 const LinearProgressIndicator(minHeight: 2),
               Expanded(child: _buildBody(cs)),
@@ -305,17 +306,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
 
     return Column(
       children: [
-        Center(
-          child: Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 2),
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.outlineVariant,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
+        const AppSheetHandle(margin: EdgeInsets.only(top: 10, bottom: 2)),
         Padding(
           padding: EdgeInsets.fromLTRB(20, tight ? 2 : 8, 8, 0),
           child: Row(
@@ -391,7 +382,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                   minHeight: 42,
                 ),
                 filled: true,
-                fillColor: cs.surfaceContainerHigh,
+                fillColor: cs.surfaceContainerHighest,
                 isDense: true,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -399,11 +390,11 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: cs.outlineVariant),
+                  borderSide: appBorderSide(cs),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: cs.outlineVariant),
+                  borderSide: appBorderSide(cs),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -692,49 +683,55 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     final description = script.description?.trim() ?? '';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Material(
-        color: selected ? cs.primaryContainer : Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        clipBehavior: Clip.antiAlias,
-        child: Semantics(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Semantics(
+        selected: selected,
+        child: AppCard(
+          key: ValueKey('script-${script.id}'),
+          onSheet: true,
           selected: selected,
-          child: InkWell(
-            key: ValueKey('script-${script.id}'),
-            onTap: () => setState(() => _selectedScriptId = script.id),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    script.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      color: selected ? cs.onPrimaryContainer : cs.onSurface,
-                    ),
-                  ),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 3),
+          radius: AppRadii.control,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          onTap: () => setState(() => _selectedScriptId = script.id),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      description,
+                      script.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
-                        height: 1.3,
-                        color: selected
-                            ? cs.onPrimaryContainer.withValues(alpha: 0.76)
-                            : cs.outline,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? cs.onPrimaryContainer : cs.onSurface,
                       ),
                     ),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.3,
+                          color: selected
+                              ? cs.onPrimaryContainer.withValues(alpha: 0.76)
+                              : cs.outline,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+              if (selected) ...[
+                const SizedBox(width: 10),
+                Icon(AppIcons.checkCircle, size: 20, color: cs.primary),
+              ],
+            ],
           ),
         ),
       ),
@@ -747,7 +744,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     return Container(
       decoration: BoxDecoration(
         color: cs.surface,
-        border: Border(top: BorderSide(color: cs.outlineVariant)),
+        border: Border(top: appBorderSide(cs)),
       ),
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       child: FilledButton(

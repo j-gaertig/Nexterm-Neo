@@ -52,23 +52,26 @@ class PasswordFillHint extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (item.username.isNotEmpty) ...[
-            Container(
-              constraints: const BoxConstraints(maxWidth: 180),
-              margin: const EdgeInsets.only(bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: cs.outlineVariant.withValues(alpha: 0.45),
+            // Already part of the button label above.
+            ExcludeSemantics(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 180),
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.45),
+                  ),
                 ),
-              ),
-              child: Text(
-                item.username,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: cs.onSurface.withValues(alpha: 0.9),
+                child: Text(
+                  item.username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
                 ),
               ),
             ),

@@ -7,7 +7,9 @@ class ServerService {
   static Future<List<dynamic>> getServerList(String token) async {
     final response = await ApiClient.get('/entries/list', token: token);
     if (response.statusCode != 200) {
-      throw Exception('Failed to load servers: ${response.statusCode} - ${response.body}');
+      throw Exception(
+        'Failed to load servers: ${response.statusCode} - ${response.body}',
+      );
     }
 
     final List<dynamic> jsonData = json.decode(response.body);
@@ -19,7 +21,9 @@ class ServerService {
 
       if (type == 'organization' || type == 'folder') {
         final filteredItem = Map<String, dynamic>.from(item);
-        filteredItem['entries'] = _filterEntries(item['entries'] as List<dynamic>? ?? []);
+        filteredItem['entries'] = _filterEntries(
+          item['entries'] as List<dynamic>? ?? [],
+        );
         if ((filteredItem['entries'] as List).isNotEmpty) {
           items.add(ServerFolder.fromJson(filteredItem));
         }
@@ -41,8 +45,11 @@ class ServerService {
 
       if (type == 'folder' || type == 'organization') {
         final filteredEntry = Map<String, dynamic>.from(entry);
-        filteredEntry['entries'] = _filterEntries(entry['entries'] as List<dynamic>? ?? []);
-        if ((filteredEntry['entries'] as List).isNotEmpty) filtered.add(filteredEntry);
+        filteredEntry['entries'] = _filterEntries(
+          entry['entries'] as List<dynamic>? ?? [],
+        );
+        if ((filteredEntry['entries'] as List).isNotEmpty)
+          filtered.add(filteredEntry);
       } else if (type == 'server' && _isSupportedServer(entry)) {
         filtered.add(entry);
       } else if (_isPveEntry(type)) {
@@ -52,10 +59,18 @@ class ServerService {
     return filtered;
   }
 
-  static Future<void> wakeServer({required String token, required dynamic entryId}) async {
-    final response = await ApiClient.post('/entries/$entryId/wake', token: token);
+  static Future<void> wakeServer({
+    required String token,
+    required dynamic entryId,
+  }) async {
+    final response = await ApiClient.post(
+      '/entries/$entryId/wake',
+      token: token,
+    );
     if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Failed to send Wake-On-LAN packet: ${response.statusCode} - ${response.body}');
+      throw Exception(
+        'Failed to send Wake-On-LAN packet: ${response.statusCode} - ${response.body}',
+      );
     }
     if (response.body.isNotEmpty) {
       try {
@@ -63,10 +78,13 @@ class ServerService {
         if (data is Map<String, dynamic>) {
           final code = data['code'];
           if (code is int && code >= 300) {
-            throw Exception(data['message'] ?? 'Failed to send Wake-On-LAN packet');
+            throw Exception(
+              data['message'] ?? 'Failed to send Wake-On-LAN packet',
+            );
           }
         }
       } on FormatException {
+        // Non-JSON body: treat as success.
       }
     }
   }

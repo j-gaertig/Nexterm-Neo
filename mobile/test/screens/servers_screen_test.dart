@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nexterm/widgets/app_ui.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/models/server_account.dart';
 import 'package:nexterm/screens/servers_screen.dart';
@@ -91,19 +92,29 @@ void main() {
     });
   }
 
-  testWidgets('keeps server rows borderless in the list view', (tester) async {
+  testWidgets('draws a soft border around server rows in the list view', (
+    tester,
+  ) async {
     await _pumpGrid(
       tester,
       viewMode: ServerViewMode.list,
       entries: [_server(id: 1, name: 'plain-server', ip: '10.0.0.1')],
     );
 
-    final tile = tester.widget<Material>(
+    final tile = tester.widget<AppCard>(
       find.byKey(const ValueKey('server-tile-1')),
     );
 
-    expect(tile.color, Colors.transparent);
-    expect(tile.shape, isNull);
+    expect(tile.selected, isFalse);
+    final material = tester.widget<Material>(
+      find.descendant(
+        of: find.byKey(const ValueKey('server-tile-1')),
+        matching: find.byType(Material),
+      ),
+    );
+    final shape = material.shape as RoundedRectangleBorder;
+    expect(shape.side.width, 1);
+    expect(shape.side.color.a, greaterThan(0));
   });
 
   testWidgets('grid adapts the requested columns to the available width', (

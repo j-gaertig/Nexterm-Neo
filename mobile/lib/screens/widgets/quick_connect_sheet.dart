@@ -1,3 +1,5 @@
+import '../../widgets/app_ui.dart';
+import '../../utils/api_exception.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -103,7 +105,7 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to read key: $e'),
+            content: Text(friendlyApiError(e, fallback: 'Failed to read key.')),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -142,12 +144,14 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
     } else if (_authType == 'both') {
       directIdentity['password'] = _password.text;
       directIdentity['sshKey'] = _sshKey;
-      if (_passphrase.text.isNotEmpty)
+      if (_passphrase.text.isNotEmpty) {
         directIdentity['passphrase'] = _passphrase.text;
+      }
     } else {
       directIdentity['sshKey'] = _sshKey;
-      if (_passphrase.text.isNotEmpty)
+      if (_passphrase.text.isNotEmpty) {
         directIdentity['passphrase'] = _passphrase.text;
+      }
     }
 
     Navigator.pop(context, directIdentity);
@@ -169,17 +173,7 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 4),
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
+              AppSheetHandle(margin: const EdgeInsets.only(top: 12, bottom: 4)),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
                 child: Row(
@@ -266,7 +260,7 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
                         color: cs.surfaceContainerHigh,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: cs.outlineVariant),
+                          side: appBorderSide(cs),
                         ),
                         child: InkWell(
                           onTap: _pickKey,
@@ -377,11 +371,11 @@ class _QuickConnectSheetState extends State<QuickConnectSheet> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.outlineVariant),
+        borderSide: appBorderSide(cs),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: cs.outlineVariant),
+        borderSide: appBorderSide(cs),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

@@ -24,18 +24,13 @@ class SftpSettings extends ChangeNotifier {
   bool get warnBeforeDiscardEdit => _warnBeforeDiscardEdit;
 
   SftpSettings._({
-    required bool showHiddenFiles,
-    required bool dimHiddenFiles,
-    required bool confirmBeforeDelete,
-    required bool sortFoldersFirst,
-    required bool exposeToFilesApp,
-    required bool warnBeforeDiscardEdit,
-  })  : _showHiddenFiles = showHiddenFiles,
-        _dimHiddenFiles = dimHiddenFiles,
-        _confirmBeforeDelete = confirmBeforeDelete,
-        _sortFoldersFirst = sortFoldersFirst,
-        _exposeToFilesApp = exposeToFilesApp,
-        _warnBeforeDiscardEdit = warnBeforeDiscardEdit;
+    required this._showHiddenFiles,
+    required this._dimHiddenFiles,
+    required this._confirmBeforeDelete,
+    required this._sortFoldersFirst,
+    required this._exposeToFilesApp,
+    required this._warnBeforeDiscardEdit,
+  });
 
   static Future<SftpSettings> load() async {
     final prefs = await SharedPreferences.getInstance();

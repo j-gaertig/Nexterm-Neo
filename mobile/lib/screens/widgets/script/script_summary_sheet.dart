@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
+import '../../../widgets/app_ui.dart';
 import 'script_sheet_result.dart';
 import 'script_sheet_shell.dart';
 
@@ -67,6 +69,7 @@ class ScriptSummarySheet extends StatelessWidget {
       },
       child: ScriptSheetShell(
         title: event.title.isEmpty ? 'Script Summary' : event.title,
+        icon: AppIcons.fileCogOutline,
         footer: ScriptSheetActions(
           primary: scriptSheetPrimaryButton(
             label: 'Close',
@@ -91,26 +94,17 @@ class ScriptSummarySheet extends StatelessWidget {
           ],
         ),
         child: pairs.isEmpty
-            ? Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+            ? AppCard(
+                onSheet: true,
                 child: Text(
                   'No summary data available',
                   style: TextStyle(fontSize: 13.5, color: cs.outline),
                 ),
               )
-            : Container(
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerLow,
-                  border: Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.7),
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                clipBehavior: Clip.antiAlias,
+            : AppCard(
+                onSheet: true,
+                padding: EdgeInsets.zero,
+                radius: AppRadii.control,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -120,12 +114,7 @@ class ScriptSummarySheet extends StatelessWidget {
                         isUrl: _isUrl(pairs[i].value),
                       ),
                       if (i != pairs.length - 1)
-                        Divider(
-                          height: 1,
-                          indent: 14,
-                          endIndent: 14,
-                          color: cs.outlineVariant.withValues(alpha: 0.7),
-                        ),
+                        const AppDivider(indent: 14, endIndent: 14),
                     ],
                   ],
                 ),

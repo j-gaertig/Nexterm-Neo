@@ -64,8 +64,9 @@ void main() {
     sessionManager.dispose();
   });
 
-  testWidgets('system back restores the scroll position of the parent folder',
-      (tester) async {
+  testWidgets('system back restores the scroll position of the parent folder', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({'sftp_sortFoldersFirst': false});
     final settings = await SftpSettings.load();
     final sessionManager = SessionManager();

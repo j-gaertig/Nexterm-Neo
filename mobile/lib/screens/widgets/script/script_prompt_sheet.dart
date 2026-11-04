@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../widgets/app_ui.dart';
 import '../../../utils/app_icons.dart';
 import '../../../utils/script_protocol.dart';
 import 'script_sheet_result.dart';
@@ -96,6 +97,12 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
       },
       child: ScriptSheetShell(
         title: title,
+        icon: switch (_kind) {
+          ScriptPromptKind.password => AppIcons.key,
+          ScriptPromptKind.select => AppIcons.viewList,
+          ScriptPromptKind.confirm => AppIcons.alertCircleOutline,
+          ScriptPromptKind.input => AppIcons.pencilOutline,
+        },
         bodyIsScrollable: true,
         footer: _footer(cs),
         child: Column(
@@ -147,15 +154,15 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
             )
           : null,
       filled: true,
-      fillColor: cs.surfaceContainerHigh,
+      fillColor: cs.surfaceContainerHighest,
       isDense: true,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: cs.outlineVariant),
+        borderSide: appBorderSide(cs),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: cs.outlineVariant),
+        borderSide: appBorderSide(cs),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -182,7 +189,7 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
               minimumSize: const Size.fromHeight(52),
               padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
               alignment: Alignment.centerLeft,
-              side: BorderSide(color: cs.outlineVariant),
+              side: appBorderSide(cs),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
@@ -225,12 +232,8 @@ class _ScriptPromptSheetState extends State<ScriptPromptSheet> {
     );
   }
 
-  Widget _confirmBody(ColorScheme cs) => Container(
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: cs.surfaceContainerHigh,
-      borderRadius: BorderRadius.circular(14),
-    ),
+  Widget _confirmBody(ColorScheme cs) => AppCard(
+    onSheet: true,
     child: Text(
       'Choose Yes to continue or No to answer negatively. Both answers keep the script running.',
       style: TextStyle(fontSize: 12, height: 1.4, color: cs.onSurfaceVariant),

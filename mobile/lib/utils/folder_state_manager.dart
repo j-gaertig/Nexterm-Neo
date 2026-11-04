@@ -6,9 +6,11 @@ class FolderStateManager {
 
   FolderStateManager._(this._prefs);
 
-  static Future<FolderStateManager> create() async => FolderStateManager._(await SharedPreferences.getInstance());
+  static Future<FolderStateManager> create() async =>
+      FolderStateManager._(await SharedPreferences.getInstance());
 
-  bool isFolderExpanded(dynamic folderId) => folderId != null && (_prefs.getBool('$_prefix$folderId') ?? false);
+  bool isFolderExpanded(dynamic folderId) =>
+      folderId != null && (_prefs.getBool('$_prefix$folderId') ?? false);
 
   Future<void> setFolderExpanded(dynamic folderId, bool isExpanded) async {
     if (folderId != null) await _prefs.setBool('$_prefix$folderId', isExpanded);
@@ -20,7 +22,8 @@ class FolderStateManager {
     }
   }
 
-  Set<String> getAllExpandedFolderIds() => _prefs.getKeys()
+  Set<String> getAllExpandedFolderIds() => _prefs
+      .getKeys()
       .where((k) => k.startsWith(_prefix) && (_prefs.getBool(k) ?? false))
       .map((k) => k.substring(_prefix.length))
       .toSet();

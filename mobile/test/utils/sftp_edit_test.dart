@@ -10,7 +10,10 @@ void main() {
     });
 
     test('differs when bytes change', () {
-      expect(fnv1a63Hex('hello'.codeUnits), isNot(fnv1a63Hex('hallo'.codeUnits)));
+      expect(
+        fnv1a63Hex('hello'.codeUnits),
+        isNot(fnv1a63Hex('hallo'.codeUnits)),
+      );
     });
   });
 
@@ -18,29 +21,45 @@ void main() {
     test('detects size and hash changes, ignores mtime-only touch', () {
       expect(
         pendingEditChanged(
-          oldSize: 5, oldMtimeMs: 1, oldHash: 'aa',
-          newSize: 6, newMtimeMs: 1, newHash: 'aa',
+          oldSize: 5,
+          oldMtimeMs: 1,
+          oldHash: 'aa',
+          newSize: 6,
+          newMtimeMs: 1,
+          newHash: 'aa',
         ),
         isTrue,
       );
       expect(
         pendingEditChanged(
-          oldSize: 5, oldMtimeMs: 1, oldHash: 'aa',
-          newSize: 5, newMtimeMs: 2, newHash: 'aa',
+          oldSize: 5,
+          oldMtimeMs: 1,
+          oldHash: 'aa',
+          newSize: 5,
+          newMtimeMs: 2,
+          newHash: 'aa',
         ),
         isFalse,
       );
       expect(
         pendingEditChanged(
-          oldSize: 5, oldMtimeMs: 1, oldHash: 'aa',
-          newSize: 5, newMtimeMs: 1, newHash: 'bb',
+          oldSize: 5,
+          oldMtimeMs: 1,
+          oldHash: 'aa',
+          newSize: 5,
+          newMtimeMs: 1,
+          newHash: 'bb',
         ),
         isTrue,
       );
       expect(
         pendingEditChanged(
-          oldSize: 5, oldMtimeMs: 1, oldHash: 'aa',
-          newSize: 5, newMtimeMs: 1, newHash: 'aa',
+          oldSize: 5,
+          oldMtimeMs: 1,
+          oldHash: 'aa',
+          newSize: 5,
+          newMtimeMs: 1,
+          newHash: 'aa',
         ),
         isFalse,
       );

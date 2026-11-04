@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_ui.dart';
 import '../../models/server.dart';
 import '../../utils/app_icons.dart';
 
@@ -123,17 +124,7 @@ class ServerActionsSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 4),
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
+            AppSheetHandle(margin: const EdgeInsets.only(top: 12, bottom: 4)),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
               child: Row(

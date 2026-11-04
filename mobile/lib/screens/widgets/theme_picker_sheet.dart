@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_ui.dart';
 import '../../utils/app_icons.dart';
 import '../../utils/app_themes.dart';
 import '../../utils/theme_manager.dart';
@@ -54,7 +55,7 @@ class ThemePickerSheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: cs.surface,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border(top: BorderSide(color: cs.outlineVariant)),
+            border: Border(top: appBorderSide(cs)),
           ),
           child: Column(
             children: [

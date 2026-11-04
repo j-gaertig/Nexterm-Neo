@@ -6,6 +6,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../widgets/app_ui.dart';
 import '../utils/app_icons.dart';
 import '../services/session_manager.dart';
 import '../utils/api_exception.dart';
@@ -367,7 +368,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
         decoration: BoxDecoration(
           color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: cs.outlineVariant),
+          border: Border.all(color: appBorderColor(cs)),
           boxShadow: const [
             BoxShadow(
               color: Colors.black26,

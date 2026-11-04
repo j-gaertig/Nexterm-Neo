@@ -64,7 +64,11 @@ void main() {
     });
 
     test('detects Windows target like the server ScriptLayer', () {
-      final windows = Script.fromJson({'id': 1, 'name': 'x', 'osFilter': ['Windows']});
+      final windows = Script.fromJson({
+        'id': 1,
+        'name': 'x',
+        'osFilter': ['Windows'],
+      });
       expect(windows.isWindows, isTrue);
 
       final linux = Script.fromJson({'id': 2, 'name': 'y', 'osFilter': []});
@@ -72,12 +76,20 @@ void main() {
     });
 
     test('sourceId marks read-only scripts', () {
-      final source = Script.fromJson({'id': 4, 'name': 'synced', 'sourceId': 11});
+      final source = Script.fromJson({
+        'id': 4,
+        'name': 'synced',
+        'sourceId': 11,
+      });
       expect(source.isSource, isTrue);
     });
 
     test('matchesSearch matches name and description case-insensitively', () {
-      final script = Script.fromJson({'id': 1, 'name': 'Deploy Stack', 'description': 'Web server setup'});
+      final script = Script.fromJson({
+        'id': 1,
+        'name': 'Deploy Stack',
+        'description': 'Web server setup',
+      });
       expect(script.matchesSearch('deploy'), isTrue);
       expect(script.matchesSearch('web server'), isTrue);
       expect(script.matchesSearch('apache'), isFalse);

@@ -15,11 +15,7 @@ class TerminalKeyInput {
     return '$prefix${String.fromCharCode(modified)}${String.fromCharCodes(runes.skip(1))}';
   }
 
-  static String applyKey(
-    String key, {
-    required bool ctrl,
-    required bool alt,
-  }) {
+  static String applyKey(String key, {required bool ctrl, required bool alt}) {
     if (key.length == 1) return applyText(key, ctrl: ctrl, alt: alt);
 
     final base = _baseKeySequence(key);
@@ -50,8 +46,7 @@ class TerminalKeyInput {
   }
 
   static int? _controlCode(int code) {
-    if ((code >= 0x40 && code <= 0x5f) ||
-        (code >= 0x61 && code <= 0x7a)) {
+    if ((code >= 0x40 && code <= 0x5f) || (code >= 0x61 && code <= 0x7a)) {
       return code & 0x1f;
     }
 
@@ -79,29 +74,52 @@ class TerminalKeyInput {
 
   static String? _baseKeySequence(String key) {
     switch (key) {
-      case 'ESC': return '\x1b';
-      case 'TAB': return '\t';
-      case 'UP': return '\x1b[A';
-      case 'DOWN': return '\x1b[B';
-      case 'RIGHT': return '\x1b[C';
-      case 'LEFT': return '\x1b[D';
-      case 'HOME': return '\x1b[H';
-      case 'END': return '\x1b[F';
-      case 'PGUP': return '\x1b[5~';
-      case 'PGDN': return '\x1b[6~';
-      case 'F1': return '\x1bOP';
-      case 'F2': return '\x1bOQ';
-      case 'F3': return '\x1bOR';
-      case 'F4': return '\x1bOS';
-      case 'F5': return '\x1b[15~';
-      case 'F6': return '\x1b[17~';
-      case 'F7': return '\x1b[18~';
-      case 'F8': return '\x1b[19~';
-      case 'F9': return '\x1b[20~';
-      case 'F10': return '\x1b[21~';
-      case 'F11': return '\x1b[23~';
-      case 'F12': return '\x1b[24~';
-      default: return null;
+      case 'ESC':
+        return '\x1b';
+      case 'TAB':
+        return '\t';
+      case 'UP':
+        return '\x1b[A';
+      case 'DOWN':
+        return '\x1b[B';
+      case 'RIGHT':
+        return '\x1b[C';
+      case 'LEFT':
+        return '\x1b[D';
+      case 'HOME':
+        return '\x1b[H';
+      case 'END':
+        return '\x1b[F';
+      case 'PGUP':
+        return '\x1b[5~';
+      case 'PGDN':
+        return '\x1b[6~';
+      case 'F1':
+        return '\x1bOP';
+      case 'F2':
+        return '\x1bOQ';
+      case 'F3':
+        return '\x1bOR';
+      case 'F4':
+        return '\x1bOS';
+      case 'F5':
+        return '\x1b[15~';
+      case 'F6':
+        return '\x1b[17~';
+      case 'F7':
+        return '\x1b[18~';
+      case 'F8':
+        return '\x1b[19~';
+      case 'F9':
+        return '\x1b[20~';
+      case 'F10':
+        return '\x1b[21~';
+      case 'F11':
+        return '\x1b[23~';
+      case 'F12':
+        return '\x1b[24~';
+      default:
+        return null;
     }
   }
 }
