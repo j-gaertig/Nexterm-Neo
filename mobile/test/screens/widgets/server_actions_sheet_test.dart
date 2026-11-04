@@ -166,6 +166,78 @@ void main() {
     });
   });
 
+  group('buildServerActions (web parity)', () {
+    List<String> labels(Server server) => buildServerActions(
+      server,
+      onConnect: () {},
+      onRunScript: () {},
+      onQuickConnect: () {},
+      onWakeOnLan: () {},
+      onEdit: () {},
+      onDuplicate: () {},
+      onToggleDisabled: () {},
+      onDelete: () {},
+      onOpenSftp: () {},
+      onOpenBrowser: () {},
+      onNotes: () {},
+      onTags: () {},
+      onPveAction: (_) {},
+    ).map((a) => a.label).toList();
+
+    test('SSH servers get SFTP, Browser, Notes and Tags like the web', () {
+      expect(labels(_server), [
+        'Connect',
+        'Open SFTP',
+        'Open Browser',
+        'Run Script',
+        'Quick Connect',
+        'Wake-On-LAN',
+        'Add notes',
+        'Edit',
+        'Duplicate',
+        'Tags',
+        'Disable',
+        'Delete',
+      ]);
+    });
+
+    test('Proxmox machines offer power actions depending on status', () {
+      const running = Server(
+        id: 8,
+        name: 'vm',
+        ip: '10.0.0.8',
+        type: 'pve-qemu',
+        status: 'running',
+      );
+      const stopped = Server(
+        id: 9,
+        name: 'ct',
+        ip: '10.0.0.9',
+        type: 'pve-lxc',
+        status: 'stopped',
+      );
+      expect(labels(running), containsAll(['Shut down', 'Stop']));
+      expect(labels(running), isNot(contains('Start')));
+      expect(labels(stopped), contains('Start'));
+      expect(labels(stopped), isNot(contains('Stop')));
+    });
+
+    test('delete is the only destructive action', () {
+      final actions = buildServerActions(
+        _server,
+        onConnect: () {},
+        onRunScript: () {},
+        onQuickConnect: () {},
+        onWakeOnLan: () {},
+        onEdit: () {},
+        onDuplicate: () {},
+        onToggleDisabled: () {},
+        onDelete: () {},
+      );
+      expect(actions.where((a) => a.danger).map((a) => a.label), ['Delete']);
+    });
+  });
+
   group('ServerActionsSheet', () {
     testWidgets('scrolls so every action stays reachable on a short screen', (
       tester,

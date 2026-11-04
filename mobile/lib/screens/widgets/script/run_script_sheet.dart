@@ -285,6 +285,7 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
             children: [
               _header(cs, tight: tight),
               _searchRow(cs, tight: tight),
+              if (!tight) _compatibilityChip(cs),
               const AppDivider(),
               if (widget.manager.isLoading)
                 const LinearProgressIndicator(minHeight: 2),
@@ -403,8 +404,6 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          _compatibilityButton(cs),
           if (_needsIdentitySelection) ...[
             const SizedBox(width: 8),
             _identityButton(cs),
@@ -414,43 +413,46 @@ class _RunScriptSheetState extends State<RunScriptSheet> {
     );
   }
 
-  Widget _compatibilityButton(ColorScheme cs) {
+  /// Labelled toggle below the search field. A text chip makes it obvious that
+  /// the list is being filtered by operating system compatibility.
+  Widget _compatibilityChip(ColorScheme cs) {
     final active = _compatibilityFilterActive;
     final enabled = _osKnown && !_osLoading;
-    final background = active
-        ? cs.primary
-        : (enabled ? cs.surfaceContainerHigh : cs.surfaceContainerLow);
-    final foreground = active
-        ? cs.onPrimary
-        : (enabled ? cs.onSurfaceVariant : cs.outline);
+    final label = _osLoading
+        ? 'Detecting operating system…'
+        : (!_osKnown
+              ? 'Operating system unknown'
+              : (active
+                    ? 'Compatible with $_osName only'
+                    : 'Show compatible only'));
 
-    return Tooltip(
-      message: _compatibilityTooltip,
-      child: Semantics(
-        button: true,
-        enabled: enabled,
-        toggled: active,
-        label: _compatibilityTooltip,
-        child: Material(
-          color: background,
-          borderRadius: BorderRadius.circular(14),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: enabled ? _toggleCompatibilityFilter : null,
-            child: SizedBox.square(
-              dimension: _controlSize,
-              child: Center(
-                child: _osLoading
-                    ? SizedBox.square(
-                        dimension: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: foreground,
-                        ),
-                      )
-                    : Icon(AppIcons.filterVariant, size: 20, color: foreground),
-              ),
-            ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Semantics(
+          button: true,
+          toggled: active,
+          label: _compatibilityTooltip,
+          excludeSemantics: true,
+          child: FilterChip(
+            key: const ValueKey('compatible-only-chip'),
+            selected: active,
+            showCheckmark: true,
+            avatar: _osLoading
+                ? SizedBox.square(
+                    dimension: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.outline,
+                    ),
+                  )
+                : (active
+                      ? null
+                      : const Icon(AppIcons.filterVariant, size: 16)),
+            label: Text(label),
+            onSelected: enabled ? (_) => _toggleCompatibilityFilter() : null,
+            side: appBorderSide(cs),
           ),
         ),
       ),

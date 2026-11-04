@@ -148,7 +148,7 @@ void main() {
       expect(find.text('Other OS'), findsNothing);
       expect(find.text('Ubuntu'), findsNothing);
       expect(find.text('Select a script to run'), findsNothing);
-      expect(find.byTooltip('Compatible only'), findsOneWidget);
+      expect(find.text('Show compatible only'), findsOneWidget);
     });
 
     testWidgets('keeps a searched-away selection and submits it by id', (
@@ -179,7 +179,7 @@ void main() {
       expect(selection.identityId, 7);
     });
 
-    testWidgets('compatibility filter is an opt-in square toggle', (
+    testWidgets('compatibility filter is an opt-in labelled chip', (
       tester,
     ) async {
       final manager = _seededManager();
@@ -190,19 +190,20 @@ void main() {
       await _pumpSheet(tester);
       expect(find.text('Windows tune'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Compatible only'));
+      await tester.tap(find.byKey(const ValueKey('compatible-only-chip')));
       await tester.pump();
 
       expect(find.text('Windows tune'), findsNothing);
       expect(find.text('Ubuntu deploy'), findsOneWidget);
       expect(find.text('Org deploy'), findsOneWidget);
-      expect(find.byTooltip('Show all scripts'), findsOneWidget);
+      expect(find.textContaining('only'), findsWidgets);
+      expect(find.textContaining('Compatible with'), findsOneWidget);
 
-      await tester.tap(find.byTooltip('Show all scripts'));
+      await tester.tap(find.byKey(const ValueKey('compatible-only-chip')));
       await tester.pump();
 
       expect(find.text('Windows tune'), findsOneWidget);
-      expect(find.byTooltip('Compatible only'), findsOneWidget);
+      expect(find.text('Show compatible only'), findsOneWidget);
     });
 
     testWidgets('shows all scripts when the OS is unknown', (tester) async {
@@ -214,11 +215,11 @@ void main() {
       await _pumpSheet(tester);
 
       expect(find.text('Windows tune'), findsOneWidget);
-      expect(find.byTooltip('Operating system unknown'), findsOneWidget);
+      expect(find.text('Operating system unknown'), findsOneWidget);
       expect(find.text('OS unknown'), findsNothing);
       expect(find.text('All operating systems'), findsNothing);
 
-      await tester.tap(find.byTooltip('Operating system unknown'));
+      await tester.tap(find.text('Operating system unknown'));
       await tester.pump();
       expect(find.text('Windows tune'), findsOneWidget);
     });

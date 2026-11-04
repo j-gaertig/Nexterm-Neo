@@ -11,6 +11,7 @@ import '../models/server.dart';
 import '../models/script_runtime.dart';
 import '../utils/api_client.dart';
 import 'connection_service.dart';
+import 'browser_controller.dart';
 import 'script_connection.dart';
 
 enum ConnectionType { guacamole, terminal, sftp }
@@ -46,6 +47,11 @@ class AppSession {
   /// attention banner. Owned by the renderer's controller and mirrored here so
   /// background prompts can be discovered without renderer context.
   ScriptRuntimeState? scriptRuntime;
+
+  /// Remote-browser controller for web ('browser') sessions.
+  final BrowserController? browser;
+
+  bool get isBrowserSession => browser != null;
 
   bool get isScriptSession => scriptId != null;
   bool get scriptNeedsInput => scriptRuntime?.needsInput ?? false;
@@ -101,6 +107,7 @@ class AppSession {
     this.termSubscription,
     this.sftpChannel,
     this.sftpSubscription,
+    this.browser,
   });
 }
 
@@ -136,12 +143,15 @@ class SessionManager extends ChangeNotifier {
     required Server server,
     Map<String, dynamic>? directIdentity,
     String? connectionReason,
+    int? identityOverride,
+    bool browser = false,
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true
-              ? server.identities!.first
-              : null);
+        : (identityOverride ??
+              (server.identities?.isNotEmpty == true
+                  ? server.identities!.first
+                  : null));
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -149,6 +159,7 @@ class SessionManager extends ChangeNotifier {
       identityId: identityId ?? 0,
       directIdentity: directIdentity,
       connectionReason: connectionReason,
+      type: browser ? 'web' : null,
     );
 
     final tunnel = GuacWebSocketTunnel(
@@ -162,6 +173,8 @@ class SessionManager extends ChangeNotifier {
       type: ConnectionType.guacamole,
       guacClient: client,
       guacTunnel: tunnel,
+      identityId: identityId,
+      browser: browser ? BrowserController() : null,
     );
 
     _sessions[session.sessionId] = session;
@@ -176,12 +189,14 @@ class SessionManager extends ChangeNotifier {
     Map<String, dynamic>? directIdentity,
     String? connectionReason,
     String? startPath,
+    int? identityOverride,
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true
-              ? server.identities!.first
-              : null);
+        : (identityOverride ??
+              (server.identities?.isNotEmpty == true
+                  ? server.identities!.first
+                  : null));
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -275,12 +290,14 @@ class SessionManager extends ChangeNotifier {
     required Server server,
     Map<String, dynamic>? directIdentity,
     String? connectionReason,
+    int? identityOverride,
   }) async {
     final identityId = directIdentity != null
         ? null
-        : (server.identities?.isNotEmpty == true
-              ? server.identities!.first
-              : null);
+        : (identityOverride ??
+              (server.identities?.isNotEmpty == true
+                  ? server.identities!.first
+                  : null));
 
     final cs = await ConnectionService.createSession(
       token: token,
@@ -395,6 +412,10 @@ class SessionManager extends ChangeNotifier {
                 type: ConnectionType.guacamole,
                 guacClient: client,
                 guacTunnel: tunnel,
+                browser:
+                    (config['type'] == 'web' || config['renderer'] == 'web')
+                    ? BrowserController()
+                    : null,
               );
               break;
 
@@ -503,7 +524,9 @@ class SessionManager extends ChangeNotifier {
     if (protocol == 'rdp' ||
         protocol == 'vnc' ||
         protocol == 'spice' ||
-        renderer == 'guac') {
+        renderer == 'guac' ||
+        renderer == 'web' ||
+        cfgType == 'web') {
       return ConnectionType.guacamole;
     }
     return ConnectionType.terminal;

@@ -14,6 +14,8 @@ class Server {
   final bool? wakeOnLanEnabled;
   final String? macAddress;
   final bool disabled;
+  final String? notes;
+  final bool showNoteInList;
 
   const Server({
     this.id,
@@ -31,6 +33,8 @@ class Server {
     this.wakeOnLanEnabled,
     this.macAddress,
     this.disabled = false,
+    this.notes,
+    this.showNoteInList = false,
   });
 
   factory Server.fromJson(Map<String, dynamic> json) => Server(
@@ -51,6 +55,8 @@ class Server {
     wakeOnLanEnabled: json['wakeOnLanEnabled'] as bool?,
     macAddress: json['macAddress'] as String?,
     disabled: json['disabled'] == true,
+    notes: json['notes'] as String?,
+    showNoteInList: json['showNoteInList'] == true,
   );
 
   Map<String, dynamic> toJson() => {
@@ -69,6 +75,8 @@ class Server {
     'wakeOnLanEnabled': wakeOnLanEnabled,
     'macAddress': macAddress,
     'disabled': disabled,
+    'notes': notes,
+    'showNoteInList': showNoteInList,
   };
 
   bool get isPve => type?.startsWith('pve-') == true;

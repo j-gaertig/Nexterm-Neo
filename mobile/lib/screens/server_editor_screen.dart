@@ -294,69 +294,87 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final tt = Theme.of(context).textTheme;
+    final title = _isEdit
+        ? 'Edit server'
+        : (_protocol == null || _protocol!.isEmpty)
+        ? 'New server'
+        : 'New ${_protocol!.toUpperCase()} server';
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _isEdit
-              ? 'Edit server'
-              : (_protocol == null || _protocol!.isEmpty)
-              ? 'New server'
-              : 'New ${_protocol!.toUpperCase()} server',
-        ),
-        bottom: _loading
-            ? null
-            : TabBar(
-                controller: _tabs,
-                tabs: [for (final k in _tabKeys) Tab(text: _tabLabel(k))],
-              ),
-        actions: [
-          if (!_loading)
-            TextButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Save'),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            AppSubPageHeader(
+              title: title,
+              subtitle: _name.text.trim().isEmpty ? null : _name.text.trim(),
+              trailing: _loading || _error != null
+                  ? null
+                  : FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(AppIcons.contentSave, size: 18),
+                      label: const Text('Save'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.control),
+                        ),
+                      ),
+                    ),
             ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      AppIcons.alertCircleOutline,
-                      size: 40,
-                      color: cs.error,
+            if (!_loading && _error == null && _tabKeys.length > 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: cs.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                    border: Border.all(color: appBorderColor(cs)),
+                  ),
+                  padding: const EdgeInsets.all(4),
+                  child: TabBar(
+                    controller: _tabs,
+                    dividerColor: Colors.transparent,
+                    indicatorSize: TabBarIndicatorSize.tab,
+                    indicator: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadii.tile - 2),
                     ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _error!,
-                      style: tt.bodyMedium,
-                      textAlign: TextAlign.center,
+                    labelColor: cs.onPrimaryContainer,
+                    unselectedLabelColor: cs.outline,
+                    labelStyle: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
                     ),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Back'),
-                    ),
-                  ],
+                    splashBorderRadius: BorderRadius.circular(AppRadii.tile),
+                    tabs: [
+                      for (final k in _tabKeys)
+                        Tab(height: 38, text: _tabLabel(k)),
+                    ],
+                  ),
                 ),
               ),
-            )
-          : TabBarView(
-              controller: _tabs,
-              children: [for (final k in _tabKeys) _tabView(k)],
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? AppErrorState(
+                      message: _error!,
+                      title: 'Could not open the server',
+                    )
+                  : TabBarView(
+                      controller: _tabs,
+                      children: [for (final k in _tabKeys) _tabView(k)],
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -392,11 +410,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         borderSide: appBorderSide(cs),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         borderSide: appBorderSide(cs),
       ),
       focusedBorder: OutlineInputBorder(

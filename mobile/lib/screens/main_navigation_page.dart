@@ -57,7 +57,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
   final _serversKey = GlobalKey<ServersScreenState>();
-  final _navController = MainNavController();
+  final _serversNavKey = GlobalKey<NavigatorState>();
+  final _settingsNavKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -69,12 +70,36 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
-    _navController.dispose();
     super.dispose();
+  }
+
+  /// Navigator of the tab at [index], or null for tabs without sub pages.
+  GlobalKey<NavigatorState>? _tabNavigatorKey(int index) {
+    if (index == 0) return _serversNavKey;
+    if (index == _lastTabIndex) return _settingsNavKey;
+    return null;
+  }
+
+  int get _lastTabIndex => _hasSessions ? 3 : 2;
+
+  int get monitoringIndex => _hasSessions ? 2 : 1;
+
+  /// Pops one page of the tab at [index]. Returns true when a page was closed.
+  bool _popTabPage(int index) {
+    final navigator = _tabNavigatorKey(index)?.currentState;
+    if (navigator == null || !navigator.canPop()) return false;
+    navigator.pop();
+    return true;
   }
 
   void _switchTab(int index) {
     if (index == _selectedIndex) {
+      // Tapping the active destination again goes one step back inside it.
+      if (_popTabPage(index)) return;
+      if (index == monitoringIndex &&
+          _monitoringKey.currentState?.goBack() == true) {
+        return;
+      }
       // Pressing the Sessions destination again always returns to the
       // overview instead of re-opening the last session.
       if (index == 1 && _openSessionId != null) {
@@ -93,6 +118,20 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     setState(() {
       _selectedIndex = 1;
       _openSessionId = sessionId;
+    });
+    // A new session can insert the Sessions destination in the same frame
+    // (and script sessions notify again while starting). Re-assert the target
+    // once the dust has settled so the new session always ends up on screen.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || widget.sessionManager.getSession(sessionId) == null) {
+        return;
+      }
+      if (_openSessionId != sessionId || _selectedIndex != 1) {
+        setState(() {
+          _selectedIndex = 1;
+          _openSessionId = sessionId;
+        });
+      }
     });
   }
 
@@ -157,15 +196,18 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final List<Widget> pages = [
       KeyedSubtree(
         key: const ValueKey('tab-page-servers'),
-        child: ServersScreen(
-          key: _serversKey,
-          authManager: widget.authManager,
-          snippetManager: widget.snippetManager,
-          sessionManager: widget.sessionManager,
-          serverViewSettings: widget.serverViewSettings,
-          onSessionOpened: (sessionId) {
-            if (_hasSessions) _openSession(sessionId);
-          },
+        child: TabNavigator(
+          navigatorKey: _serversNavKey,
+          builder: (_) => ServersScreen(
+            key: _serversKey,
+            authManager: widget.authManager,
+            snippetManager: widget.snippetManager,
+            sessionManager: widget.sessionManager,
+            serverViewSettings: widget.serverViewSettings,
+            onSessionOpened: (sessionId) {
+              if (_hasSessions) _openSession(sessionId);
+            },
+          ),
         ),
       ),
       if (hasSessions)
@@ -195,32 +237,28 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       ),
       KeyedSubtree(
         key: const ValueKey('tab-page-settings'),
-        child: SettingsScreen(
-          themeManager: widget.themeManager,
-          authManager: widget.authManager,
-          terminalSettings: widget.terminalSettings,
-          sftpSettings: widget.sftpSettings,
-          serverViewSettings: widget.serverViewSettings,
-          screenLockSettings: widget.screenLockSettings,
-          screenLockService: widget.screenLockService,
+        child: TabNavigator(
+          navigatorKey: _settingsNavKey,
+          builder: (_) => SettingsScreen(
+            themeManager: widget.themeManager,
+            authManager: widget.authManager,
+            terminalSettings: widget.terminalSettings,
+            sftpSettings: widget.sftpSettings,
+            serverViewSettings: widget.serverViewSettings,
+            screenLockSettings: widget.screenLockSettings,
+            screenLockService: widget.screenLockService,
+          ),
         ),
       ),
     ];
 
     if (_selectedIndex >= pages.length) _selectedIndex = 0;
 
-    final monitoringIndex = hasSessions ? 2 : 1;
     // Like T3 Code, the One UI bar disappears while the keyboard is open and
     // while a fullscreen session is on screen. The overview keeps the bar so
     // it behaves like every other top-level page.
     final showNavigationBar =
         !isInSession && MediaQuery.viewInsetsOf(context).bottom == 0;
-
-    _navController.update(
-      selectedIndex: _selectedIndex,
-      destinations: _destinations(hasSessions),
-      onSelect: _switchTab,
-    );
 
     final theme = Theme.of(context);
     final pageTheme = showNavigationBar
@@ -237,8 +275,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           )
         : theme;
 
-    return MainNavScope(
-      controller: _navController,
+    return Theme(
+      // The theme wraps the whole shell so that snack bars shown by the shell's
+      // own Scaffold also float above the navigation bar.
+      data: pageTheme,
       child: PopScope(
         canPop: false,
         onPopInvokedWithResult: (didPop, _) {
@@ -260,6 +300,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
             _switchTab(0);
             return;
           }
+
+          if (_popTabPage(_selectedIndex)) return;
 
           if (_selectedIndex == monitoringIndex) {
             final handled = _monitoringKey.currentState?.goBack() ?? false;

@@ -7,6 +7,7 @@ import 'package:guacamole_common_dart/guacamole_common_dart.dart';
 import '../../utils/app_icons.dart';
 
 import '../../services/session_manager.dart';
+import '../widgets/browser_toolbar.dart';
 import '../widgets/connection_loader.dart';
 
 enum MouseMode { direct, virtualMouse }
@@ -136,6 +137,7 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
       setState(() => _error = null);
       final session = widget.session;
       _client = session.guacClient;
+      session.browser?.attach(_client!);
 
       _client!.display.onflush = () {
         if (mounted) {
@@ -686,6 +688,18 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
   @override
   Widget build(BuildContext context) {
     _updateScaling();
+    final body = _buildBody(context);
+    final browser = widget.session.browser;
+    if (browser == null) return body;
+    return Column(
+      children: [
+        BrowserToolbar(controller: browser),
+        Expanded(child: body),
+      ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     return Stack(
       children: [
         Positioned.fill(

@@ -36,6 +36,10 @@ class GuacClient {
   void Function(GuacInputStream stream, String mimetype)? onclipboard;
   void Function(GuacInputStream stream, String mimetype, String filename)? onfile;
 
+  /// Called when the server opens a named pipe (used by the browser protocol
+  /// for page state events).
+  void Function(GuacInputStream stream, String mimetype, String name)? onpipe;
+
   static const _lineCap = ['butt', 'round', 'square'];
   static const _lineJoin = ['bevel', 'miter', 'round'];
 
@@ -150,6 +154,16 @@ class GuacClient {
       _streamIndices.free(streamIndex);
       _outputStreams.remove(streamIndex);
     }
+  }
+
+  /// Opens a named pipe to the server. Send data with [sendBlob] (base64) and
+  /// close it with [endStream].
+  GuacOutputStream createPipeStream(String mimetype, String name) {
+    final index = _streamIndices.next();
+    final stream = GuacOutputStream(index);
+    _outputStreams[index] = stream;
+    _tunnel.sendMessage(['pipe', index, mimetype, name]);
+    return stream;
   }
 
   GuacOutputStream createClipboardStream(String mimetype) {
@@ -478,7 +492,16 @@ class GuacClient {
       },
 
       'pipe': (args) {
-        sendAck(int.parse(args[0]), 'Named pipes unsupported', GuacStatus.unsupported);
+        final streamIndex = int.parse(args[0]);
+        final handler = onpipe;
+        if (handler == null) {
+          sendAck(streamIndex, 'Named pipes unsupported', GuacStatus.unsupported);
+          return;
+        }
+        final stream = GuacInputStream(streamIndex);
+        _streams[streamIndex] = stream;
+        sendAck(streamIndex, 'OK', GuacStatus.success);
+        handler(stream, args[1], args[2]);
       },
 
       'argv': (args) {

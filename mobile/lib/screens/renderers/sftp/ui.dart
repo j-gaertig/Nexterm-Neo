@@ -278,6 +278,8 @@ extension _SftpUi on _SftpRendererState {
       child: ListView.builder(
         key: PageStorageKey<String>('sftp-list-$_sessionId-$_listedPath'),
         controller: _scrollController,
+        // Keep the last entry (and its menu) clear of the floating + button.
+        padding: EdgeInsets.only(bottom: _selectionMode ? 16 : 16 + 56 + 16),
         itemCount: _entries.length,
         itemBuilder: (ctx, index) => _buildEntryTile(index),
       ),

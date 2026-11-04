@@ -21,7 +21,12 @@ import 'widgets/quick_connect_sheet.dart';
 import 'widgets/server_grid_card.dart';
 import 'widgets/connection_reason_dialog.dart';
 import 'widgets/instance_switcher.dart';
+import 'widgets/identity_picker_sheet.dart';
+import 'widgets/name_dialog.dart';
 import 'widgets/server_actions_sheet.dart';
+import 'widgets/server_notes_sheet.dart';
+import 'widgets/server_tags_sheet.dart';
+import '../services/server_actions_service.dart';
 import 'widgets/server_protocol_sheet.dart';
 import 'widgets/tag_filter_sheet.dart';
 import 'widgets/script/run_script_sheet.dart';
@@ -32,6 +37,7 @@ import 'server_editor_screen.dart';
 part 'servers/filter.dart';
 part 'servers/ui.dart';
 part 'servers/actions.dart';
+part 'servers/menu.dart';
 
 class ServersScreen extends StatefulWidget {
   final AuthManager authManager;
@@ -387,12 +393,15 @@ class ServersScreenState extends State<ServersScreen> {
 
   /// Opens the protocol picker and the server editor. Used by the add action
   /// next to the floating navigation bar.
-  Future<void> createServer() async {
+  ///
+  /// [inFolder] pre-selects the target folder (used by the folder menu);
+  /// otherwise the deepest expanded folder is used.
+  Future<void> createServer({FolderOption? inFolder}) async {
     final token = widget.authManager.sessionToken;
     if (token == null) return;
     final protocol = await showServerProtocolSheet(context);
     if (protocol == null || !mounted) return;
-    final contextFolder = _expandedFolderContext();
+    final contextFolder = inFolder ?? _expandedFolderContext();
     final changed = await pushPage(
       context,
       (_) => ServerEditorScreen(

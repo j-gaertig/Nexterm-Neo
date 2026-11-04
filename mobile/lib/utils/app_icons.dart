@@ -120,6 +120,14 @@ class AppIcons {
   static const IconData viewList = LucideIcons.list;
   static const IconData viewGrid = LucideIcons.grid2x2;
   static const IconData web = LucideIcons.globe;
+  static const IconData syncIcon = LucideIcons.refreshCw;
+  static const IconData textCursorInput = LucideIcons.textCursorInput;
+  static const IconData folderRemove = LucideIcons.folderX;
+  static const IconData play = LucideIcons.play;
+  static const IconData power = LucideIcons.power;
+  static const IconData tags = LucideIcons.tags;
+  static const IconData tag = LucideIcons.tag;
+  static const IconData noteEdit = LucideIcons.notebookPen;
   static const IconData zipBoxOutline = LucideIcons.archive;
 
   static const IconData brandServer = MdiIcons.server;

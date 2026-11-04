@@ -305,6 +305,7 @@ extension _ServersUi on ServersScreenState {
             color: Colors.transparent,
             child: InkWell(
               onTap: hasEntries ? () => _toggleFolder(folder) : null,
+              onLongPress: () => _showFolderMenu(folder),
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding: const EdgeInsets.symmetric(

@@ -26,6 +26,8 @@ extension _ServersActions on ServersScreenState {
     ConnectionType type = ConnectionType.terminal,
     Map<String, dynamic>? directIdentity,
     RunScriptSelection? script,
+    int? identityId,
+    bool browser = false,
   }) async {
     if (server.disabled) {
       if (mounted) {
@@ -66,6 +68,8 @@ extension _ServersActions on ServersScreenState {
               server: server,
               directIdentity: directIdentity,
               connectionReason: connectionReason,
+              identityOverride: identityId,
+              browser: browser,
             ),
           ConnectionType.terminal =>
             await widget.sessionManager.createTerminalSession(
@@ -73,12 +77,14 @@ extension _ServersActions on ServersScreenState {
               server: server,
               directIdentity: directIdentity,
               connectionReason: connectionReason,
+              identityOverride: identityId,
             ),
           ConnectionType.sftp => await widget.sessionManager.createSftpSession(
             token: token,
             server: server,
             directIdentity: directIdentity,
             connectionReason: connectionReason,
+            identityOverride: identityId,
           ),
         };
       }
@@ -128,25 +134,6 @@ extension _ServersActions on ServersScreenState {
   }
 
   int? _serverIdInt(dynamic id) => id is int ? id : int.tryParse(id.toString());
-
-  void _showServerMenu(Server server) {
-    showServerActionsSheet(
-      context,
-      server,
-      icon: _serverIcon(server),
-      actions: buildServerActions(
-        server,
-        onConnect: () => _connectToServer(server),
-        onRunScript: () => _runScript(server),
-        onQuickConnect: () => _quickConnect(server),
-        onWakeOnLan: () => _wakeServer(server),
-        onEdit: () => _editServer(server),
-        onDuplicate: () => _duplicateServer(server),
-        onToggleDisabled: () => _toggleServerDisabled(server),
-        onDelete: () => _deleteServer(server),
-      ),
-    );
-  }
 
   Future<void> _quickConnect(Server server) async {
     if (server.disabled) {
@@ -466,7 +453,7 @@ extension _ServersActions on ServersScreenState {
     }
   }
 
-  void _connectToServer(Server server) {
+  void _connectToServer(Server server, {int? identityId}) {
     if (server.disabled) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -495,7 +482,11 @@ extension _ServersActions on ServersScreenState {
     }
     if (ServerService.isGuacamoleProtocol(server.protocol) ||
         server.type == 'pve-qemu') {
-      _initiateConnection(server, type: ConnectionType.guacamole);
+      _initiateConnection(
+        server,
+        type: ConnectionType.guacamole,
+        identityId: identityId,
+      );
       return;
     }
     final protocolLower = server.protocol?.toLowerCase();
@@ -504,12 +495,16 @@ extension _ServersActions on ServersScreenState {
         protocolLower == 'ftp' ||
         protocolLower == 'ftps';
     if (isFileProtocol) {
-      _initiateConnection(server, type: ConnectionType.sftp);
+      _initiateConnection(
+        server,
+        type: ConnectionType.sftp,
+        identityId: identityId,
+      );
       return;
     }
     final isSSH = protocolLower == 'ssh' && !server.isPve;
     if (!isSSH) {
-      _initiateConnection(server);
+      _initiateConnection(server, identityId: identityId);
       return;
     }
     showModalBottomSheet(
@@ -577,7 +572,7 @@ extension _ServersActions on ServersScreenState {
                       cs,
                       () {
                         Navigator.pop(ctx);
-                        _initiateConnection(server);
+                        _initiateConnection(server, identityId: identityId);
                       },
                     ),
                   ),
@@ -591,7 +586,11 @@ extension _ServersActions on ServersScreenState {
                       cs,
                       () {
                         Navigator.pop(ctx);
-                        _initiateConnection(server, type: ConnectionType.sftp);
+                        _initiateConnection(
+                          server,
+                          type: ConnectionType.sftp,
+                          identityId: identityId,
+                        );
                       },
                     ),
                   ),

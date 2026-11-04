@@ -86,6 +86,12 @@ ServerFieldConfig getServerFieldConfig(String type, String? protocol) {
         showAudioSettings: true,
         allowedAuthTypes: ['password-only', 'password'],
       );
+    case 'spice':
+      return const ServerFieldConfig(
+        showDisplaySettings: true,
+        showAudioSettings: true,
+        allowedAuthTypes: ['password-only', 'password'],
+      );
     case 'sftp':
       return const ServerFieldConfig(
         allowedAuthTypes: ['password', 'ssh', 'both'],
@@ -154,6 +160,7 @@ class ServerEditorConstants {
     {'label': 'Telnet', 'value': 'telnet'},
     {'label': 'RDP', 'value': 'rdp'},
     {'label': 'VNC', 'value': 'vnc'},
+    {'label': 'SPICE', 'value': 'spice'},
     {'label': 'SFTP', 'value': 'sftp'},
     {'label': 'FTP', 'value': 'ftp'},
     {'label': 'FTPS', 'value': 'ftps'},

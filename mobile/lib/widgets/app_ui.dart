@@ -23,7 +23,7 @@ class AppRadii {
 /// outline: visible against the page, but never as heavy as a raw
 /// `outlineVariant`.
 Color appBorderColor(ColorScheme cs) =>
-    cs.outlineVariant.withValues(alpha: 0.55);
+    cs.outlineVariant.withValues(alpha: 0.32);
 
 BorderSide appBorderSide(ColorScheme cs) =>
     BorderSide(color: appBorderColor(cs));

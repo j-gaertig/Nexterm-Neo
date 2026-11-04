@@ -142,11 +142,20 @@ void main() {
   });
 
   group('protocol constants', () {
-    test('covers all seven protocols with default ports', () {
+    test('covers all eight protocols with default ports', () {
       final values = ServerEditorConstants.protocols
           .map((p) => p['value'])
           .toSet();
-      expect(values, {'ssh', 'telnet', 'rdp', 'vnc', 'sftp', 'ftp', 'ftps'});
+      expect(values, {
+        'ssh',
+        'telnet',
+        'rdp',
+        'vnc',
+        'spice',
+        'sftp',
+        'ftp',
+        'ftps',
+      });
       for (final v in values) {
         expect(ServerEditorConstants.defaultPorts[v], isNotEmpty);
       }

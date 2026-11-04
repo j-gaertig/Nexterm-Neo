@@ -24,6 +24,7 @@ class ServerProtocolSheet extends StatelessWidget {
       case 'rdp':
         return AppIcons.brandWindows;
       case 'vnc':
+      case 'spice':
         return AppIcons.brandMonitor;
       case 'sftp':
       case 'ftp':
