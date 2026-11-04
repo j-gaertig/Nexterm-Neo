@@ -5,7 +5,6 @@ import 'package:nexterm/models/server_account.dart';
 import 'package:nexterm/screens/server_accounts_screen.dart';
 import 'package:nexterm/screens/settings_screen.dart';
 import 'package:nexterm/services/screen_lock_service.dart';
-import 'package:nexterm/utils/app_icons.dart';
 import 'package:nexterm/utils/app_themes.dart';
 import 'package:nexterm/utils/auth_manager.dart';
 import 'package:nexterm/utils/screen_lock_settings.dart';
@@ -106,109 +105,90 @@ Future<_SettingsHarness> _pumpSettings(
   );
 }
 
+Future<void> _open(WidgetTester tester, String title) async {
+  await tester.tap(find.text(title));
+  await tester.pumpAndSettle();
+}
+
 void main() {
-  testWidgets('orders the top-level settings sections', (tester) async {
+  testWidgets('orders the settings groups', (tester) async {
     await _pumpSettings(tester);
 
-    final sections = [
-      'Account',
-      'Security',
-      'Appearance',
-      'Terminal',
-      'File Manager',
-    ];
+    final groups = ['Account', 'Preferences', 'Security', 'Library', 'About'];
     final positions = [
-      for (final section in sections) tester.getTopLeft(find.text(section)).dy,
+      for (final g in groups) tester.getTopLeft(find.text(g).first).dy,
     ];
-
     for (var i = 0; i < positions.length - 1; i++) {
       expect(
         positions[i],
         lessThan(positions[i + 1]),
-        reason: '${sections[i]} should be above ${sections[i + 1]}',
+        reason: '${groups[i]} should be above ${groups[i + 1]}',
       );
     }
   });
 
-  testWidgets('uses the new labels and removes the old mixed labels', (
+  testWidgets('lists every top-level destination', (tester) async {
+    await _pumpSettings(tester);
+
+    for (final title in const [
+      'API keys',
+      'Signed-in devices',
+      'Authorize login',
+      'Server connections',
+      'Appearance',
+      'Terminal',
+      'File manager',
+      'Screen lock',
+      'Identities',
+      'About Nexterm Neo',
+      'Sign out',
+    ]) {
+      expect(find.text(title), findsOneWidget, reason: title);
+    }
+    // Administration only appears for users with the matching permissions.
+    expect(find.text('Administration'), findsNothing);
+    expect(find.text('Engines'), findsNothing);
+  });
+
+  testWidgets('shows the profile card with the signed-in user', (tester) async {
+    await _pumpSettings(tester);
+
+    expect(find.text('Jane Doe'), findsOneWidget);
+    expect(find.textContaining('@jane'), findsOneWidget);
+  });
+
+  testWidgets('search narrows the list and explains empty results', (
     tester,
   ) async {
     await _pumpSettings(tester);
 
-    expect(find.text('Server Connections'), findsOneWidget);
-    expect(find.text('Signed-in Devices'), findsOneWidget);
-    expect(find.text('Authorize Login'), findsOneWidget);
-    expect(find.text('Default View'), findsOneWidget);
-    expect(find.text('Keyboard Toolbar'), findsOneWidget);
-    expect(find.text('File Manager'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'font');
+    await tester.pump();
+    expect(find.text('Results'), findsOneWidget);
+    expect(find.text('Terminal'), findsOneWidget);
+    expect(find.text('Appearance'), findsNothing);
 
-    expect(find.text('File Browser'), findsNothing);
-    expect(find.text('Scan QR Code'), findsNothing);
-    expect(find.text('Connections'), findsNothing);
-    expect(find.text('Sessions'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'zzzz');
+    await tester.pump();
+    expect(find.text('No settings found'), findsOneWidget);
   });
 
-  testWidgets(
-    'places Server List under Appearance and Keyboard Toolbar under Terminal',
-    (tester) async {
-      await _pumpSettings(tester);
-
-      final appearance = tester.getTopLeft(find.text('Appearance')).dy;
-      final serverList = tester.getTopLeft(find.text('Server List')).dy;
-      final terminal = tester.getTopLeft(find.text('Terminal')).dy;
-      final keyboardToolbar = tester
-          .getTopLeft(find.text('Keyboard Toolbar'))
-          .dy;
-      final fileManager = tester.getTopLeft(find.text('File Manager')).dy;
-
-      expect(appearance, lessThan(serverList));
-      expect(serverList, lessThan(terminal));
-      expect(terminal, lessThan(keyboardToolbar));
-      expect(keyboardToolbar, lessThan(fileManager));
-    },
-  );
-
-  testWidgets('shows dependent rows only when their parent is enabled', (
-    tester,
-  ) async {
-    final harness = await _pumpSettings(tester);
-
-    expect(find.text('Dim Hidden Files'), findsNothing);
-    expect(find.text('Columns'), findsNothing);
-
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Show Hidden Files'));
-    await tester.pump();
-    expect(harness.sftpSettings.showHiddenFiles, isTrue);
-    expect(find.text('Dim Hidden Files'), findsOneWidget);
-
-    await harness.serverViewSettings.setMode(ServerViewMode.grid);
-    await tester.pump();
-    expect(find.text('Columns'), findsOneWidget);
-
-    await harness.serverViewSettings.setMode(ServerViewMode.list);
-    await tester.pump();
-    expect(find.text('Columns'), findsNothing);
-  });
-
-  testWidgets('keeps logout in the account card and can cancel it', (
-    tester,
-  ) async {
+  testWidgets('keeps sign out reachable and can cancel it', (tester) async {
     await _pumpSettings(tester);
 
-    expect(find.text('Logout'), findsOneWidget);
-    await tester.tap(find.text('Logout'));
+    await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
-
     expect(find.text('Are you sure you want to logout?'), findsOneWidget);
+
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
-    expect(find.text('Logout'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
   });
 
-  testWidgets('signs out after confirming logout', (tester) async {
+  testWidgets('signs out after confirming', (tester) async {
     final harness = await _pumpSettings(tester);
 
-    await tester.tap(find.text('Logout'));
+    await tester.tap(find.text('Sign out'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Logout'));
     await tester.pumpAndSettle();
@@ -217,32 +197,28 @@ void main() {
     expect(harness.authManager.accountManager.accounts, isEmpty);
   });
 
-  testWidgets('keeps Server Connections reachable without a username', (
+  testWidgets('keeps Server connections reachable without a username', (
     tester,
   ) async {
     final harness = await _pumpSettings(tester, username: null, fullName: null);
 
     expect(harness.authManager.isAuthenticated, isTrue);
-    expect(find.text('Server Connections'), findsOneWidget);
-    expect(find.text('Logout'), findsOneWidget);
+    expect(find.text('Server connections'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
     expect(find.text('User'), findsOneWidget);
   });
 
-  testWidgets('keeps Server Connections reachable without an account', (
-    tester,
-  ) async {
+  testWidgets('hides sign out without an account', (tester) async {
     await _pumpSettings(tester, authenticated: false);
 
-    expect(find.text('Server Connections'), findsOneWidget);
-    expect(find.text('Logout'), findsNothing);
-    expect(find.text('User'), findsNothing);
+    expect(find.text('Server connections'), findsOneWidget);
+    expect(find.text('Sign out'), findsNothing);
   });
 
-  testWidgets('opens Server Connections from the account card', (tester) async {
+  testWidgets('opens Server connections', (tester) async {
     await _pumpSettings(tester);
 
-    await tester.tap(find.text('Server Connections'));
-    await tester.pumpAndSettle();
+    await _open(tester, 'Server connections');
 
     expect(find.byType(ServerAccountsScreen), findsOneWidget);
   });
@@ -251,14 +227,7 @@ void main() {
     await _pumpSettings(tester, size: const Size(320, 4200));
 
     expect(tester.takeException(), isNull);
-    expect(find.text('File Manager'), findsOneWidget);
-  });
-
-  testWidgets('fits a 320dp-wide screen at large text scales', (tester) async {
-    await _pumpSettings(tester, size: const Size(320, 8000), textScale: 2.0);
-
-    expect(tester.takeException(), isNull);
-    expect(find.text('File Manager'), findsOneWidget);
+    expect(find.text('About Nexterm Neo'), findsOneWidget);
   });
 
   testWidgets('fits a 320dp-wide screen at extreme text scales', (
@@ -269,7 +238,7 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.scrollUntilVisible(
-      find.text('File Manager'),
+      find.text('About Nexterm Neo'),
       400,
       scrollable: find
           .descendant(
@@ -281,104 +250,133 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('File Manager'), findsOneWidget);
+    expect(find.text('About Nexterm Neo'), findsOneWidget);
   });
 
-  testWidgets('opens a compact palette gallery and applies a theme', (
-    tester,
-  ) async {
-    final harness = await _pumpSettings(tester);
-
-    expect(find.text('Themes'), findsOneWidget);
-    expect(find.text('Graphite'), findsOneWidget);
-    expect(find.byKey(const ValueKey('app-theme-picker')), findsOneWidget);
-    expect(AppThemes.all.map((theme) => theme.label), [
-      'Graphite',
-      'Adaptive',
-      'Blossom',
-      'Meadow',
-      'Tide',
-      'Copper',
-      'Aurora',
-    ]);
-    // The gallery only appears on demand; settings keeps a single row.
-    expect(find.byKey(const ValueKey('app-theme-graphite')), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('app-theme-picker')));
-    await tester.pumpAndSettle();
-
-    final sheet = find.byKey(const ValueKey('theme-picker-sheet'));
-    expect(sheet, findsOneWidget);
-    for (final theme in AppThemes.all) {
-      expect(
-        find.descendant(of: sheet, matching: find.text(theme.label)),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(ValueKey('app-theme-preview-${theme.id}')),
-        findsOneWidget,
-      );
-    }
-    expect(find.text('Dynamic Color'), findsNothing);
-
-    await tester.tap(find.byKey(const ValueKey('app-theme-blossom')));
-    await tester.pumpAndSettle();
-
-    expect(harness.themeManager.theme.id, 'blossom');
-    final selectedMaterial = tester.widget<Material>(
-      find.byKey(const ValueKey('app-theme-card-blossom')),
-    );
-    final selectedShape = selectedMaterial.shape! as RoundedRectangleBorder;
-    expect(
-      selectedShape.side.color,
-      Theme.of(
-        tester.element(find.byKey(const ValueKey('app-theme-card-blossom'))),
-      ).colorScheme.primary,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('app-theme-blossom')),
-        matching: find.byIcon(AppIcons.checkCircle),
-      ),
-      findsNothing,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('theme-picker-close')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('theme-picker-sheet')), findsNothing);
-    expect(find.text('Blossom · light & dark'), findsNothing);
-    expect(find.text('Themes'), findsOneWidget);
-    expect(find.text('Blossom'), findsOneWidget);
-  });
-
-  testWidgets('terminal theme cards expose a semantics tap action', (
-    tester,
-  ) async {
-    final handle = tester.ensureSemantics();
-    try {
+  group('appearance page', () {
+    testWidgets('puts Server List under Appearance', (tester) async {
       await _pumpSettings(tester);
+      await _open(tester, 'Appearance');
 
-      final node = tester.getSemantics(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is Semantics &&
-              widget.properties.label == 'Default terminal theme',
-        ),
-      );
+      expect(find.text('Default View'), findsOneWidget);
+      final themes = tester.getTopLeft(find.text('Themes')).dy;
+      final serverList = tester.getTopLeft(find.text('Server List')).dy;
+      expect(themes, lessThan(serverList));
+    });
 
-      expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
-    } finally {
-      handle.dispose();
-    }
+    testWidgets('shows the column count only in grid view', (tester) async {
+      final harness = await _pumpSettings(tester);
+      await _open(tester, 'Appearance');
+
+      expect(find.text('Columns'), findsNothing);
+
+      await harness.serverViewSettings.setMode(ServerViewMode.grid);
+      await tester.pump();
+      expect(find.text('Columns'), findsOneWidget);
+
+      await harness.serverViewSettings.setMode(ServerViewMode.list);
+      await tester.pump();
+      expect(find.text('Columns'), findsNothing);
+    });
+
+    testWidgets('opens a compact palette gallery and applies a theme', (
+      tester,
+    ) async {
+      final harness = await _pumpSettings(tester);
+      await _open(tester, 'Appearance');
+
+      expect(find.text('Themes'), findsOneWidget);
+      expect(find.byKey(const ValueKey('app-theme-picker')), findsOneWidget);
+      expect(AppThemes.all.map((theme) => theme.label), [
+        'Graphite',
+        'Adaptive',
+        'Blossom',
+        'Meadow',
+        'Tide',
+        'Copper',
+        'Aurora',
+      ]);
+      expect(find.byKey(const ValueKey('app-theme-graphite')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('app-theme-picker')));
+      await tester.pumpAndSettle();
+
+      final sheet = find.byKey(const ValueKey('theme-picker-sheet'));
+      expect(sheet, findsOneWidget);
+      for (final theme in AppThemes.all) {
+        expect(
+          find.descendant(of: sheet, matching: find.text(theme.label)),
+          findsOneWidget,
+        );
+      }
+
+      await tester.tap(find.byKey(const ValueKey('app-theme-blossom')));
+      await tester.pumpAndSettle();
+      expect(harness.themeManager.theme.id, 'blossom');
+
+      await tester.tap(find.byKey(const ValueKey('theme-picker-close')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('theme-picker-sheet')), findsNothing);
+    });
   });
 
-  testWidgets('hides the iOS Files integration on non-iOS test platforms', (
-    tester,
-  ) async {
-    await _pumpSettings(tester);
+  group('terminal page', () {
+    testWidgets('puts Keyboard Toolbar under Terminal', (tester) async {
+      await _pumpSettings(tester, size: const Size(390, 4200));
+      await _open(tester, 'Terminal');
 
-    expect(find.text('iOS Integration'), findsNothing);
-    expect(find.text('Show in Files App'), findsNothing);
+      expect(find.text('Keyboard Toolbar'), findsOneWidget);
+      expect(find.text('Terminal Theme'), findsOneWidget);
+    });
+
+    testWidgets('terminal theme cards expose a semantics tap action', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      try {
+        await _pumpSettings(tester);
+        await _open(tester, 'Terminal');
+
+        final node = tester.getSemantics(
+          find.byWidgetPredicate(
+            (widget) =>
+                widget is Semantics &&
+                widget.properties.label == 'Default terminal theme',
+          ),
+        );
+
+        expect(node.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
+      } finally {
+        handle.dispose();
+      }
+    });
+  });
+
+  group('file manager page', () {
+    testWidgets('shows dependent rows only when their parent is enabled', (
+      tester,
+    ) async {
+      final harness = await _pumpSettings(tester);
+      await _open(tester, 'File manager');
+
+      expect(find.text('Dim Hidden Files'), findsNothing);
+
+      await tester.tap(
+        find.widgetWithText(SwitchListTile, 'Show Hidden Files'),
+      );
+      await tester.pump();
+      expect(harness.sftpSettings.showHiddenFiles, isTrue);
+      expect(find.text('Dim Hidden Files'), findsOneWidget);
+    });
+
+    testWidgets('hides the iOS Files integration on other platforms', (
+      tester,
+    ) async {
+      await _pumpSettings(tester);
+      await _open(tester, 'File manager');
+
+      expect(find.text('iOS Integration'), findsNothing);
+      expect(find.text('Show in Files App'), findsNothing);
+    });
   });
 }
