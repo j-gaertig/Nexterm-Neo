@@ -80,6 +80,8 @@ class ServersScreenState extends State<ServersScreen> {
   late final ScriptManager _scriptManager;
   String? _activeAccountId;
   int _loadGeneration = 0;
+  int _totalServers = 0;
+  int _onlineServers = 0;
 
   String _folderKey(ServerFolder folder) {
     final id = folder.id;
@@ -87,8 +89,6 @@ class ServersScreenState extends State<ServersScreen> {
     return 'n:${folder.type}:${folder.name}:${folder.position}';
   }
 
-  int get _totalServers =>
-      folders.fold(0, (sum, item) => sum + _countServers(item));
   int _countServers(dynamic item) {
     if (item is Server) return 1;
     if (item is ServerFolder) {
@@ -98,8 +98,17 @@ class ServersScreenState extends State<ServersScreen> {
     return 0;
   }
 
-  int get _onlineServers =>
-      folders.fold(0, (sum, item) => sum + _countOnline(item));
+  void _updateCounts() {
+    var total = 0;
+    var online = 0;
+    for (final item in folders) {
+      total += _countServers(item);
+      online += _countOnline(item);
+    }
+    _totalServers = total;
+    _onlineServers = online;
+  }
+
   int _countOnline(dynamic item) {
     if (item is Server) return item.isRunning ? 1 : 0;
     if (item is ServerFolder) {
@@ -137,7 +146,7 @@ class ServersScreenState extends State<ServersScreen> {
     _handleAccountSwitch();
   }
 
-  void _handleAccountSwitch() {
+  Future<void> _handleAccountSwitch() async {
     _debounce?.cancel();
     _search.clear();
     if (!mounted) return;
@@ -150,7 +159,12 @@ class ServersScreenState extends State<ServersScreen> {
       _hasText = false;
       errorMessage = null;
       isLoading = true;
+      _totalServers = 0;
+      _onlineServers = 0;
     });
+    final accountId = _activeAccountId;
+    await _reloadFolderState();
+    if (!mounted || _activeAccountId != accountId) return;
     _loadData();
   }
 
@@ -181,8 +195,19 @@ class ServersScreenState extends State<ServersScreen> {
   }
 
   Future<void> _initStateManager() async {
-    _folderState = await FolderStateManager.create();
+    await _reloadFolderState();
     await _loadData();
+  }
+
+  Future<void> _reloadFolderState() async {
+    final account = widget.authManager.accountManager.activeAccount;
+    final manager = await FolderStateManager.create(scope: account?.baseUrl);
+    if (!mounted) return;
+    // A second switch may have started while SharedPreferences was loading.
+    if (widget.authManager.accountManager.activeAccount?.id != account?.id) {
+      return;
+    }
+    _folderState = manager;
   }
 
   Future<void> _loadData() async {
@@ -213,6 +238,7 @@ class ServersScreenState extends State<ServersScreen> {
         _expanded.clear();
         if (_folderState != null) _restoreStates(data);
         _filterFolders();
+        _updateCounts();
       });
       _pruneStaleFolderStates(data);
     } catch (e) {
@@ -247,6 +273,7 @@ class ServersScreenState extends State<ServersScreen> {
         _expanded.clear();
         if (_folderState != null) _restoreStates(data);
         _filterFolders();
+        _updateCounts();
       });
       _pruneStaleFolderStates(data);
     } catch (e) {

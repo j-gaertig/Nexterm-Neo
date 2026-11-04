@@ -11,6 +11,7 @@ import '../../utils/app_icons.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../widgets/app_ui.dart';
 import '../widgets/connection_loader.dart';
 import '../sftp_code_editor_screen.dart';
 import 'package:http/http.dart' as http;
@@ -458,9 +459,10 @@ class _SftpRendererState extends State<SftpRenderer>
         if (!_selectionMode && _connected)
           Positioned(
             right: 16,
-            bottom: 16,
+            bottom: 16 + MediaQuery.paddingOf(context).bottom,
             child: FloatingActionButton(
               onPressed: _showAddMenu,
+              tooltip: 'Add files',
               child: Icon(AppIcons.plus),
             ),
           ),

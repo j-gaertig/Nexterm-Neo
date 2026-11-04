@@ -61,10 +61,6 @@ class ThemeManager extends ChangeNotifier {
     );
   }
 
-  void toggleTheme(bool isDark) async {
-    await setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light);
-  }
-
   static const _pageTransitions = PageTransitionsTheme(
     builders: {
       TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
@@ -111,8 +107,10 @@ class ThemeManager extends ChangeNotifier {
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surfaceContainerHigh,
         surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.sheet),
+        ),
       ),
-      // One snackbar style everywhere: floating, rounded, never full-width.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: mutedAccent(scheme),
@@ -125,6 +123,7 @@ class ThemeManager extends ChangeNotifier {
         backgroundColor: mutedAccent(scheme),
         foregroundColor: scheme.onSurface,
       ),
+      // One snackbar style everywhere: floating, rounded, never full-width.
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,

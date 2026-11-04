@@ -39,7 +39,7 @@ extension _SettingsSections on _SettingsScreenState {
           listenable: widget.screenLockSettings,
           builder: (_, __) => SwitchListTile(
             contentPadding: const EdgeInsets.only(left: 16, right: 12),
-            secondary: _iconBox(AppIcons.lockOutline, cs),
+            secondary: _iconBox(AppIcons.lockOutline),
             title: const Text('Screen Lock', style: TextStyle(fontSize: 15)),
             subtitle: Text(
               _screenLockBusy
@@ -70,11 +70,9 @@ extension _SettingsSections on _SettingsScreenState {
           'Authorize Login',
           'Approve a web login with a QR code',
           cs,
-          () => Navigator.push(
+          () => pushFullScreen(
             context,
-            MaterialPageRoute(
-              builder: (_) => QrScannerScreen(authManager: widget.authManager),
-            ),
+            (_) => QrScannerScreen(authManager: widget.authManager),
           ),
         ),
       ],
@@ -94,7 +92,7 @@ extension _SettingsSections on _SettingsScreenState {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  _iconBox(AppIcons.themeLightDark, cs),
+                  _iconBox(AppIcons.themeLightDark),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text('Theme', style: TextStyle(fontSize: 15)),
@@ -197,7 +195,6 @@ extension _SettingsSections on _SettingsScreenState {
                                   sv.isGrid
                                       ? AppIcons.viewGrid
                                       : AppIcons.viewList,
-                                  cs,
                                 ),
                                 const SizedBox(width: 12),
                                 label,
@@ -221,7 +218,6 @@ extension _SettingsSections on _SettingsScreenState {
                         children: [
                           _iconBox(
                             sv.isGrid ? AppIcons.viewGrid : AppIcons.viewList,
-                            cs,
                           ),
                           const SizedBox(width: 12),
                           label,
@@ -240,7 +236,7 @@ extension _SettingsSections on _SettingsScreenState {
                     ),
                     child: Row(
                       children: [
-                        _iconBox(AppIcons.viewGrid, cs),
+                        _iconBox(AppIcons.viewGrid),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
@@ -346,7 +342,7 @@ extension _SettingsSections on _SettingsScreenState {
                   ),
                   child: Row(
                     children: [
-                      _iconBox(AppIcons.formatSize, cs),
+                      _iconBox(AppIcons.formatSize),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
@@ -428,11 +424,13 @@ extension _SettingsSections on _SettingsScreenState {
                               width: 80,
                               decoration: BoxDecoration(
                                 color: t.background,
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(
+                                  AppRadii.tile,
+                                ),
                                 border: selected
                                     ? Border.all(color: cs.primary, width: 2.5)
                                     : Border.all(
-                                        color: cs.outlineVariant,
+                                        color: appBorderColor(cs),
                                         width: 1,
                                       ),
                               ),
@@ -483,7 +481,7 @@ extension _SettingsSections on _SettingsScreenState {
                         left: 16,
                         right: 12,
                       ),
-                      secondary: _iconBox(AppIcons.key, cs),
+                      secondary: _iconBox(AppIcons.key),
                       title: Text(
                         strings.settingTitle,
                         style: const TextStyle(fontSize: 15),
@@ -562,7 +560,7 @@ extension _SettingsSections on _SettingsScreenState {
               children: [
                 SwitchListTile(
                   contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                  secondary: _iconBox(AppIcons.fileHidden, cs),
+                  secondary: _iconBox(AppIcons.fileHidden),
                   title: const Text(
                     'Show Hidden Files',
                     style: TextStyle(fontSize: 15),
@@ -578,7 +576,7 @@ extension _SettingsSections on _SettingsScreenState {
                   _divider(cs),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                    secondary: _iconBox(AppIcons.opacity, cs),
+                    secondary: _iconBox(AppIcons.opacity),
                     title: const Text(
                       'Dim Hidden Files',
                       style: TextStyle(fontSize: 15),
@@ -594,7 +592,7 @@ extension _SettingsSections on _SettingsScreenState {
                 _divider(cs),
                 SwitchListTile(
                   contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                  secondary: _iconBox(AppIcons.folderArrowUp, cs),
+                  secondary: _iconBox(AppIcons.folderArrowUp),
                   title: const Text(
                     'Sort Folders First',
                     style: TextStyle(fontSize: 15),
@@ -609,7 +607,7 @@ extension _SettingsSections on _SettingsScreenState {
                 _divider(cs),
                 SwitchListTile(
                   contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                  secondary: _iconBox(AppIcons.deleteAlert, cs),
+                  secondary: _iconBox(AppIcons.deleteAlert),
                   title: const Text(
                     'Confirm Before Delete',
                     style: TextStyle(fontSize: 15),
@@ -624,7 +622,7 @@ extension _SettingsSections on _SettingsScreenState {
                 _divider(cs),
                 SwitchListTile(
                   contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                  secondary: _iconBox(AppIcons.alertOutline, cs),
+                  secondary: _iconBox(AppIcons.alertOutline),
                   title: const Text(
                     'Warn Before Discarding',
                     style: TextStyle(fontSize: 15),
@@ -641,7 +639,7 @@ extension _SettingsSections on _SettingsScreenState {
                   _subsectionHeader('iOS Integration', cs),
                   SwitchListTile(
                     contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                    secondary: _iconBox(AppIcons.folderMultipleOutline, cs),
+                    secondary: _iconBox(AppIcons.folderMultipleOutline),
                     title: const Text(
                       'Show in Files App',
                       style: TextStyle(fontSize: 15),

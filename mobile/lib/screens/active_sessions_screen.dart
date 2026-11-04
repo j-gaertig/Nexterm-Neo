@@ -274,7 +274,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     if (confirmed != true) return;
     if (!mounted || sm.sessions.isEmpty) return;
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _closingAll = true);
+    _closingAll = true;
     try {
       await sm.closeAll(token);
       _previews.clear();
@@ -288,7 +288,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
         ),
       );
     } finally {
-      if (mounted) setState(() => _closingAll = false);
+      _closingAll = false;
     }
   }
 
@@ -481,26 +481,38 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                 color: cs.outlineVariant.withValues(alpha: 0.5),
               ),
 
-              GestureDetector(
-                onTap: () {
-                  if (active.showSnippets != null) {
-                    active.showSnippets!();
-                  } else {
-                    active.showMenu?.call();
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
-                  ),
-                  child: Icon(
-                    active.showSnippets != null
-                        ? AppIcons.codeBraces
-                        : AppIcons.toolbox,
-                    size: 16,
-                    color: cs.primary,
+              Tooltip(
+                message: active.showSnippets != null
+                    ? 'Snippets'
+                    : 'Session actions',
+                excludeFromSemantics: true,
+                child: Semantics(
+                  button: true,
+                  label: active.showSnippets != null
+                      ? 'Snippets'
+                      : 'Session actions',
+                  child: GestureDetector(
+                    onTap: () {
+                      if (active.showSnippets != null) {
+                        active.showSnippets!();
+                      } else {
+                        active.showMenu?.call();
+                      }
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      child: Icon(
+                        active.showSnippets != null
+                            ? AppIcons.codeBraces
+                            : AppIcons.toolbox,
+                        size: 16,
+                        color: cs.primary,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -513,15 +525,27 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                 color: cs.outlineVariant.withValues(alpha: 0.5),
               ),
 
-              GestureDetector(
-                onTap: () => active.showAI?.call(),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 7,
+              Tooltip(
+                message: 'AI assistant',
+                excludeFromSemantics: true,
+                child: Semantics(
+                  button: true,
+                  label: 'AI assistant',
+                  child: GestureDetector(
+                    onTap: () => active.showAI?.call(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      child: Icon(
+                        AppIcons.creation,
+                        size: 16,
+                        color: cs.primary,
+                      ),
+                    ),
                   ),
-                  child: Icon(AppIcons.creation, size: 16, color: cs.primary),
                 ),
               ),
             ],

@@ -15,8 +15,9 @@ Future<Set<int>?> showTagFilterSheet(
   return showModalBottomSheet<Set<int>>(
     context: context,
     isScrollControlled: true,
+    useRootNavigator: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.sheet)),
     ),
     builder: (_) => TagFilterSheet(tags: tags, selected: selected),
   );

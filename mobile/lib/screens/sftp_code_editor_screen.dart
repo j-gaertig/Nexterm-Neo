@@ -128,7 +128,10 @@ class _SftpCodeEditorScreenState extends State<SftpCodeEditorScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = friendlyApiError(
+          e,
+          fallback: 'Could not open the file.',
+        );
         _loading = false;
       });
     }

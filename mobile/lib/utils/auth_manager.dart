@@ -22,7 +22,7 @@ class AuthManager extends ChangeNotifier {
     required String baseUrl,
     required String label,
   }) async {
-    final userInfo = await _authService.getCurrentUser(token);
+    final userInfo = await _authService.getCurrentUser(token, baseUrl: baseUrl);
     final account = ServerAccount(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       label: label,

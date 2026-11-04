@@ -234,6 +234,12 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
   }
 
   Future<void> _init() async {
+    if (!_loading || _error != null) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final enginesFuture = ServerEditorService.getEngines(widget.token);
       final identitiesFuture = ServerEditorService.getIdentities(widget.token);
@@ -285,7 +291,10 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = e.toString();
+        _error = friendlyApiError(
+          e,
+          fallback: 'Could not load the server editor.',
+        );
         _loading = false;
       });
     }
@@ -305,27 +314,37 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
         bottom: false,
         child: Column(
           children: [
-            AppSubPageHeader(
-              title: title,
-              subtitle: _name.text.trim().isEmpty ? null : _name.text.trim(),
-              trailing: _loading || _error != null
-                  ? null
-                  : FilledButton.icon(
-                      onPressed: _saving ? null : _save,
-                      icon: _saving
-                          ? const SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(AppIcons.contentSave, size: 18),
-                      label: const Text('Save'),
-                      style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.control),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _name,
+              builder: (context, value, _) {
+                final subtitle = value.text.trim();
+                return AppSubPageHeader(
+                  title: title,
+                  subtitle: subtitle.isEmpty ? null : subtitle,
+                  trailing: _loading || _error != null
+                      ? null
+                      : FilledButton.icon(
+                          onPressed: _saving ? null : _save,
+                          icon: _saving
+                              ? const SizedBox.square(
+                                  dimension: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(AppIcons.contentSave, size: 18),
+                          label: const Text('Save'),
+                          style: FilledButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.control,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                );
+              },
             ),
             if (!_loading && _error == null && _tabKeys.length > 1)
               Padding(
@@ -366,6 +385,7 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
                   ? AppErrorState(
                       message: _error!,
                       title: 'Could not open the server',
+                      onRetry: _init,
                     )
                   : TabBarView(
                       controller: _tabs,
@@ -418,7 +438,7 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
         borderSide: appBorderSide(cs),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         borderSide: BorderSide(color: cs.primary, width: 1.5),
       ),
     );

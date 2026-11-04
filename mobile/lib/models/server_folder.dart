@@ -13,6 +13,13 @@ class ServerFolder {
   final String? icon;
   final String? folderType;
 
+  // Parsed once per folder instead of on every build or recursive count. The
+  // raw entries are immutable, so the cache stays valid for the object's life.
+  List<Server>? _servers;
+  List<ServerFolder>? _subfolders;
+  List<ServerFolder>? _organizations;
+  List<Server>? _pveEntries;
+
   ServerFolder({
     this.id,
     required this.name,
@@ -20,12 +27,12 @@ class ServerFolder {
     this.position,
     this.organizationId,
     this.requireConnectionReason,
-    this.entries = const [],
+    List<dynamic> entries = const [],
     this.isExpanded = false,
     this.ip,
     this.icon,
     this.folderType,
-  });
+  }) : entries = List<dynamic>.unmodifiable(entries);
 
   factory ServerFolder.fromJson(Map<String, dynamic> json) => ServerFolder(
     id: json['id'],
@@ -53,22 +60,22 @@ class ServerFolder {
     'folderType': folderType,
   };
 
-  List<Server> get servers => entries
+  List<Server> get servers => _servers ??= entries
       .where((e) => e is Map<String, dynamic> && e['type'] == 'server')
       .map((e) => Server.fromJson(e as Map<String, dynamic>))
       .toList();
 
-  List<ServerFolder> get subfolders => entries
+  List<ServerFolder> get subfolders => _subfolders ??= entries
       .where((e) => e is Map<String, dynamic> && e['type'] == 'folder')
       .map((e) => ServerFolder.fromJson(e as Map<String, dynamic>))
       .toList();
 
-  List<ServerFolder> get organizations => entries
+  List<ServerFolder> get organizations => _organizations ??= entries
       .where((e) => e is Map<String, dynamic> && e['type'] == 'organization')
       .map((e) => ServerFolder.fromJson(e as Map<String, dynamic>))
       .toList();
 
-  List<Server> get pveEntries => entries
+  List<Server> get pveEntries => _pveEntries ??= entries
       .where(
         (e) =>
             e is Map<String, dynamic> &&

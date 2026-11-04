@@ -55,21 +55,16 @@ class ThemePickerSheet extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(AppRadii.sheet),
+            ),
             border: Border(top: appBorderSide(cs)),
           ),
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 2),
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+              const Padding(
+                padding: EdgeInsets.only(top: 8, bottom: 2),
+                child: AppSheetHandle(margin: EdgeInsets.zero),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 8, 10),
@@ -96,10 +91,7 @@ class ThemePickerSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              Divider(
-                height: 1,
-                color: cs.outlineVariant.withValues(alpha: 0.6),
-              ),
+              Divider(height: 1, color: appBorderColor(cs)),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
@@ -161,14 +153,15 @@ class _ThemePickerCard extends StatelessWidget {
         color: cs.surfaceContainerHigh,
         clipBehavior: Clip.antiAlias,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.card),
           side: selected
               ? BorderSide(color: cs.primary, width: 2)
-              : BorderSide.none,
+              : appBorderSide(cs),
         ),
         child: InkWell(
           key: ValueKey('app-theme-${theme.id}'),
           onTap: onTap,
+          borderRadius: BorderRadius.circular(AppRadii.card),
           child: Padding(
             padding: const EdgeInsets.all(7),
             child: Column(

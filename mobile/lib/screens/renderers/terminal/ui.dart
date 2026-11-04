@@ -46,67 +46,33 @@ extension _TerminalUi on _TerminalRendererState {
               return const Center(child: CircularProgressIndicator());
             }
             if (sm.error != null) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        AppIcons.alertCircleOutline,
-                        size: 48,
-                        color: Theme.of(ctx).colorScheme.error,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Failed to load snippets',
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
+              return AppErrorState(
+                title: 'Failed to load snippets',
+                message: 'Check your connection and try again.',
+                onRetry: () => sm.reloadSnippets(widget.token),
               );
             }
             if (sm.snippets.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        AppIcons.codeBracesBox,
-                        size: 48,
-                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No snippets available',
-                        style: Theme.of(ctx).textTheme.titleMedium,
-                      ),
-                    ],
-                  ),
-                ),
+              return const AppEmptyState(
+                icon: AppIcons.codeBracesBox,
+                title: 'No snippets available',
+                message: 'Create snippets in the web dashboard',
               );
             }
+            final cs = Theme.of(ctx).colorScheme;
             return Column(
               children: [
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: Theme.of(ctx).colorScheme.surface,
+                    color: cs.surface,
                     border: Border(
-                      bottom: BorderSide(
-                        color: Theme.of(ctx).colorScheme.outlineVariant,
-                      ),
+                      bottom: BorderSide(color: appBorderColor(cs)),
                     ),
                   ),
                   child: Row(
                     children: [
-                      Icon(
-                        AppIcons.codeBraces,
-                        color: Theme.of(ctx).colorScheme.primary,
-                      ),
+                      Icon(AppIcons.codeBraces, color: cs.primary),
                       const SizedBox(width: 12),
                       Text(
                         'Snippets',
@@ -116,6 +82,7 @@ extension _TerminalUi on _TerminalRendererState {
                       IconButton(
                         icon: Icon(AppIcons.close),
                         onPressed: () => Navigator.pop(ctx),
+                        tooltip: 'Close snippets',
                       ),
                     ],
                   ),
@@ -185,6 +152,7 @@ extension _TerminalUi on _TerminalRendererState {
             icon: Icon(AppIcons.close),
             onPressed: () => setState(() => _errorMessage = null),
             color: colors.onErrorContainer,
+            tooltip: 'Dismiss error',
           ),
         ],
       ),

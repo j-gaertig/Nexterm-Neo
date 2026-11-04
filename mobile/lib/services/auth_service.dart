@@ -17,9 +17,13 @@ class AuthService {
     }
   }
 
-  Future<UserInfo?> getCurrentUser(String token) async {
+  Future<UserInfo?> getCurrentUser(String token, {String? baseUrl}) async {
     try {
-      final response = await ApiClient.get(ApiConfig.me, token: token);
+      final response = await ApiClient.get(
+        ApiConfig.me,
+        token: token,
+        baseUrl: baseUrl,
+      );
       return response.statusCode == 200
           ? UserInfo.fromJson(jsonDecode(response.body))
           : null;

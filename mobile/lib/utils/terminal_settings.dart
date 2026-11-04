@@ -431,6 +431,9 @@ class TerminalSettings extends ChangeNotifier {
   String _themeId;
   bool _passwordPromptDetection;
 
+  /// Serializes preference writes so fast slider drags cannot interleave.
+  Future<void> _pendingWrite = Future.value();
+
   double get fontSize => _fontSize;
   Map<ToolbarGroup, bool> get groupEnabled => Map.unmodifiable(_groupEnabled);
   List<ToolbarGroup> get groupOrder => List.unmodifiable(_groupOrder);
@@ -491,10 +494,18 @@ class TerminalSettings extends ChangeNotifier {
   }
 
   Future<void> setFontSize(double size) async {
-    _fontSize = size.clamp(8.0, 24.0);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_fontSizeKey, _fontSize);
+    final next = size.clamp(8.0, 24.0);
+    if (_fontSize == next) return;
+    // Update and notify immediately so the slider follows the drag; only the
+    // disk write is asynchronous.
+    _fontSize = next;
     notifyListeners();
+    final task = _pendingWrite.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_fontSizeKey, next);
+    });
+    _pendingWrite = task.catchError((_) {});
+    await task;
   }
 
   Future<void> setGroupEnabled(ToolbarGroup group, bool value) async {

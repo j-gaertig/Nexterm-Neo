@@ -1,5 +1,6 @@
 import 'dart:convert';
 import '../utils/api_client.dart';
+import '../utils/api_exception.dart';
 
 class DeviceCodeResponse {
   final String code;
@@ -56,11 +57,12 @@ class DeviceCodeService {
   static const String _createEndpoint = '/auth/device/create';
   static const String _pollEndpoint = '/auth/device/poll';
 
-  Future<DeviceCodeResponse> createCode() async {
+  Future<DeviceCodeResponse> createCode({String? baseUrl}) async {
     try {
       final response = await ApiClient.post(
         _createEndpoint,
         body: {'clientType': 'mobile'},
+        baseUrl: baseUrl,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -82,15 +84,18 @@ class DeviceCodeService {
         );
       }
     } catch (e) {
-      return DeviceCodeResponse.error('Connection error: $e');
+      return DeviceCodeResponse.error(
+        friendlyApiError(e, fallback: 'Could not reach the server.'),
+      );
     }
   }
 
-  Future<DevicePollResponse> pollToken(String token) async {
+  Future<DevicePollResponse> pollToken(String token, {String? baseUrl}) async {
     try {
       final response = await ApiClient.post(
         _pollEndpoint,
         body: {'token': token},
+        baseUrl: baseUrl,
       );
 
       if (response.statusCode == 200) {

@@ -35,31 +35,29 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   int _step = 1;
   _SubStep _subStep = _SubStep.choice;
   bool _isLoading = false;
-  bool _loggedIn = false;
-  String? _deviceCode, _deviceToken, _error, _previousBaseUrl;
+  bool _polling = false;
+  String? _deviceCode, _deviceToken, _error, _serverBaseUrl;
   Timer? _pollTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _previousBaseUrl = ApiConfig.baseUrl;
-  }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
-    if (widget.isAddingServer && _previousBaseUrl != null && !_loggedIn) {
-      ApiConfig.setBaseUrlSync(_previousBaseUrl!);
-    }
     _urlController.dispose();
     _urlFocus.dispose();
     super.dispose();
   }
 
   Future<bool> _tryConnect(String url) async {
-    ApiConfig.setBaseUrlSync(ApiClient.normalizeBaseUrl(url));
+    final target = ApiClient.normalizeBaseUrl(url);
     try {
-      return (await ApiClient.get('/service/is-fts')).statusCode == 200;
+      final ok =
+          (await ApiClient.get(
+            '/service/is-fts',
+            baseUrl: target,
+          )).statusCode ==
+          200;
+      if (ok) _serverBaseUrl = target;
+      return ok;
     } catch (_) {
       return false;
     }
@@ -76,12 +74,15 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
       _error = null;
     });
     if (await _tryConnect(url)) {
+      if (!mounted) return;
       await _createDeviceCode();
+      if (!mounted) return;
       setState(() {
         _step = 2;
         _isLoading = false;
       });
     } else {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to connect to server';
         _isLoading = false;
@@ -90,7 +91,8 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   }
 
   Future<void> _createDeviceCode() async {
-    final r = await _codeService.createCode();
+    final r = await _codeService.createCode(baseUrl: _serverBaseUrl);
+    if (!mounted) return;
     if (r.error != null) {
       setState(() => _error = r.error);
       return;
@@ -110,28 +112,41 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
   }
 
   Future<void> _pollForAuth() async {
-    if (_deviceToken == null) return;
-    final r = await _codeService.pollToken(_deviceToken!);
-    if (r.isAuthorized && r.token != null) {
-      _pollTimer?.cancel();
-      _loggedIn = true;
-      final label = _urlController.text.trim().replaceFirst(
-        RegExp(r'^https?://'),
-        '',
+    final deviceToken = _deviceToken;
+    if (deviceToken == null || _polling) return;
+    _polling = true;
+    try {
+      final r = await _codeService.pollToken(
+        deviceToken,
+        baseUrl: _serverBaseUrl,
       );
-      await widget.authManager.loginWithToken(
-        r.token!,
-        baseUrl: ApiConfig.baseUrl,
-        label: label,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Successfully authenticated!')),
+      if (!mounted) return;
+      if (r.isAuthorized && r.token != null) {
+        _pollTimer?.cancel();
+        // Stop polling before the login round-trip; a late in-flight poll must
+        // not start a second login and create a duplicate account.
+        _deviceToken = null;
+        final label = _urlController.text.trim().replaceFirst(
+          RegExp(r'^https?://'),
+          '',
         );
-        if (widget.isAddingServer) Navigator.pop(context);
+        final baseUrl = _serverBaseUrl ?? ApiConfig.baseUrl;
+        await widget.authManager.loginWithToken(
+          r.token!,
+          baseUrl: baseUrl,
+          label: label,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Successfully authenticated!')),
+          );
+          if (widget.isAddingServer) Navigator.pop(context);
+        }
+      } else if (r.isInvalid) {
+        await _createDeviceCode();
       }
-    } else if (r.isInvalid) {
-      await _createDeviceCode();
+    } finally {
+      _polling = false;
     }
   }
 
@@ -173,6 +188,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
       _error = null;
     });
     if (await _tryConnect(Uri.decodeComponent(server))) {
+      if (!mounted) return;
       _urlController.text = Uri.decodeComponent(server);
       _deviceToken = token;
       _startPolling();
@@ -182,6 +198,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
         _isLoading = false;
       });
     } else {
+      if (!mounted) return;
       setState(() {
         _error = 'Failed to connect to server';
         _isLoading = false;
@@ -191,7 +208,7 @@ class _DeviceSetupScreenState extends State<DeviceSetupScreen> {
 
   Future<void> _handleOpenBrowser() async {
     if (_deviceCode == null) return;
-    var baseUrl = ApiConfig.baseUrl;
+    var baseUrl = _serverBaseUrl ?? ApiConfig.baseUrl;
     if (baseUrl.endsWith('/api')) {
       baseUrl = baseUrl.substring(0, baseUrl.length - 4);
     }

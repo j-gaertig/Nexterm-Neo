@@ -28,8 +28,6 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   String? _activeAccountId;
   int _loadGeneration = 0;
 
-  bool get hasDetails => _selected != null;
-
   bool goBack() {
     if (_selected != null) {
       setState(() {
@@ -94,13 +92,14 @@ class MonitoringScreenState extends State<MonitoringScreen> {
         _servers = servers;
         _loading = false;
         _error = null;
+        final selected = _selected;
+        if (selected != null) {
+          _selected = servers.firstWhere(
+            (s) => s['id'] == selected['id'],
+            orElse: () => selected,
+          );
+        }
       });
-      if (_selected != null) {
-        _selected = servers.firstWhere(
-          (s) => s['id'] == _selected!['id'],
-          orElse: () => _selected!,
-        );
-      }
     } catch (e) {
       if (mounted && generation == _loadGeneration) {
         setState(() {
@@ -168,7 +167,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   Widget _errView() => AppErrorState(message: _error!, onRetry: _load);
 
   Widget _emptyView() => RefreshIndicator(
-    onRefresh: _load,
+    onRefresh: () => _load(silent: true),
     child: LayoutBuilder(
       builder: (context, constraints) => ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -187,7 +186,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   );
 
   Widget _listView() => RefreshIndicator(
-    onRefresh: _load,
+    onRefresh: () => _load(silent: true),
     child: ListView.builder(
       padding: EdgeInsets.only(
         left: 12,

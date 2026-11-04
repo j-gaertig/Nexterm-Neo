@@ -127,7 +127,6 @@ extension _SftpConnection on _SftpRendererState {
     );
     if (!mounted || !success) return false;
     _quietReadyOnce = quiet;
-    _reconnectAttempts = 0;
     _aliveResets = 0;
     _initialized = false;
     try {

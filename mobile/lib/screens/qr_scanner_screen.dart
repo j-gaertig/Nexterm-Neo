@@ -4,7 +4,6 @@ import '../widgets/app_ui.dart';
 import '../utils/app_icons.dart';
 import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
-import '../services/api_config.dart';
 import '../widgets/qr_scanner_page.dart';
 
 class QrScannerScreen extends StatefulWidget {
@@ -93,22 +92,23 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
       return;
     }
 
-    final prev = ApiConfig.baseUrl;
-    ApiConfig.setBaseUrlSync(account.baseUrl);
     try {
+      // Target the account's own server explicitly. Mutating the global base
+      // URL here would send the active account's token to the scanned server
+      // and race with background requests (monitoring, session restore).
       final resp = await ApiClient.post(
         '/auth/device/authorize',
         body: {'code': _code},
         token: account.token,
+        baseUrl: account.baseUrl,
       );
+      if (!mounted) return;
       final data = json.decode(resp.body);
       if (resp.statusCode == 200 && data['code'] is! int) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Login authorized')));
-          Navigator.pop(context);
-        }
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Login authorized')));
+        Navigator.pop(context);
       } else {
         setState(() {
           _error = data['message'] ?? 'Authorization failed';
@@ -116,12 +116,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         });
       }
     } catch (_) {
+      if (!mounted) return;
       setState(() {
         _error = 'Connection error';
         _authorizing = false;
       });
-    } finally {
-      ApiConfig.setBaseUrlSync(prev);
     }
   }
 
@@ -142,6 +141,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           children: [
             IconButton(
               icon: const Icon(AppIcons.arrowBack),
+              tooltip: 'Back',
               onPressed: _authorizing ? null : _openScanner,
             ),
             const SizedBox(width: 4),

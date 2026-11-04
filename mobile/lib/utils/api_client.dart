@@ -28,14 +28,21 @@ class ApiClient {
     if (token != null) 'Authorization': 'Bearer $token',
   };
 
+  /// Resolves the endpoint against [baseUrl], falling back to the active
+  /// account's server. Callers that target a specific server (QR login, adding
+  /// another instance) must pass [baseUrl] instead of mutating the global one.
+  static String _url(String endpoint, String? baseUrl) =>
+      '${baseUrl ?? ApiConfig.baseUrl}$endpoint';
+
   static Future<http.Response> get(
     String endpoint, {
     Map<String, String>? headers,
     String? token,
     Duration? timeout,
+    String? baseUrl,
   }) => http
       .get(
-        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+        Uri.parse(_url(endpoint, baseUrl)),
         headers: _headers(headers, token),
       )
       .timeout(timeout ?? _timeout);
@@ -46,9 +53,10 @@ class ApiClient {
     Map<String, String>? headers,
     String? token,
     Duration? timeout,
+    String? baseUrl,
   }) => http
       .post(
-        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+        Uri.parse(_url(endpoint, baseUrl)),
         headers: _headers(headers, token),
         body: body != null ? json.encode(body) : null,
       )
@@ -60,9 +68,10 @@ class ApiClient {
     Map<String, String>? headers,
     String? token,
     Duration? timeout,
+    String? baseUrl,
   }) => http
       .put(
-        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+        Uri.parse(_url(endpoint, baseUrl)),
         headers: _headers(headers, token),
         body: body != null ? json.encode(body) : null,
       )
@@ -74,9 +83,10 @@ class ApiClient {
     Map<String, String>? headers,
     String? token,
     Duration? timeout,
+    String? baseUrl,
   }) => http
       .patch(
-        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+        Uri.parse(_url(endpoint, baseUrl)),
         headers: _headers(headers, token),
         body: body != null ? json.encode(body) : null,
       )
@@ -87,9 +97,10 @@ class ApiClient {
     Map<String, String>? headers,
     String? token,
     Duration? timeout,
+    String? baseUrl,
   }) => http
       .delete(
-        Uri.parse('${ApiConfig.baseUrl}$endpoint'),
+        Uri.parse(_url(endpoint, baseUrl)),
         headers: _headers(headers, token),
       )
       .timeout(timeout ?? _timeout);
@@ -97,8 +108,9 @@ class ApiClient {
   static String buildWebSocketUrl(
     String endpoint, {
     Map<String, String>? queryParams,
+    String? baseUrl,
   }) {
-    final wsUrl = ApiConfig.baseUrl
+    final wsUrl = (baseUrl ?? ApiConfig.baseUrl)
         .replaceFirst('http://', 'ws://')
         .replaceFirst('https://', 'wss://');
     if (queryParams == null || queryParams.isEmpty) return '$wsUrl$endpoint';

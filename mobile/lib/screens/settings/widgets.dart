@@ -7,14 +7,11 @@ extension _SettingsWidgets on _SettingsScreenState {
     padding: const EdgeInsets.all(16),
     child: Row(
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(AppIcons.account, color: cs.onPrimaryContainer, size: 24),
+        AppIconBox(
+          icon: AppIcons.account,
+          size: 48,
+          background: cs.primaryContainer,
+          foreground: cs.onPrimaryContainer,
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -55,15 +52,7 @@ extension _SettingsWidgets on _SettingsScreenState {
     ),
   );
 
-  Widget _iconBox(IconData icon, ColorScheme cs) => Container(
-    width: 36,
-    height: 36,
-    decoration: BoxDecoration(
-      color: cs.primaryContainer,
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Icon(icon, color: cs.onPrimaryContainer, size: 18),
-  );
+  Widget _iconBox(IconData icon) => AppIconBox(icon: icon, size: 36);
 
   Widget _divider(ColorScheme cs, {double indent = 56, double endIndent = 0}) =>
       Divider(
@@ -87,7 +76,7 @@ extension _SettingsWidgets on _SettingsScreenState {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            _iconBox(icon, cs),
+            _iconBox(icon),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -121,18 +110,11 @@ extension _SettingsWidgets on _SettingsScreenState {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: cs.errorContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  AppIcons.exitToApp,
-                  color: cs.onErrorContainer,
-                  size: 18,
-                ),
+              AppIconBox(
+                icon: AppIcons.exitToApp,
+                size: 36,
+                background: cs.errorContainer,
+                foreground: cs.onErrorContainer,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -171,7 +153,7 @@ extension _SettingsWidgets on _SettingsScreenState {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  _iconBox(AppIcons.palette, cs),
+                  _iconBox(AppIcons.palette),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(

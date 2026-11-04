@@ -36,7 +36,7 @@ extension _SftpUi on _SftpRendererState {
       decoration: BoxDecoration(
         color: cs.surface,
         border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+          bottom: BorderSide(color: appBorderColor(cs), width: 0.5),
         ),
       ),
       child: Row(
@@ -71,12 +71,16 @@ extension _SftpUi on _SftpRendererState {
       decoration: BoxDecoration(
         color: cs.primaryContainer,
         border: Border(
-          bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+          bottom: BorderSide(color: appBorderColor(cs), width: 0.5),
         ),
       ),
       child: Row(
         children: [
-          IconButton(icon: Icon(AppIcons.close), onPressed: _cancelSelection),
+          IconButton(
+            icon: Icon(AppIcons.close),
+            onPressed: _cancelSelection,
+            tooltip: 'Cancel selection',
+          ),
           Text(
             '${_selectedIndices.length} selected',
             style: TextStyle(
@@ -129,7 +133,7 @@ extension _SftpUi on _SftpRendererState {
         color: theme.colorScheme.surfaceContainerHighest,
         border: Border(
           bottom: BorderSide(
-            color: theme.colorScheme.outlineVariant,
+            color: appBorderColor(theme.colorScheme),
             width: 0.5,
           ),
         ),
@@ -223,6 +227,7 @@ extension _SftpUi on _SftpRendererState {
             icon: Icon(AppIcons.close, size: 18),
             onPressed: () => setState(() => _errorMessage = null),
             color: Theme.of(context).colorScheme.onErrorContainer,
+            tooltip: 'Dismiss error',
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -248,24 +253,10 @@ extension _SftpUi on _SftpRendererState {
             physics: const AlwaysScrollableScrollPhysics(),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      AppIcons.folderOpen,
-                      size: 64,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Empty directory',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
+              child: const AppEmptyState(
+                icon: AppIcons.folderOpen,
+                title: 'Empty directory',
+                message: 'Upload files or create a folder with the + button',
               ),
             ),
           ),
@@ -278,8 +269,13 @@ extension _SftpUi on _SftpRendererState {
       child: ListView.builder(
         key: PageStorageKey<String>('sftp-list-$_sessionId-$_listedPath'),
         controller: _scrollController,
-        // Keep the last entry (and its menu) clear of the floating + button.
-        padding: EdgeInsets.only(bottom: _selectionMode ? 16 : 16 + 56 + 16),
+        // Keep the last entry (and its menu) clear of the floating + button
+        // and the system gesture inset.
+        padding: EdgeInsets.only(
+          bottom:
+              (_selectionMode ? 16 : 16 + 56 + 16) +
+              MediaQuery.paddingOf(context).bottom,
+        ),
         itemCount: _entries.length,
         itemBuilder: (ctx, index) => _buildEntryTile(index),
       ),
@@ -289,96 +285,91 @@ extension _SftpUi on _SftpRendererState {
   Widget _buildEntryTile(int index) {
     final entry = _entries[index];
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
     final isSelected = _selectedIndices.contains(index);
     final isDimmed =
         entry.name.startsWith('.') && widget.sftpSettings.dimHiddenFiles;
+    final baseIconColor = _getFileIconColor(entry, theme);
+    final iconColor = isDimmed
+        ? baseIconColor.withValues(alpha: 0.55)
+        : baseIconColor;
+    final nameColor = cs.onSurface.withValues(alpha: isDimmed ? 0.55 : 1);
+    final detailColor = cs.outline.withValues(alpha: isDimmed ? 0.55 : 1);
 
     return Material(
       color: isSelected
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
+          ? cs.primaryContainer.withValues(alpha: 0.3)
           : Colors.transparent,
       child: InkWell(
         onTap: () => _onEntryTap(entry, index),
         onLongPress: () => _onEntryLongPress(index),
-        child: Opacity(
-          opacity: isDimmed ? 0.55 : 1.0,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                if (_selectionMode)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Icon(
-                      isSelected
-                          ? AppIcons.checkboxMarked
-                          : AppIcons.checkboxBlankOutline,
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outline,
-                      size: 22,
-                    ),
-                  ),
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: _getFileIconColor(
-                      entry,
-                      theme,
-                    ).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              if (_selectionMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
                   child: Icon(
-                    _getFileIcon(entry),
-                    color: _getFileIconColor(entry, theme),
+                    isSelected
+                        ? AppIcons.checkboxMarked
+                        : AppIcons.checkboxBlankOutline,
+                    color: isSelected ? cs.primary : detailColor,
                     size: 22,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        entry.name,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        [
-                          if (!entry.isDir) entry.formattedSize,
-                          if (entry.mtime > 0) _formatDate(entry.modifiedDate),
-                        ].join(' • '),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.outline,
-                        ),
-                      ),
-                    ],
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: baseIconColor.withValues(
+                    alpha: isDimmed ? 0.07 : 0.12,
                   ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                if (!_selectionMode)
-                  IconButton(
-                    icon: Icon(
-                      AppIcons.dotsVertical,
-                      color: theme.colorScheme.outline,
-                      size: 20,
+                child: Icon(_getFileIcon(entry), color: iconColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      entry.name,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: nameColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    onPressed: () => _showEntryActions(entry),
-                    visualDensity: VisualDensity.compact,
-                  ),
-                if (!_selectionMode && entry.isDir)
-                  Icon(
-                    AppIcons.chevronRight,
-                    color: theme.colorScheme.outline,
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (!entry.isDir) entry.formattedSize,
+                        if (entry.mtime > 0) _formatDate(entry.modifiedDate),
+                      ].join(' • '),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: detailColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!_selectionMode)
+                IconButton(
+                  icon: Icon(
+                    AppIcons.dotsVertical,
+                    color: detailColor,
                     size: 20,
                   ),
-              ],
-            ),
+                  onPressed: () => _showEntryActions(entry),
+                  tooltip: 'File actions',
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (!_selectionMode && entry.isDir)
+                Icon(AppIcons.chevronRight, color: detailColor, size: 20),
+            ],
           ),
         ),
       ),

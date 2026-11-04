@@ -114,6 +114,9 @@ class AppSession {
 class SessionManager extends ChangeNotifier {
   final Map<String, AppSession> _sessions = {};
   String? _activeSessionId;
+  bool _restoring = false;
+  String? _pendingRestoreToken;
+  int _restoreGeneration = 0;
 
   List<AppSession> get sessions => _sessions.values.toList();
   int get sessionCount => _sessions.length;
@@ -350,8 +353,29 @@ class SessionManager extends ChangeNotifier {
   }
 
   Future<void> restoreSessions({required String token}) async {
+    // Rapid app resumes (and account switches) can overlap. Queue the newest
+    // request instead of dropping it: after an account switch the previous
+    // restore may still be running, and skipping the new token would leave
+    // the new instance without its sessions.
+    _pendingRestoreToken = token;
+    if (_restoring) return;
+    _restoring = true;
+    try {
+      while (_pendingRestoreToken != null) {
+        final nextToken = _pendingRestoreToken!;
+        _pendingRestoreToken = null;
+        await _restoreOnce(nextToken);
+      }
+    } finally {
+      _restoring = false;
+    }
+  }
+
+  Future<void> _restoreOnce(String token) async {
+    final generation = _restoreGeneration;
     try {
       final serverSessions = await ConnectionService.listSessions(token: token);
+      if (generation != _restoreGeneration) return;
       if (serverSessions.isEmpty) return;
 
       // Only sessions that are neither open locally nor hibernated need their
@@ -382,6 +406,9 @@ class SessionManager extends ChangeNotifier {
           }
         }),
       );
+      // An account switch may have discarded everything while the entries
+      // were loading. Do not resurrect the old instance's sessions.
+      if (generation != _restoreGeneration) return;
 
       for (final sData in serverSessions) {
         final sessionId = sData['sessionId'] as String?;
@@ -643,6 +670,16 @@ class SessionManager extends ChangeNotifier {
         ),
         headers: {'User-Agent': ApiClient.userAgent},
       );
+      // `connect` is lazy: without awaiting `ready` a dead server would still
+      // look like a successful reconnect and the retry limit never trips.
+      try {
+        await channel.ready.timeout(const Duration(seconds: 10));
+      } catch (_) {
+        try {
+          await channel.sink.close();
+        } catch (_) {}
+        return false;
+      }
 
       session.termChannel = channel;
       session.identityId = identityId;
@@ -675,6 +712,14 @@ class SessionManager extends ChangeNotifier {
         ),
         headers: {'User-Agent': ApiClient.userAgent},
       );
+      try {
+        await channel.ready.timeout(const Duration(seconds: 10));
+      } catch (_) {
+        try {
+          await channel.sink.close();
+        } catch (_) {}
+        return false;
+      }
 
       session.sftpChannel = channel;
       notifyListeners();
@@ -705,6 +750,8 @@ class SessionManager extends ChangeNotifier {
   }
 
   Future<void> closeAll(String token) async {
+    _restoreGeneration++;
+    _pendingRestoreToken = null;
     final ids = _sessions.keys.toList();
     for (final id in ids) {
       final session = _sessions[id];
@@ -726,6 +773,8 @@ class SessionManager extends ChangeNotifier {
   /// token. They remain on the old instance and are restored when the user
   /// switches back.
   void discardAll() {
+    _restoreGeneration++;
+    _pendingRestoreToken = null;
     for (final session in _sessions.values) {
       _disconnectSession(session);
     }

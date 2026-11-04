@@ -16,8 +16,9 @@ Future<Map<String, dynamic>?> showQuickConnectSheet(
   return showModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
+    useRootNavigator: true,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.sheet)),
     ),
     builder: (_) => QuickConnectSheet(server: server),
   );

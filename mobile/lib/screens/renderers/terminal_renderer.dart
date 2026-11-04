@@ -20,6 +20,7 @@ import '../../utils/terminal_graphics.dart';
 import '../../utils/terminal_image_fetch.dart';
 import '../../utils/terminal_key_input.dart';
 import '../../utils/terminal_settings.dart';
+import '../../widgets/app_ui.dart';
 import '../widgets/ai_assistant_sheet.dart';
 import '../widgets/connection_loader.dart';
 import 'password_fill_hint.dart';
@@ -70,6 +71,7 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   late TerminalGraphicsProcessor _graphics;
   final Map<String, Timer> _arrowRepeatTimers = {};
   int _reconnectAttempts = 0;
+  bool _reconnecting = false;
   static const int _maxReconnectAttempts = 5;
   static const Duration _arrowRepeatDelay = Duration(milliseconds: 400);
   static const Duration _arrowRepeatInterval = Duration(milliseconds: 80);
@@ -197,6 +199,9 @@ class _TerminalRendererState extends State<TerminalRenderer> {
     if (widget.session.termSubscription == null) {
       widget.session.termSubscription = _channel?.stream.listen(
         (data) {
+          // Only real data proves the reconnect worked; resetting the counter
+          // on a successful socket handshake would retry forever.
+          _reconnectAttempts = 0;
           if (!_receivedData && mounted) {
             setState(() => _receivedData = true);
           }
@@ -227,7 +232,12 @@ class _TerminalRendererState extends State<TerminalRenderer> {
         },
         onDone: () {
           _stopAllArrowRepeats();
-          if (mounted) setState(() => _connected = false);
+          if (mounted) {
+            setState(() {
+              _connected = false;
+              _errorMessage ??= 'Connection lost. Reconnecting...';
+            });
+          }
           widget.session.isConnected = false;
           unawaited(_attemptReconnect());
         },
@@ -235,7 +245,6 @@ class _TerminalRendererState extends State<TerminalRenderer> {
 
       if (mounted) setState(() => _connected = true);
       widget.session.isConnected = true;
-      _reconnectAttempts = 0;
 
       Future.delayed(const Duration(milliseconds: 100), () {
         if (_channel == null) return;
@@ -267,40 +276,45 @@ class _TerminalRendererState extends State<TerminalRenderer> {
   /// backoff. On success the stream state is reset (fresh size handshake,
   /// cleared prompt tracking) and the identity list is refreshed.
   Future<void> _attemptReconnect() async {
-    if (!mounted || _reconnectAttempts >= _maxReconnectAttempts) {
-      widget.onDisconnected?.call();
-      return;
-    }
+    // `onError` and `onDone` both fire for the same dropped connection; without
+    // this guard they start two reconnect loops in parallel.
+    if (!mounted || _reconnecting) return;
+    _reconnecting = true;
+    try {
+      while (mounted && _reconnectAttempts < _maxReconnectAttempts) {
+        _reconnectAttempts++;
+        final delay = Duration(seconds: _reconnectAttempts.clamp(1, 5));
+        await Future.delayed(delay);
 
-    _reconnectAttempts++;
-    final delay = Duration(seconds: _reconnectAttempts.clamp(1, 5));
-    await Future.delayed(delay);
+        if (!mounted) return;
 
-    if (!mounted) return;
+        final success = await widget.sessionManager.reconnectTerminalSession(
+          token: widget.token,
+          session: widget.session,
+        );
 
-    final success = await widget.sessionManager.reconnectTerminalSession(
-      token: widget.token,
-      session: widget.session,
-    );
+        if (!mounted) return;
 
-    if (!mounted) return;
-
-    if (success) {
-      _initialized = false;
-      _resetGraphicsProcessor();
-      widget.session.termSubscription = null;
-      // Fresh stream: drop prompt tracking so a stale hint cannot submit
-      // into the new shell, then refresh the identity list.
-      _promptLine = '';
-      _hidePasswordHint();
-      unawaited(_loadPasswordIdentities());
-      setState(() {
-        _errorMessage = null;
-        _receivedData = false;
-      });
-      _setupTerminal();
-    } else {
-      unawaited(_attemptReconnect());
+        if (success) {
+          _initialized = false;
+          _resetGraphicsProcessor();
+          widget.session.termSubscription = null;
+          // Fresh stream: drop prompt tracking so a stale hint cannot submit
+          // into the new shell, then refresh the identity list.
+          _promptLine = '';
+          _hidePasswordHint();
+          unawaited(_loadPasswordIdentities());
+          setState(() {
+            _errorMessage = null;
+            _receivedData = false;
+          });
+          _setupTerminal();
+          return;
+        }
+      }
+      if (mounted) widget.onDisconnected?.call();
+    } finally {
+      _reconnecting = false;
     }
   }
 

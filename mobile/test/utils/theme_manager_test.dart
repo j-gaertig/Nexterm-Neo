@@ -156,7 +156,10 @@ void main() {
     final data = ThemeManager(ThemeMode.dark).darkTheme();
     expect(data.dividerTheme.color, isNull);
     expect(data.dialogTheme.shape, isNull);
-    expect(data.bottomSheetTheme.shape, isNull);
+    // Bottom sheets share one rounded shape; it must not draw a border.
+    final sheetShape = data.bottomSheetTheme.shape;
+    expect(sheetShape, isA<RoundedRectangleBorder>());
+    expect((sheetShape! as RoundedRectangleBorder).side, BorderSide.none);
     expect(data.popupMenuTheme.shape, isNull);
     expect(data.cardTheme.shape, isNull);
   });
