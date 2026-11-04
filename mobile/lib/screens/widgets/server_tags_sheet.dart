@@ -15,6 +15,7 @@ Future<bool?> showServerTagsSheet(
 }) {
   return showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) => ServerTagsSheet(server: server, token: token),

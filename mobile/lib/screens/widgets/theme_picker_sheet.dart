@@ -16,6 +16,7 @@ Future<void> showThemePickerSheet(
 ) {
   return showModalBottomSheet<void>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,

@@ -23,6 +23,10 @@ class TabCrossfade extends StatefulWidget {
   /// Called when a swipe commits to a different page.
   final ValueChanged<int>? onSwipeIndexChanged;
 
+  /// Receives the fractional page index while a swipe is in progress so a
+  /// tab bar can follow the gesture.
+  final ValueNotifier<double>? swipeProgress;
+
   const TabCrossfade({
     super.key,
     required this.index,
@@ -30,6 +34,7 @@ class TabCrossfade extends StatefulWidget {
     this.duration = const Duration(milliseconds: 240),
     this.swipeEnabled = false,
     this.onSwipeIndexChanged,
+    this.swipeProgress,
   });
 
   @override
@@ -77,6 +82,7 @@ class _TabCrossfadeState extends State<TabCrossfade>
       duration: const Duration(milliseconds: 220),
     );
     _animations = Listenable.merge([_controller, _drag]);
+    _drag.addListener(_publishSwipeProgress);
   }
 
   @override
@@ -152,6 +158,15 @@ class _TabCrossfadeState extends State<TabCrossfade>
     } else {
       _controller.forward(from: 0.0);
     }
+  }
+
+  void _publishSwipeProgress() {
+    final notifier = widget.swipeProgress;
+    if (notifier == null) return;
+    final target = _dragTarget;
+    notifier.value = target == null
+        ? _pageIndex.toDouble()
+        : _pageIndex + _dragDirection * _drag.value;
   }
 
   void _handleAnimationStatus(AnimationStatus status) {

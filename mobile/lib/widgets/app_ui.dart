@@ -19,6 +19,14 @@ class AppRadii {
   static const double sheet = 20;
 }
 
+/// Calmer stand-in for the solid accent colour on large surfaces (buttons,
+/// the add action). The accent is mixed into a neutral raised surface, so every
+/// theme keeps its hue without shouting.
+Color mutedAccent(ColorScheme cs, {double amount = 0.3}) => Color.alphaBlend(
+  cs.primary.withValues(alpha: amount),
+  cs.surfaceContainerHighest,
+);
+
 /// The one border colour used for cards, tiles and dividers. It is a soft
 /// outline: visible against the page, but never as heavy as a raw
 /// `outlineVariant`.

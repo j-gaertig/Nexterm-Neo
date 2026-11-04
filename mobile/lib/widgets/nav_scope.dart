@@ -11,11 +11,18 @@ Future<T?> pushPage<T>(
   WidgetBuilder builder, {
   bool showNavBar = true,
 }) {
-  return Navigator.of(
-    context,
-    rootNavigator: !showNavBar,
-  ).push<T>(MaterialPageRoute<T>(builder: builder));
+  return Navigator.of(context, rootNavigator: !showNavBar).push<T>(
+    MaterialPageRoute<T>(
+      // Only a tab's root page owns the tab's scroll-to-top controller.
+      builder: (ctx) => PrimaryScrollController.none(child: builder(ctx)),
+    ),
+  );
 }
+
+/// Pushes a full-screen page that covers the navigation bar (editors, sign-in
+/// flows, cameras).
+Future<T?> pushFullScreen<T>(BuildContext context, WidgetBuilder builder) =>
+    pushPage<T>(context, builder, showNavBar: false);
 
 /// Hosts a tab's page in its own [Navigator].
 ///

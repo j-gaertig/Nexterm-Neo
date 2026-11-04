@@ -16,6 +16,7 @@ Future<ScriptSheetResult?> showScriptPromptSheet(
 ) {
   return showModalBottomSheet<ScriptSheetResult>(
     context: context,
+    useRootNavigator: true,
     isDismissible: false,
     enableDrag: false,
     isScrollControlled: true,

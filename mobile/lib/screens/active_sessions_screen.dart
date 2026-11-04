@@ -88,6 +88,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
   bool _closingAll = false;
   final Map<String, GlobalKey> _previewKeys = {};
   final Map<String, Uint8List> _previews = {};
+  final ScrollController _overviewScroll = ScrollController();
 
   Size get _effectivePillSize =>
       _pillSize.isEmpty ? _fallbackPillSize : _pillSize;
@@ -108,8 +109,19 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
     widget.aiManager.addListener(_onChanged);
   }
 
+  /// Scrolls the sessions overview back to the top.
+  void scrollOverviewToTop() {
+    if (!_overviewScroll.hasClients || _overviewScroll.offset <= 0) return;
+    _overviewScroll.animateTo(
+      0,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   void dispose() {
+    _overviewScroll.dispose();
     widget.sessionManager.removeListener(_onChanged);
     widget.aiManager.removeListener(_onChanged);
     super.dispose();
@@ -320,6 +332,7 @@ class ActiveSessionsScreenState extends State<ActiveSessionsScreen> {
                       previews: _previews,
                       onOpenSession: _openSession,
                       onCloseSession: _closeSession,
+                      scrollController: _overviewScroll,
                     ),
                   ],
                 ),

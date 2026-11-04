@@ -57,6 +57,15 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   final _monitoringKey = GlobalKey<MonitoringScreenState>();
   final _sessionsKey = GlobalKey<ActiveSessionsScreenState>();
   final _serversKey = GlobalKey<ServersScreenState>();
+
+  /// Scroll-to-top controllers of the tabs' root pages.
+  final _serversScroll = ScrollController();
+  final _monitoringScroll = ScrollController();
+  final _settingsScroll = ScrollController();
+
+  /// Fractional page index while swiping, mirrored by the navigation bar.
+  final _swipeProgress = ValueNotifier<double>(0);
+
   final _serversNavKey = GlobalKey<NavigatorState>();
   final _settingsNavKey = GlobalKey<NavigatorState>();
 
@@ -70,6 +79,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   void dispose() {
     widget.sessionManager.removeListener(_onSessionsChanged);
+    _serversScroll.dispose();
+    _monitoringScroll.dispose();
+    _settingsScroll.dispose();
+    _swipeProgress.dispose();
     super.dispose();
   }
 
@@ -102,15 +115,41 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       }
       // Pressing the Sessions destination again always returns to the
       // overview instead of re-opening the last session.
-      if (index == 1 && _openSessionId != null) {
-        setState(() => _openSessionId = null);
+      if (_hasSessions && index == 1) {
+        if (_openSessionId != null) {
+          setState(() => _openSessionId = null);
+        } else {
+          _sessionsKey.currentState?.scrollOverviewToTop();
+        }
+        return;
       }
+      // Already at the root of this tab: jump back to the top of the list.
+      _scrollToTop(_scrollControllerFor(index));
       return;
     }
     setState(() {
       _selectedIndex = index;
       _openSessionId = null;
     });
+  }
+
+  ScrollController? _scrollControllerFor(int index) {
+    if (index == 0) return _serversScroll;
+    if (index == monitoringIndex) return _monitoringScroll;
+    if (index == _lastTabIndex) return _settingsScroll;
+    return null;
+  }
+
+  void _scrollToTop(ScrollController? controller) {
+    if (controller == null) return;
+    for (final position in controller.positions) {
+      if (position.pixels <= 0) continue;
+      position.animateTo(
+        0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _openSession(String sessionId) {
@@ -196,17 +235,20 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final List<Widget> pages = [
       KeyedSubtree(
         key: const ValueKey('tab-page-servers'),
-        child: TabNavigator(
-          navigatorKey: _serversNavKey,
-          builder: (_) => ServersScreen(
-            key: _serversKey,
-            authManager: widget.authManager,
-            snippetManager: widget.snippetManager,
-            sessionManager: widget.sessionManager,
-            serverViewSettings: widget.serverViewSettings,
-            onSessionOpened: (sessionId) {
-              if (_hasSessions) _openSession(sessionId);
-            },
+        child: PrimaryScrollController(
+          controller: _serversScroll,
+          child: TabNavigator(
+            navigatorKey: _serversNavKey,
+            builder: (_) => ServersScreen(
+              key: _serversKey,
+              authManager: widget.authManager,
+              snippetManager: widget.snippetManager,
+              sessionManager: widget.sessionManager,
+              serverViewSettings: widget.serverViewSettings,
+              onSessionOpened: (sessionId) {
+                if (_hasSessions) _openSession(sessionId);
+              },
+            ),
           ),
         ),
       ),
@@ -230,23 +272,29 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         ),
       KeyedSubtree(
         key: const ValueKey('tab-page-monitoring'),
-        child: MonitoringScreen(
-          key: _monitoringKey,
-          authManager: widget.authManager,
+        child: PrimaryScrollController(
+          controller: _monitoringScroll,
+          child: MonitoringScreen(
+            key: _monitoringKey,
+            authManager: widget.authManager,
+          ),
         ),
       ),
       KeyedSubtree(
         key: const ValueKey('tab-page-settings'),
-        child: TabNavigator(
-          navigatorKey: _settingsNavKey,
-          builder: (_) => SettingsScreen(
-            themeManager: widget.themeManager,
-            authManager: widget.authManager,
-            terminalSettings: widget.terminalSettings,
-            sftpSettings: widget.sftpSettings,
-            serverViewSettings: widget.serverViewSettings,
-            screenLockSettings: widget.screenLockSettings,
-            screenLockService: widget.screenLockService,
+        child: PrimaryScrollController(
+          controller: _settingsScroll,
+          child: TabNavigator(
+            navigatorKey: _settingsNavKey,
+            builder: (_) => SettingsScreen(
+              themeManager: widget.themeManager,
+              authManager: widget.authManager,
+              terminalSettings: widget.terminalSettings,
+              sftpSettings: widget.sftpSettings,
+              serverViewSettings: widget.serverViewSettings,
+              screenLockSettings: widget.screenLockSettings,
+              screenLockService: widget.screenLockService,
+            ),
           ),
         ),
       ),
@@ -361,6 +409,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                               // open. The edge destinations only move inwards.
                               swipeEnabled: showNavigationBar && !isInSession,
                               onSwipeIndexChanged: _switchTab,
+                              swipeProgress: _swipeProgress,
                               children: pages,
                             );
                             if (showAttentionBanner) {
@@ -421,6 +470,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     return FloatingNavigationBar(
       selectedIndex: _selectedIndex,
       onDestinationSelected: _switchTab,
+      onSelectedDestinationTapped: () => _switchTab(_selectedIndex),
+      liveIndex: _swipeProgress,
       trailing: _buildNavigationAction(),
       destinations: _destinations(hasSessions),
     );

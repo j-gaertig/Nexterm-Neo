@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'app_ui.dart';
 
 /// A destination shown in the [FloatingNavigationBar].
 class FloatingNavigationDestination {
@@ -101,12 +104,21 @@ class FloatingNavigationBar extends StatefulWidget {
   /// Optional action shown to the right of the bar at the same height.
   final Widget? trailing;
 
+  /// Called when the already selected destination is tapped again.
+  final VoidCallback? onSelectedDestinationTapped;
+
+  /// Fractional destination index while the user swipes between pages. When it
+  /// changes, the selection capsule follows the finger live.
+  final ValueListenable<double>? liveIndex;
+
   const FloatingNavigationBar({
     super.key,
     required this.selectedIndex,
     required this.onDestinationSelected,
     required this.destinations,
     this.trailing,
+    this.onSelectedDestinationTapped,
+    this.liveIndex,
   });
 
   @override
@@ -136,6 +148,7 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
     super.initState();
     _indicator = AnimationController.unbounded(vsync: this)
       ..value = widget.selectedIndex.toDouble();
+    widget.liveIndex?.addListener(_onLiveIndex);
   }
 
   @override
@@ -147,9 +160,21 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
     }
   }
 
+  void _onLiveIndex() {
+    final value = widget.liveIndex?.value;
+    if (value == null || _dragging) return;
+    final max = (_destinationCount - 1).toDouble();
+    _indicator.stop();
+    _indicator.value = value.clamp(0.0, max < 0 ? 0.0 : max);
+  }
+
   @override
   void didUpdateWidget(FloatingNavigationBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.liveIndex != widget.liveIndex) {
+      oldWidget.liveIndex?.removeListener(_onLiveIndex);
+      widget.liveIndex?.addListener(_onLiveIndex);
+    }
 
     if (oldWidget.destinations.length != widget.destinations.length) {
       // The sessions destination can appear or disappear. Snap to the real
@@ -176,7 +201,11 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
   }
 
   void _handleTap(int index) {
-    if (index == widget.selectedIndex) return;
+    if (index == widget.selectedIndex) {
+      HapticFeedback.selectionClick();
+      widget.onSelectedDestinationTapped?.call();
+      return;
+    }
     HapticFeedback.selectionClick();
     widget.onDestinationSelected(index);
   }
@@ -237,6 +266,7 @@ class _FloatingNavigationBarState extends State<FloatingNavigationBar>
 
   @override
   void dispose() {
+    widget.liveIndex?.removeListener(_onLiveIndex);
     _indicator.dispose();
     super.dispose();
   }
@@ -441,8 +471,8 @@ class FloatingNavigationAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final background = destructive ? cs.error : cs.primary;
-    final foreground = destructive ? cs.onError : cs.onPrimary;
+    final background = destructive ? cs.error : mutedAccent(cs);
+    final foreground = destructive ? cs.onError : cs.onSurface;
 
     return Semantics(
       container: true,

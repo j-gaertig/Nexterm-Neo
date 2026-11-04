@@ -459,6 +459,7 @@ class _GuacamoleRendererState extends State<GuacamoleRenderer> {
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),

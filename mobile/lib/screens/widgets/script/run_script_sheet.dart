@@ -29,6 +29,7 @@ Future<RunScriptSelection?> showRunScriptSheet(
 }) {
   return showModalBottomSheet<RunScriptSelection>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     isDismissible: true,

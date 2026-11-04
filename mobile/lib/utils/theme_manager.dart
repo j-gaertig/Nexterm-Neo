@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../widgets/app_ui.dart';
 import 'app_themes.dart';
 
 class ThemeManager extends ChangeNotifier {
@@ -112,6 +113,18 @@ class ThemeManager extends ChangeNotifier {
         surfaceTintColor: Colors.transparent,
       ),
       // One snackbar style everywhere: floating, rounded, never full-width.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: mutedAccent(scheme),
+          foregroundColor: scheme.onSurface,
+          disabledBackgroundColor: scheme.surfaceContainerHigh,
+          disabledForegroundColor: scheme.onSurface.withValues(alpha: 0.38),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: mutedAccent(scheme),
+        foregroundColor: scheme.onSurface,
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: scheme.inverseSurface,

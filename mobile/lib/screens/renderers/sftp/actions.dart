@@ -48,6 +48,7 @@ extension _SftpActions on _SftpRendererState {
     final sheetSid = _sessionId;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -209,6 +210,7 @@ extension _SftpActions on _SftpRendererState {
     final menuSid = _sessionId;
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

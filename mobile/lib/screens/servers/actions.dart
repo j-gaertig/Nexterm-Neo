@@ -335,7 +335,7 @@ extension _ServersActions on ServersScreenState {
     if (token == null) return;
     if (!mounted) return;
     final parent = _parentFolderOf(server.id);
-    final changed = await pushPage(
+    final changed = await pushFullScreen(
       context,
       (_) => ServerEditorScreen(
         token: token,
@@ -509,6 +509,7 @@ extension _ServersActions on ServersScreenState {
     }
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

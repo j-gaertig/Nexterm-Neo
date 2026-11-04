@@ -17,6 +17,7 @@ Future<int?> showIdentityPickerSheet(
 }) {
   return showModalBottomSheet<int>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) =>

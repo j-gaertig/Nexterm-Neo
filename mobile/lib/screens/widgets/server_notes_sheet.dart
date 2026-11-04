@@ -14,6 +14,7 @@ Future<bool?> showServerNotesSheet(
 }) {
   return showModalBottomSheet<bool>(
     context: context,
+    useRootNavigator: true,
     isScrollControlled: true,
     useSafeArea: true,
     builder: (_) => ServerNotesSheet(server: server, token: token),

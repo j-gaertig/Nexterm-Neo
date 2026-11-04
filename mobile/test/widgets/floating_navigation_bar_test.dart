@@ -1,8 +1,10 @@
 import 'dart:ui' show Tristate;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nexterm/utils/app_icons.dart';
+import 'package:nexterm/widgets/app_ui.dart';
 import 'package:nexterm/widgets/floating_navigation_bar.dart';
 
 const _destinations = [
@@ -20,6 +22,7 @@ const _destinations = [
 ];
 
 void main() {
+  _extraTests();
   testWidgets('renders destinations and marks the active one', (tester) async {
     await _pumpBar(tester, selectedIndex: 2);
 
@@ -226,8 +229,10 @@ void main() {
     final cs = Theme.of(
       tester.element(find.byTooltip('Add server')),
     ).colorScheme;
-    expect(material.color, cs.primary);
-    expect(tester.widget<Icon>(find.byIcon(AppIcons.plus)).color, cs.onPrimary);
+    // The add action uses a calmer, muted accent instead of the solid one.
+    expect(material.color, mutedAccent(cs));
+    expect(material.color, isNot(cs.primary));
+    expect(tester.widget<Icon>(find.byIcon(AppIcons.plus)).color, cs.onSurface);
     expect(material.elevation, 6);
     expect(
       material.borderRadius,
@@ -265,6 +270,49 @@ void main() {
   });
 }
 
+void _extraTests() {
+  testWidgets('tapping the selected destination reports it', (tester) async {
+    var selectedTaps = 0;
+    var changes = 0;
+    await _pumpBar(
+      tester,
+      selectedIndex: 0,
+      onSelectedTapped: () => selectedTaps++,
+      onDestinationSelected: (_) => changes++,
+    );
+
+    await tester.tap(find.byTooltip(_destinations.first.label).first);
+    await tester.pump();
+
+    expect(selectedTaps, 1);
+    expect(changes, 0);
+  });
+
+  testWidgets('the capsule follows the live swipe progress', (tester) async {
+    final progress = ValueNotifier<double>(0);
+    addTearDown(progress.dispose);
+    await _pumpBar(tester, selectedIndex: 0, liveIndex: progress);
+
+    final start = tester.getTopLeft(
+      find.byKey(FloatingNavigationBar.indicatorKey),
+    );
+    progress.value = 0.5;
+    await tester.pump();
+    final half = tester.getTopLeft(
+      find.byKey(FloatingNavigationBar.indicatorKey),
+    );
+    progress.value = 1;
+    await tester.pump();
+    final full = tester.getTopLeft(
+      find.byKey(FloatingNavigationBar.indicatorKey),
+    );
+
+    expect(half.dx, greaterThan(start.dx));
+    expect(full.dx, greaterThan(half.dx));
+    expect(half.dx - start.dx, closeTo((full.dx - start.dx) / 2, 0.5));
+  });
+}
+
 Future<void> _pumpBar(
   WidgetTester tester, {
   required int selectedIndex,
@@ -272,6 +320,8 @@ Future<void> _pumpBar(
   ValueChanged<int>? onDestinationSelected,
   bool disableAnimations = false,
   Widget? trailing,
+  VoidCallback? onSelectedTapped,
+  ValueListenable<double>? liveIndex,
 }) async {
   final ValueChanged<int> onSelected = onDestinationSelected ?? (int _) {};
   final bar = FloatingNavigationBar(
@@ -279,6 +329,8 @@ Future<void> _pumpBar(
     onDestinationSelected: onSelected,
     destinations: destinations,
     trailing: trailing,
+    onSelectedDestinationTapped: onSelectedTapped,
+    liveIndex: liveIndex,
   );
 
   await tester.pumpWidget(

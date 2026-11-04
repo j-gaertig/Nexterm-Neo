@@ -6,6 +6,7 @@ import '../../utils/server_field_config.dart';
 Future<String?> showServerProtocolSheet(BuildContext context) {
   return showModalBottomSheet<String>(
     context: context,
+    useRootNavigator: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

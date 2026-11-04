@@ -21,12 +21,16 @@ class SessionsOverviewScreen extends StatelessWidget {
   final ValueChanged<String> onOpenSession;
   final ValueChanged<String> onCloseSession;
 
+  /// Lets the shell scroll the overview back to the top.
+  final ScrollController? scrollController;
+
   const SessionsOverviewScreen({
     super.key,
     required this.sessionManager,
     required this.previews,
     required this.onOpenSession,
     required this.onCloseSession,
+    this.scrollController,
   });
 
   @override
@@ -86,6 +90,7 @@ class SessionsOverviewScreen extends StatelessWidget {
             8;
 
         return GridView.builder(
+          controller: scrollController,
           padding: EdgeInsets.fromLTRB(
             horizontalPadding,
             4,

@@ -402,7 +402,7 @@ class ServersScreenState extends State<ServersScreen> {
     final protocol = await showServerProtocolSheet(context);
     if (protocol == null || !mounted) return;
     final contextFolder = inFolder ?? _expandedFolderContext();
-    final changed = await pushPage(
+    final changed = await pushFullScreen(
       context,
       (_) => ServerEditorScreen(
         token: token,
