@@ -70,7 +70,7 @@ extension _SettingsSections on _SettingsScreenState {
           'Authorize Login',
           'Approve a web login with a QR code',
           cs,
-          () => pushFullScreen(
+          () => pushPage(
             context,
             (_) => QrScannerScreen(authManager: widget.authManager),
           ),
@@ -95,7 +95,7 @@ extension _SettingsSections on _SettingsScreenState {
                   _iconBox(AppIcons.themeLightDark),
                   const SizedBox(width: 12),
                   const Expanded(
-                    child: Text('Theme', style: TextStyle(fontSize: 15)),
+                    child: Text('Mode', style: TextStyle(fontSize: 15)),
                   ),
                   SegmentedButton<ThemeMode>(
                     segments: const [
@@ -140,7 +140,6 @@ extension _SettingsSections on _SettingsScreenState {
         _divider(cs),
         _themePickerTile(cs),
         _divider(cs),
-        _subsectionHeader('Server List', cs),
         ListenableBuilder(
           listenable: widget.serverViewSettings,
           builder: (_, __) {
@@ -153,7 +152,7 @@ extension _SettingsSections on _SettingsScreenState {
                     final narrow = constraints.maxWidth < 340;
                     final label = Expanded(
                       child: Text(
-                        'Default View',
+                        'Layout',
                         style: TextStyle(fontSize: 15),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
@@ -469,35 +468,6 @@ extension _SettingsSections on _SettingsScreenState {
                   ),
                 ),
                 _divider(cs, indent: 16, endIndent: 16),
-                Builder(
-                  builder: (innerContext) {
-                    // Mirrors web `settings.terminal.input.passwordPromptDetection`
-                    // (Enabled/Disabled dropdown) as a native switch.
-                    final strings = PasswordPromptLocalizations.of(
-                      innerContext,
-                    );
-                    return SwitchListTile(
-                      contentPadding: const EdgeInsets.only(
-                        left: 16,
-                        right: 12,
-                      ),
-                      secondary: _iconBox(AppIcons.key),
-                      title: Text(
-                        strings.settingTitle,
-                        style: const TextStyle(fontSize: 15),
-                      ),
-                      subtitle: Text(
-                        ts.passwordPromptDetection
-                            ? strings.enabled
-                            : strings.disabled,
-                        style: TextStyle(fontSize: 12, color: cs.outline),
-                      ),
-                      value: ts.passwordPromptDetection,
-                      onChanged: (v) => ts.setPasswordPromptDetection(v),
-                    );
-                  },
-                ),
-                _divider(cs, indent: 16, endIndent: 16),
                 _subsectionHeader('Keyboard Toolbar', cs),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
@@ -538,6 +508,30 @@ extension _SettingsSections on _SettingsScreenState {
                     );
                   },
                 ),
+                _divider(cs, indent: 16, endIndent: 16),
+                Builder(
+                  builder: (innerContext) {
+                    // Mirrors web `settings.terminal.input.passwordPromptDetection`
+                    // as a native switch. The switch state already says whether
+                    // the feature is enabled, so no extra status subtitle.
+                    final strings = PasswordPromptLocalizations.of(
+                      innerContext,
+                    );
+                    return SwitchListTile(
+                      contentPadding: const EdgeInsets.only(
+                        left: 16,
+                        right: 12,
+                      ),
+                      secondary: _iconBox(AppIcons.key),
+                      title: Text(
+                        strings.settingTitle,
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                      value: ts.passwordPromptDetection,
+                      onChanged: (v) => ts.setPasswordPromptDetection(v),
+                    );
+                  },
+                ),
               ],
             );
           },
@@ -572,23 +566,6 @@ extension _SettingsSections on _SettingsScreenState {
                   value: sf.showHiddenFiles,
                   onChanged: (v) => sf.setShowHiddenFiles(v),
                 ),
-                if (sf.showHiddenFiles) ...[
-                  _divider(cs),
-                  SwitchListTile(
-                    contentPadding: const EdgeInsets.only(left: 16, right: 12),
-                    secondary: _iconBox(AppIcons.opacity),
-                    title: const Text(
-                      'Dim Hidden Files',
-                      style: TextStyle(fontSize: 15),
-                    ),
-                    subtitle: Text(
-                      'Display hidden files with reduced opacity.',
-                      style: TextStyle(fontSize: 12, color: cs.outline),
-                    ),
-                    value: sf.dimHiddenFiles,
-                    onChanged: (v) => sf.setDimHiddenFiles(v),
-                  ),
-                ],
                 _divider(cs),
                 SwitchListTile(
                   contentPadding: const EdgeInsets.only(left: 16, right: 12),

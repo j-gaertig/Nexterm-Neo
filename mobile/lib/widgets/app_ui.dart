@@ -55,6 +55,88 @@ class AppDivider extends StatelessWidget {
   }
 }
 
+/// One destination of an [AppIconTabBar].
+class AppTabItem {
+  final String label;
+  final IconData icon;
+
+  const AppTabItem({required this.label, required this.icon});
+}
+
+/// Tab bar that shows only icons, plus the label of the active tab.
+///
+/// A transparent indicator replaces the filled selection pill, so switching
+/// tabs never flashes a coloured background behind the bar.
+class AppIconTabBar extends StatelessWidget {
+  final TabController controller;
+  final List<AppTabItem> tabs;
+  final bool scrollable;
+  final double height;
+
+  const AppIconTabBar({
+    super.key,
+    required this.controller,
+    required this.tabs,
+    this.scrollable = false,
+    this.height = 38,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return TabBar(
+      controller: controller,
+      isScrollable: scrollable,
+      tabAlignment: scrollable ? TabAlignment.start : null,
+      dividerColor: Colors.transparent,
+      indicatorSize: TabBarIndicatorSize.tab,
+      indicator: const BoxDecoration(color: Colors.transparent),
+      labelColor: cs.primary,
+      unselectedLabelColor: cs.outline,
+      labelStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+      unselectedLabelStyle: const TextStyle(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      splashBorderRadius: BorderRadius.circular(AppRadii.tile),
+      tabs: [
+        for (var i = 0; i < tabs.length; i++)
+          Tab(
+            height: height,
+            child: AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) {
+                final selected = controller.index == i;
+                return Semantics(
+                  label: tabs[i].label,
+                  child: ExcludeSemantics(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(tabs[i].icon, size: 18),
+                          if (selected) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              tabs[i].label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 /// Raised surface with the shared border, radius and ink behaviour.
 ///
 /// Use [onSheet] inside bottom sheets and dialogs: those already use the

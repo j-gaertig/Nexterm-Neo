@@ -287,8 +287,8 @@ extension _SftpUi on _SftpRendererState {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isSelected = _selectedIndices.contains(index);
-    final isDimmed =
-        entry.name.startsWith('.') && widget.sftpSettings.dimHiddenFiles;
+    // Hidden files are always shown dimmed while "Show Hidden Files" is on.
+    final isDimmed = entry.name.startsWith('.');
     final baseIconColor = _getFileIconColor(entry, theme);
     final iconColor = isDimmed
         ? baseIconColor.withValues(alpha: 0.55)

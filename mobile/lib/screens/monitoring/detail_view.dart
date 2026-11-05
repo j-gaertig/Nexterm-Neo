@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/monitoring.dart';
 import '../../services/monitoring_service.dart';
 import '../../utils/api_exception.dart';
+import '../../utils/app_icons.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/floating_navigation_bar.dart';
 import 'tabs.dart';
@@ -56,6 +57,15 @@ class _MonitoringDetailViewState extends State<MonitoringDetailView>
           ('network', 'Network'),
           ('processes', 'Processes'),
         ];
+
+  IconData _tabIcon(String id) => switch (id) {
+    'charts' => AppIcons.chartBoxOutline,
+    'storage' => AppIcons.databaseOutline,
+    'network' => AppIcons.serverNetwork,
+    'processes' => AppIcons.console,
+    'nodes' => AppIcons.layers,
+    _ => AppIcons.monitor,
+  };
 
   @override
   void initState() {
@@ -142,24 +152,14 @@ class _MonitoringDetailViewState extends State<MonitoringDetailView>
               border: Border.all(color: appBorderColor(cs)),
             ),
             padding: const EdgeInsets.all(4),
-            child: TabBar(
+            child: AppIconTabBar(
               controller: _tabs,
-              isScrollable: true,
-              tabAlignment: TabAlignment.start,
-              dividerColor: Colors.transparent,
-              indicatorSize: TabBarIndicatorSize.tab,
-              indicator: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadii.tile - 2),
-              ),
-              labelColor: cs.onPrimaryContainer,
-              unselectedLabelColor: cs.outline,
-              labelStyle: const TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-              ),
-              splashBorderRadius: BorderRadius.circular(AppRadii.tile),
-              tabs: [for (final t in _tabDefs) Tab(height: 36, text: t.$2)],
+              scrollable: true,
+              height: 36,
+              tabs: [
+                for (final t in _tabDefs)
+                  AppTabItem(label: t.$2, icon: _tabIcon(t.$1)),
+              ],
             ),
           ),
         ),

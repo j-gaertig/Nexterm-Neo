@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 ///
 /// Inside a top-level tab this resolves to the tab's own navigator, so the
 /// floating navigation bar stays visible and the page survives tab switches.
-/// Pass [showNavBar] = false for full-screen flows (sign-in, camera) that
+/// Pass [showNavBar] = false for full-screen flows (sign-in, editors) that
 /// should cover the bar.
 Future<T?> pushPage<T>(
   BuildContext context,

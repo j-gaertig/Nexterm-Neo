@@ -4,6 +4,7 @@ import '../widgets/app_ui.dart';
 import '../utils/app_icons.dart';
 import '../utils/auth_manager.dart';
 import '../utils/api_client.dart';
+import '../widgets/floating_navigation_bar.dart';
 import '../widgets/qr_scanner_page.dart';
 
 class QrScannerScreen extends StatefulWidget {
@@ -133,7 +134,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   }
 
   Widget _confirmBody(ColorScheme cs, TextTheme tt) => ListView(
-    padding: const EdgeInsets.only(bottom: 24),
+    padding: EdgeInsets.only(
+      bottom: 24 + FloatingNavigationBarInset.of(context),
+    ),
     children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),

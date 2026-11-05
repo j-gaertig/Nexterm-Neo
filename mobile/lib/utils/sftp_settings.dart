@@ -3,21 +3,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SftpSettings extends ChangeNotifier {
   static const String _showHiddenFilesKey = 'sftp_showHiddenFiles';
-  static const String _dimHiddenFilesKey = 'sftp_dimHiddenFiles';
   static const String _confirmBeforeDeleteKey = 'sftp_confirmBeforeDelete';
   static const String _sortFoldersFirstKey = 'sftp_sortFoldersFirst';
   static const String _exposeToFilesAppKey = 'sftp_exposeToFilesApp';
   static const String _warnBeforeDiscardEditKey = 'sftp_warnBeforeDiscardEdit';
 
   bool _showHiddenFiles;
-  bool _dimHiddenFiles;
   bool _confirmBeforeDelete;
   bool _sortFoldersFirst;
   bool _exposeToFilesApp;
   bool _warnBeforeDiscardEdit;
 
   bool get showHiddenFiles => _showHiddenFiles;
-  bool get dimHiddenFiles => _dimHiddenFiles;
   bool get confirmBeforeDelete => _confirmBeforeDelete;
   bool get sortFoldersFirst => _sortFoldersFirst;
   bool get exposeToFilesApp => _exposeToFilesApp;
@@ -25,7 +22,6 @@ class SftpSettings extends ChangeNotifier {
 
   SftpSettings._({
     required this._showHiddenFiles,
-    required this._dimHiddenFiles,
     required this._confirmBeforeDelete,
     required this._sortFoldersFirst,
     required this._exposeToFilesApp,
@@ -36,7 +32,6 @@ class SftpSettings extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     return SftpSettings._(
       showHiddenFiles: prefs.getBool(_showHiddenFilesKey) ?? false,
-      dimHiddenFiles: prefs.getBool(_dimHiddenFilesKey) ?? true,
       confirmBeforeDelete: prefs.getBool(_confirmBeforeDeleteKey) ?? true,
       sortFoldersFirst: prefs.getBool(_sortFoldersFirstKey) ?? true,
       exposeToFilesApp: prefs.getBool(_exposeToFilesAppKey) ?? false,
@@ -49,15 +44,6 @@ class SftpSettings extends ChangeNotifier {
     final stored = await prefs.setBool(_showHiddenFilesKey, value);
     if (stored) {
       _showHiddenFiles = value;
-      notifyListeners();
-    }
-  }
-
-  Future<void> setDimHiddenFiles(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = await prefs.setBool(_dimHiddenFilesKey, value);
-    if (stored) {
-      _dimHiddenFiles = value;
       notifyListeners();
     }
   }

@@ -7,7 +7,7 @@ class ServerViewSettings extends ChangeNotifier {
   static const String _modeKey = 'server_view_mode';
   static const String _columnsKey = 'server_view_columns';
   static const int minColumns = 2;
-  static const int maxColumns = 4;
+  static const int maxColumns = 3;
   static const int defaultColumns = 2;
 
   Future<void> _pending = Future.value();

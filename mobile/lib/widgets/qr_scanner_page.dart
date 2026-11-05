@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../utils/app_icons.dart';
+import 'floating_navigation_bar.dart';
 
 class QrScannerPage extends StatefulWidget {
   final String title;
@@ -56,83 +57,88 @@ class _QrScannerPageState extends State<QrScannerPage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(AppIcons.arrowBack),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: tt.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: FloatingNavigationBarInset.of(context),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 8, 20, 12),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(AppIcons.arrowBack),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ),
-                  ValueListenableBuilder(
-                    valueListenable: _controller,
-                    builder: (_, state, __) => IconButton(
-                      icon: Icon(
-                        state.torchState == TorchState.on
-                            ? AppIcons.flashOn
-                            : AppIcons.flashOff,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.title,
+                        style: tt.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      onPressed: () => _controller.toggleTorch(),
                     ),
-                  ),
-                ],
+                    ValueListenableBuilder(
+                      valueListenable: _controller,
+                      builder: (_, state, __) => IconButton(
+                        icon: Icon(
+                          state.torchState == TorchState.on
+                              ? AppIcons.flashOn
+                              : AppIcons.flashOff,
+                        ),
+                        onPressed: () => _controller.toggleTorch(),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    children: [
-                      MobileScanner(
-                        controller: _controller,
-                        onDetect: _onDetect,
-                      ),
-                      CustomPaint(
-                        painter: _OverlayPainter(cs.primary, Colors.black54),
-                        child: const SizedBox.expand(),
-                      ),
-                    ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        MobileScanner(
+                          controller: _controller,
+                          onDetect: _onDetect,
+                        ),
+                        CustomPaint(
+                          painter: _OverlayPainter(cs.primary, Colors.black54),
+                          child: const SizedBox.expand(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Column(
-                children: [
-                  Text(
-                    widget.hint,
-                    style: TextStyle(fontSize: 14, color: cs.outline),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Text(
-                        _error!,
-                        style: TextStyle(fontSize: 13, color: cs.error),
-                        textAlign: TextAlign.center,
-                      ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                child: Column(
+                  children: [
+                    Text(
+                      widget.hint,
+                      style: TextStyle(fontSize: 14, color: cs.outline),
+                      textAlign: TextAlign.center,
                     ),
-                ],
+                    if (_error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(fontSize: 13, color: cs.error),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -138,56 +138,78 @@ void main() {
     expect(find.text('Server Connections'), findsOneWidget);
     expect(find.text('Signed-in Devices'), findsOneWidget);
     expect(find.text('Authorize Login'), findsOneWidget);
-    expect(find.text('Default View'), findsOneWidget);
+    expect(find.text('Mode'), findsOneWidget);
+    expect(find.text('Layout'), findsOneWidget);
     expect(find.text('Keyboard Toolbar'), findsOneWidget);
     expect(find.text('File Manager'), findsOneWidget);
 
+    expect(find.text('Default View'), findsNothing);
+    expect(find.text('Server List'), findsNothing);
     expect(find.text('File Browser'), findsNothing);
     expect(find.text('Scan QR Code'), findsNothing);
     expect(find.text('Connections'), findsNothing);
     expect(find.text('Sessions'), findsNothing);
   });
 
-  testWidgets(
-    'places Server List under Appearance and Keyboard Toolbar under Terminal',
-    (tester) async {
-      await _pumpSettings(tester);
-
-      final appearance = tester.getTopLeft(find.text('Appearance')).dy;
-      final serverList = tester.getTopLeft(find.text('Server List')).dy;
-      final terminal = tester.getTopLeft(find.text('Terminal')).dy;
-      final keyboardToolbar = tester
-          .getTopLeft(find.text('Keyboard Toolbar'))
-          .dy;
-      final fileManager = tester.getTopLeft(find.text('File Manager')).dy;
-
-      expect(appearance, lessThan(serverList));
-      expect(serverList, lessThan(terminal));
-      expect(terminal, lessThan(keyboardToolbar));
-      expect(keyboardToolbar, lessThan(fileManager));
-    },
-  );
-
-  testWidgets('shows dependent rows only when their parent is enabled', (
+  testWidgets('keeps Appearance above Terminal without a Server List header', (
     tester,
   ) async {
+    await _pumpSettings(tester);
+
+    final appearance = tester.getTopLeft(find.text('Appearance')).dy;
+    final terminal = tester.getTopLeft(find.text('Terminal')).dy;
+    final keyboardToolbar = tester.getTopLeft(find.text('Keyboard Toolbar')).dy;
+    final fileManager = tester.getTopLeft(find.text('File Manager')).dy;
+
+    expect(appearance, lessThan(terminal));
+    expect(terminal, lessThan(keyboardToolbar));
+    expect(keyboardToolbar, lessThan(fileManager));
+    expect(find.text('Server List'), findsNothing);
+  });
+
+  testWidgets('puts password input detection at the end of Terminal', (
+    tester,
+  ) async {
+    await _pumpSettings(tester);
+
+    final keyboardToolbar = tester.getTopLeft(find.text('Keyboard Toolbar')).dy;
+    final passwordDetection = tester
+        .getTopLeft(find.text('Password input detection'))
+        .dy;
+    final fileManager = tester.getTopLeft(find.text('File Manager')).dy;
+
+    expect(keyboardToolbar, lessThan(passwordDetection));
+    expect(passwordDetection, lessThan(fileManager));
+    expect(find.text('Enabled'), findsNothing);
+    expect(find.text('Disabled'), findsNothing);
+  });
+
+  testWidgets('shows grid columns only for the grid layout', (tester) async {
     final harness = await _pumpSettings(tester);
 
-    expect(find.text('Dim Hidden Files'), findsNothing);
     expect(find.text('Columns'), findsNothing);
-
-    await tester.tap(find.widgetWithText(SwitchListTile, 'Show Hidden Files'));
-    await tester.pump();
-    expect(harness.sftpSettings.showHiddenFiles, isTrue);
-    expect(find.text('Dim Hidden Files'), findsOneWidget);
 
     await harness.serverViewSettings.setMode(ServerViewMode.grid);
     await tester.pump();
     expect(find.text('Columns'), findsOneWidget);
+    expect(ServerViewSettings.maxColumns, 3);
 
     await harness.serverViewSettings.setMode(ServerViewMode.list);
     await tester.pump();
     expect(find.text('Columns'), findsNothing);
+  });
+
+  testWidgets('always dims hidden files instead of offering a toggle', (
+    tester,
+  ) async {
+    await _pumpSettings(tester);
+
+    expect(find.text('Dim Hidden Files'), findsNothing);
+
+    await tester.tap(find.widgetWithText(SwitchListTile, 'Show Hidden Files'));
+    await tester.pump();
+
+    expect(find.text('Dim Hidden Files'), findsNothing);
   });
 
   testWidgets('keeps logout in the account card and can cancel it', (

@@ -84,6 +84,10 @@ class SettingsScreen extends StatefulWidget {
   final ScreenLockSettings screenLockSettings;
   final ScreenLockService screenLockService;
 
+  /// Scroll controller of the settings list, owned by the navigation shell so
+  /// the active navigation destination can scroll back to the top.
+  final ScrollController? scrollController;
+
   const SettingsScreen({
     super.key,
     required this.themeManager,
@@ -93,6 +97,7 @@ class SettingsScreen extends StatefulWidget {
     required this.serverViewSettings,
     required this.screenLockSettings,
     required this.screenLockService,
+    this.scrollController,
   });
 
   @override
@@ -293,6 +298,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: SafeArea(
         child: ListView(
           key: const ValueKey('settings-list'),
+          controller: widget.scrollController,
           padding: EdgeInsets.only(bottom: 24 + navInset),
           children: [
             const AppPageHeader(

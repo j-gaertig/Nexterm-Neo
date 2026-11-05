@@ -12,7 +12,16 @@ import '../widgets/floating_navigation_bar.dart';
 
 class MonitoringScreen extends StatefulWidget {
   final AuthManager authManager;
-  const MonitoringScreen({super.key, required this.authManager});
+
+  /// Scroll controller of the root list, owned by the navigation shell so the
+  /// active navigation destination can scroll back to the top.
+  final ScrollController? scrollController;
+
+  const MonitoringScreen({
+    super.key,
+    required this.authManager,
+    this.scrollController,
+  });
   @override
   State<MonitoringScreen> createState() => MonitoringScreenState();
 }
@@ -170,6 +179,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
     onRefresh: () => _load(silent: true),
     child: LayoutBuilder(
       builder: (context, constraints) => ListView(
+        controller: widget.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(
@@ -188,6 +198,7 @@ class MonitoringScreenState extends State<MonitoringScreen> {
   Widget _listView() => RefreshIndicator(
     onRefresh: () => _load(silent: true),
     child: ListView.builder(
+      controller: widget.scrollController,
       padding: EdgeInsets.only(
         left: 12,
         right: 12,

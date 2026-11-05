@@ -235,20 +235,18 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     final List<Widget> pages = [
       KeyedSubtree(
         key: const ValueKey('tab-page-servers'),
-        child: PrimaryScrollController(
-          controller: _serversScroll,
-          child: TabNavigator(
-            navigatorKey: _serversNavKey,
-            builder: (_) => ServersScreen(
-              key: _serversKey,
-              authManager: widget.authManager,
-              snippetManager: widget.snippetManager,
-              sessionManager: widget.sessionManager,
-              serverViewSettings: widget.serverViewSettings,
-              onSessionOpened: (sessionId) {
-                if (_hasSessions) _openSession(sessionId);
-              },
-            ),
+        child: TabNavigator(
+          navigatorKey: _serversNavKey,
+          builder: (_) => ServersScreen(
+            key: _serversKey,
+            authManager: widget.authManager,
+            snippetManager: widget.snippetManager,
+            sessionManager: widget.sessionManager,
+            serverViewSettings: widget.serverViewSettings,
+            scrollController: _serversScroll,
+            onSessionOpened: (sessionId) {
+              if (_hasSessions) _openSession(sessionId);
+            },
           ),
         ),
       ),
@@ -272,29 +270,25 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
         ),
       KeyedSubtree(
         key: const ValueKey('tab-page-monitoring'),
-        child: PrimaryScrollController(
-          controller: _monitoringScroll,
-          child: MonitoringScreen(
-            key: _monitoringKey,
-            authManager: widget.authManager,
-          ),
+        child: MonitoringScreen(
+          key: _monitoringKey,
+          authManager: widget.authManager,
+          scrollController: _monitoringScroll,
         ),
       ),
       KeyedSubtree(
         key: const ValueKey('tab-page-settings'),
-        child: PrimaryScrollController(
-          controller: _settingsScroll,
-          child: TabNavigator(
-            navigatorKey: _settingsNavKey,
-            builder: (_) => SettingsScreen(
-              themeManager: widget.themeManager,
-              authManager: widget.authManager,
-              terminalSettings: widget.terminalSettings,
-              sftpSettings: widget.sftpSettings,
-              serverViewSettings: widget.serverViewSettings,
-              screenLockSettings: widget.screenLockSettings,
-              screenLockService: widget.screenLockService,
-            ),
+        child: TabNavigator(
+          navigatorKey: _settingsNavKey,
+          builder: (_) => SettingsScreen(
+            themeManager: widget.themeManager,
+            authManager: widget.authManager,
+            terminalSettings: widget.terminalSettings,
+            sftpSettings: widget.sftpSettings,
+            serverViewSettings: widget.serverViewSettings,
+            screenLockSettings: widget.screenLockSettings,
+            screenLockService: widget.screenLockService,
+            scrollController: _settingsScroll,
           ),
         ),
       ),

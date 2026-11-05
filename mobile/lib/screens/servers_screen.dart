@@ -45,6 +45,10 @@ class ServersScreen extends StatefulWidget {
   final SessionManager sessionManager;
   final ServerViewSettings serverViewSettings;
 
+  /// Scroll controller of the root list, owned by the navigation shell so the
+  /// active navigation destination can scroll back to the top.
+  final ScrollController? scrollController;
+
   /// Opens the session that was just created from this screen.
   final ValueChanged<String>? onSessionOpened;
   final Future<List<dynamic>> Function(String token)? loadEntries;
@@ -55,6 +59,7 @@ class ServersScreen extends StatefulWidget {
     required this.snippetManager,
     required this.sessionManager,
     required this.serverViewSettings,
+    this.scrollController,
     this.onSessionOpened,
     this.loadEntries,
   });

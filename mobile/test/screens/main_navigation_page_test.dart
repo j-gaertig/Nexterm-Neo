@@ -4,6 +4,7 @@ import 'package:kterm/kterm.dart';
 import 'package:nexterm/models/script_runtime.dart';
 import 'package:nexterm/models/server.dart';
 import 'package:nexterm/screens/main_navigation_page.dart';
+import 'package:nexterm/screens/server_accounts_screen.dart';
 import 'package:nexterm/screens/sessions_overview_screen.dart';
 import 'package:nexterm/screens/widgets/session_grid_card.dart';
 import 'package:nexterm/services/screen_lock_service.dart';
@@ -213,6 +214,50 @@ void main() {
     await _swipeMainPage(tester, 300);
     expect(tester.widget<TabCrossfade>(find.byType(TabCrossfade)).index, 0);
   });
+  testWidgets('tapping the active tab goes back to its root page', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(tester);
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    await tester.tap(find.text('Server Connections'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ServerAccountsScreen), findsOneWidget);
+
+    // Re-tapping the active destination pops the pushed settings page.
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ServerAccountsScreen), findsNothing);
+    expect(find.text('Settings'), findsOneWidget);
+  });
+
+  testWidgets('re-tapping the active tab scrolls its root page to the top', (
+    tester,
+  ) async {
+    await _pumpMainNavigation(tester);
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final list = find.byKey(const ValueKey('settings-list'));
+    final scrollable = find
+        .descendant(of: list, matching: find.byType(Scrollable))
+        .first;
+    final position = tester.state<ScrollableState>(scrollable).position;
+
+    await tester.drag(list, const Offset(0, -500));
+    await tester.pumpAndSettle();
+    expect(position.pixels, greaterThan(0));
+
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    expect(position.pixels, 0);
+  });
+
   testWidgets('floating bar shows session badges and attention state', (
     tester,
   ) async {

@@ -168,6 +168,7 @@ extension _ServersUi on ServersScreenState {
     onRefresh: _refreshData,
     child: LayoutBuilder(
       builder: (context, constraints) => ListView(
+        controller: widget.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           SizedBox(
@@ -201,6 +202,7 @@ extension _ServersUi on ServersScreenState {
       return RefreshIndicator(
         onRefresh: _refreshData,
         child: ListView.builder(
+          controller: widget.scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.only(
             left: 8,
@@ -237,6 +239,7 @@ extension _ServersUi on ServersScreenState {
     return RefreshIndicator(
       onRefresh: _refreshData,
       child: ListView.builder(
+        controller: widget.scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.only(
           left: 8,

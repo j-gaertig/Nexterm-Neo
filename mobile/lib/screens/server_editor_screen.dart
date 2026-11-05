@@ -356,24 +356,11 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
                     border: Border.all(color: appBorderColor(cs)),
                   ),
                   padding: const EdgeInsets.all(4),
-                  child: TabBar(
+                  child: AppIconTabBar(
                     controller: _tabs,
-                    dividerColor: Colors.transparent,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: cs.primaryContainer,
-                      borderRadius: BorderRadius.circular(AppRadii.tile - 2),
-                    ),
-                    labelColor: cs.onPrimaryContainer,
-                    unselectedLabelColor: cs.outline,
-                    labelStyle: const TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    splashBorderRadius: BorderRadius.circular(AppRadii.tile),
                     tabs: [
                       for (final k in _tabKeys)
-                        Tab(height: 38, text: _tabLabel(k)),
+                        AppTabItem(label: _tabLabel(k), icon: _tabIcon(k)),
                     ],
                   ),
                 ),
@@ -406,6 +393,17 @@ class _ServerEditorScreenState extends State<ServerEditorScreen>
         return 'Settings';
       default:
         return 'Details';
+    }
+  }
+
+  IconData _tabIcon(String key) {
+    switch (key) {
+      case 'identities':
+        return AppIcons.accountCircleOutline;
+      case 'settings':
+        return AppIcons.cogOutline;
+      default:
+        return AppIcons.pencilOutline;
     }
   }
 
